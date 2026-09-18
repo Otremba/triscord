@@ -586,6 +586,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Route a single remote <audio> element to the user-selected output device (speaker/headset)
+  function applyAudioOutputDevice(audioEl) {
+    if (!audioEl || typeof audioEl.setSinkId !== 'function') return;
+    if (!state.selectedAudioOutput || state.selectedAudioOutput === 'default') return;
+
+    audioEl.setSinkId(state.selectedAudioOutput).catch(e => {
+      console.warn('[Audio] Error setting output device:', e);
+    });
+  }
+
+  // Re-apply the selected output device to every remote audio tag currently on screen
+  function applyAudioOutputDeviceToAll() {
+    document.querySelectorAll('audio[id^="audio-"]').forEach(applyAudioOutputDevice);
+  }
+
   // Remote User Camera / Avatar Tile
   function createRemoteUserTile(socketId, member, stream) {
     const tile = document.createElement('div');
@@ -642,6 +657,7 @@ document.addEventListener('DOMContentLoaded', () => {
       videoEl.srcObject = stream;
       audioEl.srcObject = stream;
       applyUserVolume(socketId, member);
+      applyAudioOutputDevice(audioEl);
       setupRemoteSpeakingDetector(socketId, stream);
     }
 
@@ -769,6 +785,7 @@ document.addEventListener('DOMContentLoaded', () => {
           audioEl.srcObject = stream;
         }
         applyUserVolume(socketId, member);
+        applyAudioOutputDevice(audioEl);
         setupRemoteSpeakingDetector(socketId, stream);
       }
     } else {
@@ -1076,6 +1093,61 @@ document.addEventListener('DOMContentLoaded', () => {
     return div.innerHTML;
   }
 
+  // Enumerate mic/speaker/camera devices and fill the Settings selectors.
+  // Browsers only reveal device labels (and sometimes the full device list at all)
+  // after mic/camera permission has been granted at least once, so request that
+  // permission first if we don't already have an active stream to enumerate against.
+  async function populateDeviceLists() {
+    let probeStream = null;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasLabels = devices.some(d => d.label);
+
+      if (!hasLabels && !state.webrtc?.localMicStream) {
+        try {
+          probeStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        } catch (e) {
+          try {
+            probeStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          } catch (e2) {
+            console.warn('Could not get mic/camera permission for device labels:', e2);
+          }
+        }
+      }
+
+      const finalDevices = probeStream ? await navigator.mediaDevices.enumerateDevices() : devices;
+
+      const previousInput = el.selectAudioInput.value || state.selectedAudioInput;
+      const previousOutput = el.selectAudioOutput.value || state.selectedAudioOutput;
+      const previousVideo = el.selectVideoInput.value || state.selectedVideoInput;
+
+      el.selectAudioInput.innerHTML = '';
+      el.selectAudioOutput.innerHTML = '';
+      el.selectVideoInput.innerHTML = '';
+
+      finalDevices.forEach(device => {
+        const opt = document.createElement('option');
+        opt.value = device.deviceId;
+        opt.text = device.label || `${device.kind} (${device.deviceId.slice(0, 5)}...)`;
+
+        if (device.kind === 'audioinput') {
+          if (device.deviceId === previousInput) opt.selected = true;
+          el.selectAudioInput.appendChild(opt);
+        } else if (device.kind === 'audiooutput') {
+          if (device.deviceId === previousOutput) opt.selected = true;
+          el.selectAudioOutput.appendChild(opt);
+        } else if (device.kind === 'videoinput') {
+          if (device.deviceId === previousVideo) opt.selected = true;
+          el.selectVideoInput.appendChild(opt);
+        }
+      });
+    } catch (err) {
+      console.warn('Could not enumerate media devices:', err);
+    } finally {
+      if (probeStream) probeStream.getTracks().forEach(t => t.stop());
+    }
+  }
+
   // Initialize Settings UI & Audio Device Enumeration
   async function initSettingsUI() {
     el.inputSettingsUsername.value = state.user.username;
@@ -1094,32 +1166,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // Populate Audio/Video Device Selectors
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      el.selectAudioInput.innerHTML = '';
-      el.selectAudioOutput.innerHTML = '';
-      el.selectVideoInput.innerHTML = '';
-
-      devices.forEach(device => {
-        const opt = document.createElement('option');
-        opt.value = device.deviceId;
-        opt.text = device.label || `${device.kind} (${device.deviceId.slice(0, 5)}...)`;
-
-        if (device.kind === 'audioinput') {
-          if (device.deviceId === state.selectedAudioInput) opt.selected = true;
-          el.selectAudioInput.appendChild(opt);
-        } else if (device.kind === 'audiooutput') {
-          if (device.deviceId === state.selectedAudioOutput) opt.selected = true;
-          el.selectAudioOutput.appendChild(opt);
-        } else if (device.kind === 'videoinput') {
-          if (device.deviceId === state.selectedVideoInput) opt.selected = true;
-          el.selectVideoInput.appendChild(opt);
-        }
-      });
-    } catch (err) {
-      console.warn('Could not enumerate media devices:', err);
-    }
+    // Populate Audio/Video Device Selectors (also re-usable on modal re-open / device change)
+    await populateDeviceLists();
+    navigator.mediaDevices.addEventListener('devicechange', populateDeviceLists);
 
     // Avatar Color Selection
     el.avatarColorPicker.forEach(btn => {
@@ -1206,6 +1255,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Open Settings Modal
   el.btnSettings.addEventListener('click', () => {
     el.settingsModal.classList.remove('hidden');
+    populateDeviceLists();
   });
 
   el.btnCloseSettings.addEventListener('click', () => {
@@ -1233,6 +1283,7 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('discord_noise_suppression', state.noiseSuppression);
     localStorage.setItem('discord_avatar_color', state.user.avatarColor);
 
+    applyAudioOutputDeviceToAll();
     updateUserProfileUI();
 
     if (newServerUrl && newServerUrl !== state.serverUrl) {
