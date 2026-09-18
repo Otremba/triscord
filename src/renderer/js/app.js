@@ -35,9 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectedAudioInput: localStorage.getItem('discord_mic_device') || 'default',
     selectedAudioOutput: localStorage.getItem('discord_spk_device') || 'default',
     selectedVideoInput: localStorage.getItem('discord_cam_device') || 'default',
-    noiseSuppression: localStorage.getItem('discord_noise_suppression') !== 'false',
-    userVolumes: JSON.parse(localStorage.getItem('discord_user_volumes') || '{}'),
-    localMutedUsers: new Set(JSON.parse(localStorage.getItem('discord_local_mutes') || '[]'))
+    noiseSuppression: localStorage.getItem('discord_noise_suppression') !== 'false'
   };
 
   localStorage.setItem('discord_user_id', state.user.userId);
@@ -107,23 +105,13 @@ document.addEventListener('DOMContentLoaded', () => {
     updateProgressContainer: document.getElementById('updateProgressContainer'),
     updateProgressBar: document.getElementById('updateProgressBar'),
     btnDismissUpdate: document.getElementById('btnDismissUpdate'),
-    avatarColorPicker: document.querySelectorAll('.avatar-color-option'),
-    // Context Menu Elements
-    userContextMenu: document.getElementById('userContextMenu'),
-    ctxAvatar: document.getElementById('ctxAvatar'),
-    ctxUsername: document.getElementById('ctxUsername'),
-    ctxStatusTag: document.getElementById('ctxStatusTag'),
-    ctxVolSlider: document.getElementById('ctxVolSlider'),
-    ctxVolVal: document.getElementById('ctxVolVal'),
-    ctxMuteCheckbox: document.getElementById('ctxMuteCheckbox'),
-    ctxCopyIdItem: document.getElementById('ctxCopyIdItem')
+    avatarColorPicker: document.querySelectorAll('.avatar-color-option')
   };
 
   // Initialize UI
   updateUserProfileUI();
   initSettingsUI();
   initAutoUpdater();
-  initContextMenu();
 
   // Initialize Screen Share Picker
   state.screenPicker = new window.ScreenSharePicker();
@@ -139,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setConnectionStatus('connecting', 'Conectando ao servidor...');
 
     try {
+      // Connect using io() from socket.io
       state.socket = io(state.serverUrl, {
         reconnectionAttempts: 10,
         timeout: 10000,
@@ -154,34 +143,16 @@ document.addEventListener('DOMContentLoaded', () => {
       // Initialize WebRTC Manager with socket
       state.webrtc = new window.WebRTCManager(state.socket, state.user.userId);
 
-      // Handle Remote Stream Added (Dual Stream: Camera vs Screen)
-      state.webrtc.onRemoteStreamAdded = (socketId, stream, isScreen) => {
-        console.log(`[App] Remote stream received from ${socketId} (isScreen: ${isScreen})`);
-        if (isScreen) {
-          const screenVideoEl = document.getElementById(`video-screen-${socketId}`);
-          if (screenVideoEl) {
-            screenVideoEl.srcObject = stream;
-            screenVideoEl.play().catch(e => console.warn('Play screen error:', e));
-          } else {
-            renderAllVideoTiles();
-          }
-        } else {
-          renderUserTile(socketId, stream);
-        }
+      // Handle Remote Stream Added
+      state.webrtc.onRemoteStreamAdded = (socketId, stream) => {
+        console.log(`[App] Remote stream received from ${socketId}`);
+        renderUserTile(socketId, stream);
       };
 
       // Handle Remote Stream Removed
-      state.webrtc.onRemoteStreamRemoved = (socketId, isScreen) => {
-        console.log(`[App] Remote stream removed from ${socketId} (isScreen: ${isScreen})`);
-        if (isScreen) {
-          const screenTile = document.getElementById(`tile-screen-${socketId}`);
-          if (screenTile) {
-            screenTile.remove();
-            adjustGridColumns();
-          }
-        } else {
-          renderUserTile(socketId, null);
-        }
+      state.webrtc.onRemoteStreamRemoved = (socketId) => {
+        console.log(`[App] Remote stream removed from ${socketId}`);
+        renderUserTile(socketId, null);
       };
 
       // Socket Events
@@ -189,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Connected to server with ID:', state.socket.id);
         setConnectionStatus('connected', 'RTC Conectado');
 
+        // If we were previously in a room, rejoin it
         if (state.currentRoomId) {
           joinRoom(state.currentRoomId, state.currentRoomName);
         }
@@ -221,6 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.SoundEffects.playJoin();
         updateStageView();
 
+        // Connect WebRTC to all existing members
         existingUsers.forEach(u => {
           state.webrtc.connectToPeer(u.socketId);
         });
@@ -243,14 +216,8 @@ document.addEventListener('DOMContentLoaded', () => {
       state.socket.on('user-state-updated', ({ socketId, state: newState }) => {
         if (state.roomMembers.has(socketId)) {
           const user = state.roomMembers.get(socketId);
-          const screenChanged = newState.isScreenSharing !== undefined && newState.isScreenSharing !== user.isScreenSharing;
           Object.assign(user, newState);
-
-          if (screenChanged) {
-            renderAllVideoTiles();
-          } else {
-            updateUserTileState(socketId, user);
-          }
+          updateUserTileState(socketId, user);
         }
       });
 
@@ -309,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ${room.users && room.users.length > 0 ? `
             <div class="channel-user-list">
               ${room.users.map(u => `
-                <div class="channel-user-item ${u.isSpeaking ? 'speaking' : ''}" data-user-name="${u.username}" data-socket-id="${u.socketId}">
+                <div class="channel-user-item ${u.isSpeaking ? 'speaking' : ''}">
                   <div class="channel-user-avatar" style="background-color: ${u.avatar || '#5865F2'}">
                     ${u.username.charAt(0).toUpperCase()}
                   </div>
@@ -335,19 +302,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const roomName = item.dataset.roomName;
         if (state.currentRoomId !== roomId) {
           joinRoom(roomId, roomName);
-        }
-      });
-    });
-
-    // Right-click context menu on sidebar channel users
-    el.channelsList.querySelectorAll('.channel-user-item').forEach(uItem => {
-      uItem.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const sId = uItem.dataset.socketId;
-        const member = state.roomMembers.get(sId);
-        if (member && sId !== state.socket?.id) {
-          openUserContextMenu(e.clientX, e.clientY, member, sId);
         }
       });
     });
@@ -438,39 +392,25 @@ document.addEventListener('DOMContentLoaded', () => {
     el.voiceStage.classList.remove('hidden');
 
     el.stageChannelTitle.textContent = `# ${state.currentRoomName}`;
-    const totalMembers = state.roomMembers.size + 1;
+    const totalMembers = state.roomMembers.size + 1; // peers + self
     el.stageUserCount.textContent = `${totalMembers} ${totalMembers === 1 ? 'membro' : 'membros'} no canal`;
 
     renderAllVideoTiles();
   }
 
-  // Render all tiles in the stage grid (Simultaneous Camera + Screen Share)
+  // Render all tiles in the stage grid
   function renderAllVideoTiles() {
     el.videoGrid.innerHTML = '';
 
-    // 1. Render Local User Camera/Avatar Tile
+    // 1. Render Local User Tile
     const localTile = createLocalUserTile();
     el.videoGrid.appendChild(localTile);
 
-    // 2. Render Local Screen Share Tile if sharing
-    if (state.user.isScreenSharing) {
-      const localScreenTile = createLocalScreenTile();
-      el.videoGrid.appendChild(localScreenTile);
-    }
-
-    // 3. Render Remote User Tiles & Screen Share Tiles
+    // 2. Render Remote User Tiles
     state.roomMembers.forEach((member, socketId) => {
-      // User Camera/Avatar Tile
       const remoteStream = state.webrtc.remoteStreams.get(socketId);
       const remoteTile = createRemoteUserTile(socketId, member, remoteStream);
       el.videoGrid.appendChild(remoteTile);
-
-      // User Screen Share Tile if friend is sharing screen
-      if (member.isScreenSharing) {
-        const screenStream = state.webrtc.remoteScreenStreams.get(socketId);
-        const remoteScreenTile = createRemoteScreenTile(socketId, member, screenStream);
-        el.videoGrid.appendChild(remoteScreenTile);
-      }
     });
 
     adjustGridColumns();
@@ -486,22 +426,23 @@ document.addEventListener('DOMContentLoaded', () => {
     else el.videoGrid.classList.add('grid-many');
   }
 
-  // Local Camera / Avatar Tile
   function createLocalUserTile() {
     const tile = document.createElement('div');
     tile.className = `video-tile local-tile ${state.user.isSpeaking ? 'speaking' : ''}`;
     tile.id = 'tile-local';
 
-    const hasCam = state.user.isCameraOn;
+    const hasVideo = state.user.isCameraOn || state.user.isScreenSharing;
+    const isScreen = state.user.isScreenSharing;
 
     tile.innerHTML = `
       <div class="tile-content">
-        <video id="video-local" autoplay playsinline muted class="${hasCam ? '' : 'hidden'}"></video>
-        <div class="avatar-view ${hasCam ? 'hidden' : ''}">
+        <video id="video-local" autoplay playsinline muted class="${hasVideo ? '' : 'hidden'}"></video>
+        <div class="avatar-view ${hasVideo ? 'hidden' : ''}">
           <div class="tile-avatar" style="background-color: ${state.user.avatarColor}">
             ${state.user.username.charAt(0).toUpperCase()}
           </div>
         </div>
+        ${isScreen ? '<div class="live-tag">TRANSMITINDO TELA</div>' : ''}
       </div>
       <div class="tile-overlay">
         <div class="tile-username">
@@ -513,259 +454,53 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     const videoEl = tile.querySelector('#video-local');
-    if (hasCam && state.webrtc.localCamStream) {
-      videoEl.srcObject = state.webrtc.localCamStream;
-      videoEl.play().catch(() => {});
-    }
-
-    return tile;
-  }
-
-  // Local Screen Share Tile
-  function createLocalScreenTile() {
-    const tile = document.createElement('div');
-    tile.className = 'video-tile screen-share-tile local-screen-tile';
-    tile.id = 'tile-local-screen';
-
-    tile.innerHTML = `
-      <div class="tile-content">
-        <video id="video-local-screen" autoplay playsinline muted></video>
-        <div class="live-tag">TRANSMITINDO TELA (VOCÊ)</div>
-      </div>
-      <div class="tile-overlay">
-        <div class="tile-username">
-          <span>Sua Transmissão</span>
-        </div>
-        <div class="tile-screen-actions">
-          <button class="btn-tile-stop-screen" id="btnStopLocalScreenTile" title="Parar Transmissão">
-            Parar Tela
-          </button>
-        </div>
-      </div>
-    `;
-
-    const videoEl = tile.querySelector('#video-local-screen');
-    if (state.webrtc.localScreenStream) {
+    if (isScreen && state.webrtc.localScreenStream) {
       videoEl.srcObject = state.webrtc.localScreenStream;
-      videoEl.play().catch(() => {});
+    } else if (state.user.isCameraOn && state.webrtc.localCamStream) {
+      videoEl.srcObject = state.webrtc.localCamStream;
     }
-
-    tile.querySelector('#btnStopLocalScreenTile').addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleScreenShare();
-    });
 
     return tile;
   }
 
-  // Individual User Volume Helpers
-  function getUserVolume(userKey) {
-    if (state.userVolumes[userKey] !== undefined) {
-      return state.userVolumes[userKey];
-    }
-    return 100;
-  }
-
-  function isUserLocallyMuted(userKey) {
-    return state.localMutedUsers.has(userKey);
-  }
-
-  function applyUserVolume(socketId, member) {
-    const audioEl = document.getElementById(`audio-${socketId}`);
-    if (!audioEl) return;
-
-    const userKey = member.userId || member.username;
-    const vol = getUserVolume(userKey);
-    const isLocallyMuted = isUserLocallyMuted(userKey);
-
-    if (state.user.isDeafened || isLocallyMuted || vol === 0) {
-      audioEl.muted = true;
-    } else {
-      audioEl.muted = false;
-      audioEl.volume = Math.max(0, Math.min(1, vol / 100));
-    }
-  }
-
-  // Route a single remote <audio> element to the user-selected output device (speaker/headset).
-  // Falls back to the system default (and self-heals the saved preference) if that device
-  // is no longer available, so a stale/invalid deviceId can never silently blackhole audio.
-  async function applyAudioOutputDevice(audioEl) {
-    if (!audioEl || typeof audioEl.setSinkId !== 'function') return;
-    if (!state.selectedAudioOutput || state.selectedAudioOutput === 'default') return;
-
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const stillExists = devices.some(d => d.kind === 'audiooutput' && d.deviceId === state.selectedAudioOutput);
-      if (!stillExists) {
-        console.warn('[Audio] Saved output device is no longer available, reverting to system default');
-        state.selectedAudioOutput = 'default';
-        localStorage.setItem('discord_spk_device', 'default');
-        return;
-      }
-      await audioEl.setSinkId(state.selectedAudioOutput);
-    } catch (e) {
-      console.warn('[Audio] Error setting output device, reverting to system default:', e);
-      state.selectedAudioOutput = 'default';
-      localStorage.setItem('discord_spk_device', 'default');
-    }
-  }
-
-  // Re-apply the selected output device to every remote audio tag currently on screen
-  function applyAudioOutputDeviceToAll() {
-    document.querySelectorAll('audio[id^="audio-"]').forEach(applyAudioOutputDevice);
-  }
-
-  // Remote User Camera / Avatar Tile
   function createRemoteUserTile(socketId, member, stream) {
     const tile = document.createElement('div');
     tile.className = `video-tile ${member.isSpeaking ? 'speaking' : ''}`;
     tile.id = `tile-${socketId}`;
 
-    const hasCam = member.isCameraOn;
-    const userKey = member.userId || member.username;
-    const currentVolume = getUserVolume(userKey);
-    const isLocallyMuted = isUserLocallyMuted(userKey);
+    const hasVideo = stream && stream.getVideoTracks().length > 0;
 
     tile.innerHTML = `
       <div class="tile-content">
-        <video id="video-${socketId}" autoplay playsinline class="${hasCam ? '' : 'hidden'}"></video>
+        <video id="video-${socketId}" autoplay playsinline class="${hasVideo ? '' : 'hidden'}"></video>
         <audio id="audio-${socketId}" autoplay></audio>
-        <div class="avatar-view ${hasCam ? 'hidden' : ''}">
+        <div class="avatar-view ${hasVideo ? 'hidden' : ''}">
           <div class="tile-avatar" style="background-color: ${member.avatar || '#5865F2'}">
             ${member.username.charAt(0).toUpperCase()}
           </div>
         </div>
+        ${member.isScreenSharing ? '<div class="live-tag">AO VIVO</div>' : ''}
       </div>
       <div class="tile-overlay">
         <div class="tile-username">
           <span>${member.username}</span>
-          ${member.isMuted ? '<span class="status-badge-mini red" title="Mutado na chamada">🔇</span>' : ''}
-          ${member.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido">🔕</span>' : ''}
-        </div>
-        
-        <!-- Individual Friend Volume / Local Mute Controls -->
-        <div class="tile-user-audio-controls">
-          <button class="btn-tile-local-mute ${isLocallyMuted ? 'muted' : ''}" id="btn-local-mute-${socketId}" title="${isLocallyMuted ? 'Desmutar para mim' : 'Mutar apenas para mim (ou use Botão Direito)'}">
-            <svg class="icon-vol-on" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-            </svg>
-            <svg class="icon-vol-off" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
-            </svg>
-          </button>
-          <div class="tile-volume-slider-wrapper" title="Volume de ${member.username} (ou clique com Botão Direito!)">
-            <input type="range" class="tile-volume-slider" id="slider-vol-${socketId}" min="0" max="200" value="${isLocallyMuted ? 0 : currentVolume}" />
-            <span class="tile-volume-label" id="label-vol-${socketId}">${isLocallyMuted ? 'Mudo' : `${currentVolume}%`}</span>
-          </div>
+          ${member.isMuted ? '<span class="status-badge-mini red">🔇</span>' : ''}
+          ${member.isDeafened ? '<span class="status-badge-mini red">🔕</span>' : ''}
         </div>
       </div>
     `;
 
     const videoEl = tile.querySelector(`#video-${socketId}`);
     const audioEl = tile.querySelector(`#audio-${socketId}`);
-    const muteBtn = tile.querySelector(`#btn-local-mute-${socketId}`);
-    const volSlider = tile.querySelector(`#slider-vol-${socketId}`);
-    const volLabel = tile.querySelector(`#label-vol-${socketId}`);
 
     if (stream) {
       videoEl.srcObject = stream;
       audioEl.srcObject = stream;
-      audioEl.play().catch(e => console.warn('Audio play error:', e));
-      applyUserVolume(socketId, member);
-      applyAudioOutputDevice(audioEl);
+      audioEl.muted = state.user.isDeafened;
+
+      // Attach speaking detector to remote stream
       setupRemoteSpeakingDetector(socketId, stream);
     }
-
-    // Volume Slider listener
-    volSlider.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10);
-      state.userVolumes[userKey] = val;
-      localStorage.setItem('discord_user_volumes', JSON.stringify(state.userVolumes));
-
-      if (val === 0) {
-        state.localMutedUsers.add(userKey);
-        muteBtn.classList.add('muted');
-        volLabel.textContent = 'Mudo';
-      } else {
-        state.localMutedUsers.delete(userKey);
-        muteBtn.classList.remove('muted');
-        volLabel.textContent = `${val}%`;
-      }
-      localStorage.setItem('discord_local_mutes', JSON.stringify(Array.from(state.localMutedUsers)));
-      applyUserVolume(socketId, member);
-    });
-
-    // Local Mute button listener
-    muteBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (state.localMutedUsers.has(userKey)) {
-        state.localMutedUsers.delete(userKey);
-        muteBtn.classList.remove('muted');
-        const restoredVol = state.userVolumes[userKey] > 0 ? state.userVolumes[userKey] : 100;
-        volSlider.value = restoredVol;
-        volLabel.textContent = `${restoredVol}%`;
-      } else {
-        state.localMutedUsers.add(userKey);
-        muteBtn.classList.add('muted');
-        volSlider.value = 0;
-        volLabel.textContent = 'Mudo';
-      }
-      localStorage.setItem('discord_local_mutes', JSON.stringify(Array.from(state.localMutedUsers)));
-      applyUserVolume(socketId, member);
-    });
-
-    // Right-Click Context Menu for volume & user settings
-    tile.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      openUserContextMenu(e.clientX, e.clientY, member, socketId);
-    });
-
-    return tile;
-  }
-
-  // Remote Screen Share Tile (Dedicated stream in grid)
-  function createRemoteScreenTile(socketId, member, stream) {
-    const tile = document.createElement('div');
-    tile.className = 'video-tile screen-share-tile';
-    tile.id = `tile-screen-${socketId}`;
-
-    tile.innerHTML = `
-      <div class="tile-content">
-        <video id="video-screen-${socketId}" autoplay playsinline muted></video>
-        <div class="live-tag">AO VIVO • TRANSMISSÃO</div>
-      </div>
-      <div class="tile-overlay">
-        <div class="tile-username">
-          <span>🖥️ Transmissão de ${member.username}</span>
-        </div>
-        <div class="tile-screen-actions">
-          <button class="btn-tile-fullscreen" id="btnFullscreen-${socketId}" title="Tela Cheia">
-            ⛶ Tela Cheia
-          </button>
-        </div>
-      </div>
-    `;
-
-    const videoEl = tile.querySelector(`#video-screen-${socketId}`);
-    if (stream) {
-      videoEl.srcObject = stream;
-      videoEl.onloadedmetadata = () => {
-        videoEl.play().catch(e => console.warn('Play screen onloadedmetadata error:', e));
-      };
-      videoEl.play().catch(e => console.warn('Play screen error:', e));
-    }
-
-    tile.querySelector(`#btnFullscreen-${socketId}`).addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (videoEl.requestFullscreen) {
-        videoEl.requestFullscreen();
-      }
-    });
-
-    tile.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      openUserContextMenu(e.clientX, e.clientY, member, socketId);
-    });
 
     return tile;
   }
@@ -779,10 +514,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const videoEl = existingTile.querySelector(`#video-${socketId}`);
       const audioEl = existingTile.querySelector(`#audio-${socketId}`);
       const avatarView = existingTile.querySelector('.avatar-view');
+      const tileContent = existingTile.querySelector('.tile-content');
+      let liveTag = existingTile.querySelector('.live-tag');
 
-      const hasCam = member.isCameraOn && stream && stream.getVideoTracks().some(t => t.readyState === 'live' && !t.muted);
+      const hasVideo = stream && stream.getVideoTracks().some(t => t.readyState === 'live' && !t.muted);
+      const shouldShowVideo = hasVideo && (member.isCameraOn || member.isScreenSharing);
 
-      if (hasCam) {
+      if (shouldShowVideo) {
         if (videoEl.srcObject !== stream) {
           videoEl.srcObject = stream;
         }
@@ -795,13 +533,21 @@ document.addEventListener('DOMContentLoaded', () => {
         avatarView.classList.remove('hidden');
       }
 
+      if (member.isScreenSharing) {
+        if (!liveTag && tileContent) {
+          liveTag = document.createElement('div');
+          liveTag.className = 'live-tag';
+          liveTag.textContent = 'AO VIVO';
+          tileContent.appendChild(liveTag);
+        }
+      } else if (liveTag) {
+        liveTag.remove();
+      }
+
       if (stream && audioEl) {
         if (audioEl.srcObject !== stream) {
           audioEl.srcObject = stream;
-          audioEl.play().catch(e => console.warn('Audio play error:', e));
         }
-        applyUserVolume(socketId, member);
-        applyAudioOutputDevice(audioEl);
         setupRemoteSpeakingDetector(socketId, stream);
       }
     } else {
@@ -819,6 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
       tile.classList.remove('speaking');
     }
 
+    // Update icons in tag
     const usernameSpan = tile.querySelector('.tile-username');
     if (usernameSpan) {
       usernameSpan.innerHTML = `
@@ -828,10 +575,15 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
     }
 
+    // Update Video / Avatar visibility
     const videoEl = tile.querySelector(`#video-${socketId}`);
     const avatarView = tile.querySelector('.avatar-view');
+    const tileContent = tile.querySelector('.tile-content');
+    let liveTag = tile.querySelector('.live-tag');
 
-    if (member.isCameraOn) {
+    const hasVideo = member.isCameraOn || member.isScreenSharing;
+
+    if (hasVideo) {
       const stream = state.webrtc.remoteStreams.get(socketId);
       if (stream && stream.getVideoTracks().length > 0) {
         if (videoEl.srcObject !== stream) {
@@ -845,6 +597,17 @@ document.addEventListener('DOMContentLoaded', () => {
       videoEl.classList.add('hidden');
       videoEl.srcObject = null;
       avatarView.classList.remove('hidden');
+    }
+
+    if (member.isScreenSharing) {
+      if (!liveTag && tileContent) {
+        liveTag = document.createElement('div');
+        liveTag.className = 'live-tag';
+        liveTag.textContent = 'AO VIVO';
+        tileContent.appendChild(liveTag);
+      }
+    } else if (liveTag) {
+      liveTag.remove();
     }
   }
 
@@ -926,9 +689,9 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleMute();
     }
 
-    // Apply individual volume/mute preferences to all remote audio tags
-    state.roomMembers.forEach((member, socketId) => {
-      applyUserVolume(socketId, member);
+    // Mute all remote audio tags
+    document.querySelectorAll('audio').forEach(audio => {
+      audio.muted = state.user.isDeafened;
     });
 
     window.SoundEffects.playMute(state.user.isDeafened);
@@ -1109,61 +872,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return div.innerHTML;
   }
 
-  // Enumerate mic/speaker/camera devices and fill the Settings selectors.
-  // Browsers only reveal device labels (and sometimes the full device list at all)
-  // after mic/camera permission has been granted at least once, so request that
-  // permission first if we don't already have an active stream to enumerate against.
-  async function populateDeviceLists() {
-    let probeStream = null;
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const hasLabels = devices.some(d => d.label);
-
-      if (!hasLabels && !state.webrtc?.localMicStream) {
-        try {
-          probeStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-        } catch (e) {
-          try {
-            probeStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          } catch (e2) {
-            console.warn('Could not get mic/camera permission for device labels:', e2);
-          }
-        }
-      }
-
-      const finalDevices = probeStream ? await navigator.mediaDevices.enumerateDevices() : devices;
-
-      const previousInput = el.selectAudioInput.value || state.selectedAudioInput;
-      const previousOutput = el.selectAudioOutput.value || state.selectedAudioOutput;
-      const previousVideo = el.selectVideoInput.value || state.selectedVideoInput;
-
-      el.selectAudioInput.innerHTML = '';
-      el.selectAudioOutput.innerHTML = '';
-      el.selectVideoInput.innerHTML = '';
-
-      finalDevices.forEach(device => {
-        const opt = document.createElement('option');
-        opt.value = device.deviceId;
-        opt.text = device.label || `${device.kind} (${device.deviceId.slice(0, 5)}...)`;
-
-        if (device.kind === 'audioinput') {
-          if (device.deviceId === previousInput) opt.selected = true;
-          el.selectAudioInput.appendChild(opt);
-        } else if (device.kind === 'audiooutput') {
-          if (device.deviceId === previousOutput) opt.selected = true;
-          el.selectAudioOutput.appendChild(opt);
-        } else if (device.kind === 'videoinput') {
-          if (device.deviceId === previousVideo) opt.selected = true;
-          el.selectVideoInput.appendChild(opt);
-        }
-      });
-    } catch (err) {
-      console.warn('Could not enumerate media devices:', err);
-    } finally {
-      if (probeStream) probeStream.getTracks().forEach(t => t.stop());
-    }
-  }
-
   // Initialize Settings UI & Audio Device Enumeration
   async function initSettingsUI() {
     el.inputSettingsUsername.value = state.user.username;
@@ -1182,9 +890,32 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // Populate Audio/Video Device Selectors (also re-usable on modal re-open / device change)
-    await populateDeviceLists();
-    navigator.mediaDevices.addEventListener('devicechange', populateDeviceLists);
+    // Populate Audio/Video Device Selectors
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      el.selectAudioInput.innerHTML = '';
+      el.selectAudioOutput.innerHTML = '';
+      el.selectVideoInput.innerHTML = '';
+
+      devices.forEach(device => {
+        const opt = document.createElement('option');
+        opt.value = device.deviceId;
+        opt.text = device.label || `${device.kind} (${device.deviceId.slice(0, 5)}...)`;
+
+        if (device.kind === 'audioinput') {
+          if (device.deviceId === state.selectedAudioInput) opt.selected = true;
+          el.selectAudioInput.appendChild(opt);
+        } else if (device.kind === 'audiooutput') {
+          if (device.deviceId === state.selectedAudioOutput) opt.selected = true;
+          el.selectAudioOutput.appendChild(opt);
+        } else if (device.kind === 'videoinput') {
+          if (device.deviceId === state.selectedVideoInput) opt.selected = true;
+          el.selectVideoInput.appendChild(opt);
+        }
+      });
+    } catch (err) {
+      console.warn('Could not enumerate media devices:', err);
+    }
 
     // Avatar Color Selection
     el.avatarColorPicker.forEach(btn => {
@@ -1271,7 +1002,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Open Settings Modal
   el.btnSettings.addEventListener('click', () => {
     el.settingsModal.classList.remove('hidden');
-    populateDeviceLists();
   });
 
   el.btnCloseSettings.addEventListener('click', () => {
@@ -1291,7 +1021,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.selectedAudioInput = el.selectAudioInput.value;
     state.selectedAudioOutput = el.selectAudioOutput.value;
     state.selectedVideoInput = el.selectVideoInput.value;
-    state.noiseSuppression = el.noiseSuppression ? el.noiseSuppression.checked : (state.noiseSuppression !== undefined ? state.noiseSuppression : true);
+    state.noiseSuppression = el.noiseSuppression.checked;
 
     localStorage.setItem('discord_mic_device', state.selectedAudioInput);
     localStorage.setItem('discord_spk_device', state.selectedAudioOutput);
@@ -1299,7 +1029,6 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('discord_noise_suppression', state.noiseSuppression);
     localStorage.setItem('discord_avatar_color', state.user.avatarColor);
 
-    applyAudioOutputDeviceToAll();
     updateUserProfileUI();
 
     if (newServerUrl && newServerUrl !== state.serverUrl) {
@@ -1426,213 +1155,5 @@ document.addEventListener('DOMContentLoaded', () => {
       el.updateProgressContainer.classList.add('hidden');
       el.btnDismissUpdate.classList.remove('hidden');
     }
-  }
-
-  // Discord-Style Right-Click Context Menu Controller
-  let activeContextTarget = null;
-
-  function openUserContextMenu(x, y, member, socketId) {
-    if (!el.userContextMenu) return;
-
-    const userKey = member.userId || member.username;
-    activeContextTarget = { member, socketId, userKey };
-
-    // Fill UI Info
-    if (el.ctxAvatar) {
-      el.ctxAvatar.textContent = member.username ? member.username.charAt(0).toUpperCase() : '?';
-      el.ctxAvatar.style.backgroundColor = member.avatar || '#5865F2';
-    }
-    if (el.ctxUsername) {
-      el.ctxUsername.textContent = member.username || 'Usuário';
-    }
-    if (el.ctxStatusTag) {
-      let statusText = 'No Canal de Voz';
-      if (member.isScreenSharing && member.isCameraOn) {
-        statusText = 'Transmitindo Tela & Câmera';
-      } else if (member.isScreenSharing) {
-        statusText = 'Compartilhando Tela';
-      } else if (member.isCameraOn) {
-        statusText = 'Câmera Ativada';
-      } else if (member.isSpeaking) {
-        statusText = 'Falando no Canal';
-      }
-      el.ctxStatusTag.textContent = statusText;
-    }
-
-    const currentVol = getUserVolume(userKey);
-    const isMuted = isUserLocallyMuted(userKey);
-
-    if (el.ctxVolSlider) {
-      el.ctxVolSlider.value = isMuted ? 0 : currentVol;
-    }
-    if (el.ctxVolVal) {
-      el.ctxVolVal.textContent = isMuted ? 'Mudo' : `${currentVol}%`;
-    }
-    if (el.ctxMuteCheckbox) {
-      el.ctxMuteCheckbox.checked = isMuted;
-    }
-
-    // Position Menu with viewport boundary clamping
-    el.userContextMenu.classList.remove('hidden');
-    const menuWidth = 240;
-    const menuHeight = 220;
-
-    let posX = x;
-    let posY = y;
-
-    if (posX + menuWidth > window.innerWidth - 10) {
-      posX = window.innerWidth - menuWidth - 10;
-    }
-    if (posY + menuHeight > window.innerHeight - 10) {
-      posY = window.innerHeight - menuHeight - 10;
-    }
-    if (posX < 10) posX = 10;
-    if (posY < 10) posY = 10;
-
-    el.userContextMenu.style.left = `${posX}px`;
-    el.userContextMenu.style.top = `${posY}px`;
-  }
-
-  function closeUserContextMenu() {
-    if (el.userContextMenu) {
-      el.userContextMenu.classList.add('hidden');
-    }
-    activeContextTarget = null;
-  }
-
-  function initContextMenu() {
-    if (!el.userContextMenu) return;
-
-    // Volume Slider listener
-    if (el.ctxVolSlider) {
-      el.ctxVolSlider.addEventListener('input', (e) => {
-        if (!activeContextTarget) return;
-        const val = parseInt(e.target.value, 10);
-        const { member, socketId, userKey } = activeContextTarget;
-
-        state.userVolumes[userKey] = val;
-        localStorage.setItem('discord_user_volumes', JSON.stringify(state.userVolumes));
-
-        if (el.ctxVolVal) {
-          el.ctxVolVal.textContent = val === 0 ? 'Mudo' : `${val}%`;
-        }
-
-        if (val === 0) {
-          state.localMutedUsers.add(userKey);
-          if (el.ctxMuteCheckbox) el.ctxMuteCheckbox.checked = true;
-        } else {
-          state.localMutedUsers.delete(userKey);
-          if (el.ctxMuteCheckbox) el.ctxMuteCheckbox.checked = false;
-        }
-        localStorage.setItem('discord_local_mutes', JSON.stringify(Array.from(state.localMutedUsers)));
-
-        // Sync corresponding in-tile slider & label in the grid if present
-        const tileSlider = document.getElementById(`slider-vol-${socketId}`);
-        const tileLabel = document.getElementById(`label-vol-${socketId}`);
-        const tileMuteBtn = document.getElementById(`btn-local-mute-${socketId}`);
-
-        if (tileSlider) tileSlider.value = val;
-        if (tileLabel) tileLabel.textContent = val === 0 ? 'Mudo' : `${val}%`;
-        if (tileMuteBtn) {
-          if (val === 0) tileMuteBtn.classList.add('muted');
-          else tileMuteBtn.classList.remove('muted');
-        }
-
-        applyUserVolume(socketId, member);
-      });
-    }
-
-    // Local Mute Toggle Checkbox listener
-    if (el.ctxMuteCheckbox) {
-      el.ctxMuteCheckbox.addEventListener('change', (e) => {
-        if (!activeContextTarget) return;
-        const { member, socketId, userKey } = activeContextTarget;
-        const isChecked = e.target.checked;
-
-        if (isChecked) {
-          state.localMutedUsers.add(userKey);
-          if (el.ctxVolSlider) el.ctxVolSlider.value = 0;
-          if (el.ctxVolVal) el.ctxVolVal.textContent = 'Mudo';
-        } else {
-          state.localMutedUsers.delete(userKey);
-          const restoredVol = state.userVolumes[userKey] > 0 ? state.userVolumes[userKey] : 100;
-          if (el.ctxVolSlider) el.ctxVolSlider.value = restoredVol;
-          if (el.ctxVolVal) el.ctxVolVal.textContent = `${restoredVol}%`;
-        }
-        localStorage.setItem('discord_local_mutes', JSON.stringify(Array.from(state.localMutedUsers)));
-
-        // Sync tile
-        const tileSlider = document.getElementById(`slider-vol-${socketId}`);
-        const tileLabel = document.getElementById(`label-vol-${socketId}`);
-        const tileMuteBtn = document.getElementById(`btn-local-mute-${socketId}`);
-
-        if (tileMuteBtn) {
-          if (isChecked) tileMuteBtn.classList.add('muted');
-          else tileMuteBtn.classList.remove('muted');
-        }
-        if (tileSlider && tileLabel) {
-          if (isChecked) {
-            tileSlider.value = 0;
-            tileLabel.textContent = 'Mudo';
-          } else {
-            const restored = state.userVolumes[userKey] > 0 ? state.userVolumes[userKey] : 100;
-            tileSlider.value = restored;
-            tileLabel.textContent = `${restored}%`;
-          }
-        }
-
-        applyUserVolume(socketId, member);
-      });
-    }
-
-    // Toggle mute when clicking the whole row
-    const ctxToggleMuteItem = document.getElementById('ctxToggleMuteItem');
-    if (ctxToggleMuteItem) {
-      ctxToggleMuteItem.addEventListener('click', (e) => {
-        if (e.target === el.ctxMuteCheckbox) return;
-        if (el.ctxMuteCheckbox) {
-          el.ctxMuteCheckbox.checked = !el.ctxMuteCheckbox.checked;
-          el.ctxMuteCheckbox.dispatchEvent(new Event('change'));
-        }
-      });
-    }
-
-    // Copy ID item listener
-    if (el.ctxCopyIdItem) {
-      el.ctxCopyIdItem.addEventListener('click', () => {
-        if (!activeContextTarget) return;
-        const idToCopy = activeContextTarget.member.userId || activeContextTarget.socketId || '';
-        if (idToCopy && navigator.clipboard) {
-          navigator.clipboard.writeText(idToCopy).then(() => {
-            const span = el.ctxCopyIdItem.querySelector('span');
-            const origText = span ? span.textContent : 'Copiar ID';
-            if (span) span.textContent = '✓ ID Copiado!';
-            setTimeout(() => {
-              if (span) span.textContent = origText;
-              closeUserContextMenu();
-            }, 1000);
-          });
-        }
-      });
-    }
-
-    // Dismiss context menu on click outside
-    document.addEventListener('click', (e) => {
-      if (el.userContextMenu && !el.userContextMenu.classList.contains('hidden')) {
-        if (!el.userContextMenu.contains(e.target)) {
-          closeUserContextMenu();
-        }
-      }
-    });
-
-    // Dismiss on Escape key
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        closeUserContextMenu();
-      }
-    });
-
-    // Dismiss on window resize
-    window.addEventListener('resize', closeUserContextMenu);
   }
 });

@@ -234,20 +234,10 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.log(`[Server Note] Porta ${PORT} já está em uso por outro processo ou instância.`);
-  } else {
-    console.error('[Server Error]', err);
-  }
-});
-
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`=========================================`);
-  console.log(`🚀 Servidor Triscord Ativo!`);
+  console.log(`🚀 Servidor Discord Voice Chat Ativo!`);
   console.log(`📡 Porta: ${PORT}`);
   console.log(`🔗 Local: http://localhost:${PORT}`);
   console.log(`=========================================`);
 });
-

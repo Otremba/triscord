@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Triscord</title>
-  <link rel="icon" type="image/png" href="assets/icon.png">
+  <title>Discord Voice & Video</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,8 +11,10 @@
     
     <!-- 1. Guilds / Servers Left Sidebar -->
     <aside class="guilds-sidebar">
-      <div class="guild-icon active" title="Triscord">
-        <img src="assets/icon.png" class="guild-icon-img" alt="Triscord" />
+      <div class="guild-icon active" title="Servidor Principal">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09-.01-.02-.04-.03-.07-.03-1.5.26-2.93.71-4.27 1.33-.01 0-.02.01-.03.02-2.72 4.07-3.47 8.03-3.1 11.95 0 .02.01.04.03.05 1.8 1.32 3.53 2.12 5.24 2.65.03.01.06 0 .07-.02.4-.55.76-1.13 1.07-1.74.02-.04 0-.08-.04-.09-.57-.22-1.11-.48-1.64-.78-.04-.02-.04-.08-.01-.11.11-.08.22-.17.33-.25.02-.02.05-.02.07-.01 3.44 1.57 7.15 1.57 10.55 0 .02-.01.05-.01.07.01.11.09.22.17.33.26.04.03.04.09-.01.11-.52.31-1.07.56-1.64.78-.04.01-.05.06-.04.09.32.61.68 1.19 1.07 1.74.03.01.06.02.09.01 1.72-.53 3.45-1.33 5.25-2.65.02-.01.03-.03.03-.05.44-4.53-.73-8.46-3.1-11.95-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.83 2.12-1.89 2.12z"/>
+        </svg>
       </div>
       <div class="guild-separator"></div>
       <div class="guild-icon" id="btnCreateRoom" title="Criar Canal de Voz">
@@ -27,7 +28,7 @@
     <!-- 2. Channels Sidebar -->
     <aside class="channels-sidebar">
       <div class="server-header">
-        <span>Triscord 🎙️</span>
+        <span>Galera da Voz 🎙️</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
           <path d="M7 10l5 5 5-5z"/>
         </svg>
@@ -373,50 +374,6 @@
 
       <div class="modal-footer" id="updateModalFooter">
         <button class="btn-primary hidden" id="btnDismissUpdate">Entendido</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Right-Click User Context Menu (Discord Style) -->
-  <div class="user-context-menu hidden" id="userContextMenu">
-    <div class="context-menu-header">
-      <div class="context-menu-avatar" id="ctxAvatar">U</div>
-      <div class="context-menu-user-info">
-        <span class="context-menu-username" id="ctxUsername">Usuário</span>
-        <span class="context-menu-tag" id="ctxStatusTag">No Canal de Voz</span>
-      </div>
-    </div>
-
-    <div class="context-menu-divider"></div>
-
-    <!-- Volume Slider (0% - 200%) -->
-    <div class="context-menu-item-volume">
-      <div class="ctx-vol-header">
-        <span>Volume do Usuário</span>
-        <span class="ctx-vol-val" id="ctxVolVal">100%</span>
-      </div>
-      <input type="range" class="ctx-vol-slider" id="ctxVolSlider" min="0" max="200" value="100" />
-    </div>
-
-    <!-- Local Mute Toggle Checkbox -->
-    <div class="context-menu-item" id="ctxToggleMuteItem">
-      <div class="ctx-item-left">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
-        </svg>
-        <span>Silenciar Usuário</span>
-      </div>
-      <input type="checkbox" class="ctx-checkbox" id="ctxMuteCheckbox" />
-    </div>
-
-    <div class="context-menu-divider"></div>
-
-    <div class="context-menu-item" id="ctxCopyIdItem">
-      <div class="ctx-item-left">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-        </svg>
-        <span>Copiar ID</span>
       </div>
     </div>
   </div>

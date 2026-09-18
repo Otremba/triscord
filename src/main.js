@@ -2,13 +2,6 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, session, Menu } = require(
 const path = require('path');
 const fs = require('fs');
 
-// Start embedded signaling server if running standalone
-try {
-  require('../server/server.js');
-} catch (e) {
-  console.log('[Embedded Server Startup Note]', e.message);
-}
-
 // Disable default menu for clean Discord look
 Menu.setApplicationMenu(null);
 
@@ -23,7 +16,7 @@ function createWindow() {
     minWidth: 960,
     minHeight: 600,
     backgroundColor: '#1e1f22',
-    title: 'Triscord',
+    title: 'Discord Voice & Video Client',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
