@@ -99,6 +99,17 @@ ipcMain.handle('check-and-apply-update', async (event) => {
     }
   };
 
+  // Em builds empacotadas (instalador NSIS), o app roda a partir de um
+  // app.asar virtual sem repositório git, então a atualização via
+  // "git pull" nunca funciona (e o cwd inválido derruba o spawn do cmd.exe
+  // com um ENOENT enganoso). Esse fluxo só é suportado em modo de
+  // desenvolvimento (npm start), rodando direto do clone do repositório.
+  if (app.isPackaged) {
+    const message = 'Atualização automática não é suportada nesta versão instalada. Baixe a versão mais recente pelo GitHub.';
+    sendProgress('error', message);
+    return { status: 'error', message };
+  }
+
   try {
     sendProgress('checking', 'Conectando ao GitHub e verificando novas versões...');
 
