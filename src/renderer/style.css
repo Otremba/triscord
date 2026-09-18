@@ -737,6 +737,108 @@ body {
   font-size: 12px;
 }
 
+/* Individual Friend Volume & Local Mute Controls */
+.tile-user-audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  opacity: 0.88;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.video-tile:hover .tile-user-audio-controls {
+  opacity: 1;
+  background: rgba(18, 19, 22, 0.9);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.btn-tile-local-mute {
+  background: none;
+  border: none;
+  color: var(--text-normal);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-tile-local-mute:hover {
+  color: #fff;
+  transform: scale(1.1);
+}
+
+.btn-tile-local-mute .icon-vol-off {
+  display: none;
+}
+
+.btn-tile-local-mute.muted {
+  color: var(--accent-red);
+}
+
+.btn-tile-local-mute.muted .icon-vol-on {
+  display: none;
+}
+
+.btn-tile-local-mute.muted .icon-vol-off {
+  display: inline-block;
+}
+
+.tile-volume-slider-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tile-volume-slider {
+  width: 64px;
+  height: 4px;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  accent-color: var(--accent-blurple);
+  transition: background 0.15s ease;
+}
+
+.tile-volume-slider:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.tile-volume-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-blurple);
+  cursor: pointer;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  transition: transform 0.12s ease, background-color 0.12s ease;
+}
+
+.tile-volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+  background: #7289da;
+}
+
+.tile-volume-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Floating Voice Controls Bar (Discord Bottom Bar) */
 .voice-action-bar {
   display: flex;

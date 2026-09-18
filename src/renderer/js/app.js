@@ -35,7 +35,9 @@ document.addEventListener('DOMContentLoaded', () => {
     selectedAudioInput: localStorage.getItem('discord_mic_device') || 'default',
     selectedAudioOutput: localStorage.getItem('discord_spk_device') || 'default',
     selectedVideoInput: localStorage.getItem('discord_cam_device') || 'default',
-    noiseSuppression: localStorage.getItem('discord_noise_suppression') !== 'false'
+    noiseSuppression: localStorage.getItem('discord_noise_suppression') !== 'false',
+    userVolumes: JSON.parse(localStorage.getItem('discord_user_volumes') || '{}'),
+    localMutedUsers: new Set(JSON.parse(localStorage.getItem('discord_local_mutes') || '[]'))
   };
 
   localStorage.setItem('discord_user_id', state.user.userId);
@@ -463,12 +465,43 @@ document.addEventListener('DOMContentLoaded', () => {
     return tile;
   }
 
+  // Individual User Volume Helpers
+  function getUserVolume(userKey) {
+    if (state.userVolumes[userKey] !== undefined) {
+      return state.userVolumes[userKey];
+    }
+    return 100;
+  }
+
+  function isUserLocallyMuted(userKey) {
+    return state.localMutedUsers.has(userKey);
+  }
+
+  function applyUserVolume(socketId, member) {
+    const audioEl = document.getElementById(`audio-${socketId}`);
+    if (!audioEl) return;
+
+    const userKey = member.userId || member.username;
+    const vol = getUserVolume(userKey);
+    const isLocallyMuted = isUserLocallyMuted(userKey);
+
+    if (state.user.isDeafened || isLocallyMuted || vol === 0) {
+      audioEl.muted = true;
+    } else {
+      audioEl.muted = false;
+      audioEl.volume = Math.max(0, Math.min(1, vol / 100));
+    }
+  }
+
   function createRemoteUserTile(socketId, member, stream) {
     const tile = document.createElement('div');
     tile.className = `video-tile ${member.isSpeaking ? 'speaking' : ''}`;
     tile.id = `tile-${socketId}`;
 
     const hasVideo = stream && stream.getVideoTracks().length > 0;
+    const userKey = member.userId || member.username;
+    const currentVolume = getUserVolume(userKey);
+    const isLocallyMuted = isUserLocallyMuted(userKey);
 
     tile.innerHTML = `
       <div class="tile-content">
@@ -484,23 +517,81 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="tile-overlay">
         <div class="tile-username">
           <span>${member.username}</span>
-          ${member.isMuted ? '<span class="status-badge-mini red">🔇</span>' : ''}
-          ${member.isDeafened ? '<span class="status-badge-mini red">🔕</span>' : ''}
+          ${member.isMuted ? '<span class="status-badge-mini red" title="Mutado na chamada">🔇</span>' : ''}
+          ${member.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido">🔕</span>' : ''}
+        </div>
+        
+        <!-- Individual Friend Volume / Local Mute Controls -->
+        <div class="tile-user-audio-controls">
+          <button class="btn-tile-local-mute ${isLocallyMuted ? 'muted' : ''}" id="btn-local-mute-${socketId}" title="${isLocallyMuted ? 'Desmutar para mim' : 'Mutar apenas para mim'}">
+            <svg class="icon-vol-on" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            </svg>
+            <svg class="icon-vol-off" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+            </svg>
+          </button>
+          <div class="tile-volume-slider-wrapper" title="Volume de ${member.username}">
+            <input type="range" class="tile-volume-slider" id="slider-vol-${socketId}" min="0" max="100" value="${isLocallyMuted ? 0 : currentVolume}" />
+            <span class="tile-volume-label" id="label-vol-${socketId}">${isLocallyMuted ? 'Mudo' : `${currentVolume}%`}</span>
+          </div>
         </div>
       </div>
     `;
 
     const videoEl = tile.querySelector(`#video-${socketId}`);
     const audioEl = tile.querySelector(`#audio-${socketId}`);
+    const muteBtn = tile.querySelector(`#btn-local-mute-${socketId}`);
+    const volSlider = tile.querySelector(`#slider-vol-${socketId}`);
+    const volLabel = tile.querySelector(`#label-vol-${socketId}`);
 
     if (stream) {
       videoEl.srcObject = stream;
       audioEl.srcObject = stream;
-      audioEl.muted = state.user.isDeafened;
+      applyUserVolume(socketId, member);
 
       // Attach speaking detector to remote stream
       setupRemoteSpeakingDetector(socketId, stream);
     }
+
+    // Volume Slider listener
+    volSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      state.userVolumes[userKey] = val;
+      localStorage.setItem('discord_user_volumes', JSON.stringify(state.userVolumes));
+
+      if (val === 0) {
+        state.localMutedUsers.add(userKey);
+        muteBtn.classList.add('muted');
+        volLabel.textContent = 'Mudo';
+      } else {
+        state.localMutedUsers.delete(userKey);
+        muteBtn.classList.remove('muted');
+        volLabel.textContent = `${val}%`;
+      }
+      localStorage.setItem('discord_local_mutes', JSON.stringify(Array.from(state.localMutedUsers)));
+      applyUserVolume(socketId, member);
+    });
+
+    // Local Mute button listener
+    muteBtn.addEventListener('click', () => {
+      if (state.localMutedUsers.has(userKey)) {
+        // Unmute
+        state.localMutedUsers.delete(userKey);
+        muteBtn.classList.remove('muted');
+        const restoredVol = state.userVolumes[userKey] > 0 ? state.userVolumes[userKey] : 100;
+        volSlider.value = restoredVol;
+        volLabel.textContent = `${restoredVol}%`;
+      } else {
+        // Mute locally
+        state.localMutedUsers.add(userKey);
+        muteBtn.classList.add('muted');
+        volSlider.value = 0;
+        volLabel.textContent = 'Mudo';
+      }
+      localStorage.setItem('discord_local_mutes', JSON.stringify(Array.from(state.localMutedUsers)));
+      applyUserVolume(socketId, member);
+    });
 
     return tile;
   }
@@ -548,6 +639,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (audioEl.srcObject !== stream) {
           audioEl.srcObject = stream;
         }
+        applyUserVolume(socketId, member);
         setupRemoteSpeakingDetector(socketId, stream);
       }
     } else {
@@ -689,9 +781,9 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleMute();
     }
 
-    // Mute all remote audio tags
-    document.querySelectorAll('audio').forEach(audio => {
-      audio.muted = state.user.isDeafened;
+    // Apply individual volume/mute preferences to all remote audio tags
+    state.roomMembers.forEach((member, socketId) => {
+      applyUserVolume(socketId, member);
     });
 
     window.SoundEffects.playMute(state.user.isDeafened);
