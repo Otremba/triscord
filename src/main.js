@@ -23,7 +23,7 @@ function createWindow() {
     minWidth: 960,
     minHeight: 600,
     backgroundColor: '#1e1f22',
-    title: 'Discord Voice & Video Client',
+    title: 'Triscord',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,

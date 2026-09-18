@@ -1,7 +1,7 @@
 {
-  "name": "discord-voice-app",
+  "name": "triscord",
   "version": "1.0.0",
-  "description": "Discord-like Voice, Video and Screen Sharing Desktop Application with Electron and WebRTC",
+  "description": "Triscord - Voice, Video & Screen Sharing Desktop Application with Electron and WebRTC",
   "main": "src/main.js",
   "scripts": {
     "start": "concurrently \"npm run server\" \"npm run electron\"",
@@ -10,13 +10,14 @@
     "build:win": "electron-builder --win"
   },
   "keywords": [
+    "triscord",
     "electron",
     "webrtc",
     "voice-chat",
     "discord-clone",
     "screen-sharing"
   ],
-  "author": "",
+  "author": "Otremba",
   "license": "MIT",
   "dependencies": {
     "cors": "^2.8.5",
@@ -30,8 +31,8 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.discordvoice.app",
-    "productName": "Discord Voice App",
+    "appId": "com.otremba.triscord",
+    "productName": "Triscord",
     "directories": {
       "output": "release"
     },
@@ -43,13 +44,14 @@
     ],
     "win": {
       "target": "nsis",
-      "artifactName": "Discord-Voice-App-Setup-${version}.${ext}"
+      "icon": "src/renderer/assets/icon.ico",
+      "artifactName": "Triscord-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Discord Voice App"
+      "shortcutName": "Triscord"
     }
   }
 }

@@ -245,7 +245,7 @@ server.on('error', (err) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`=========================================`);
-  console.log(`🚀 Servidor Discord Voice Chat Ativo!`);
+  console.log(`🚀 Servidor Triscord Ativo!`);
   console.log(`📡 Porta: ${PORT}`);
   console.log(`🔗 Local: http://localhost:${PORT}`);
   console.log(`=========================================`);

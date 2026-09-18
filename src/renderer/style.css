@@ -104,6 +104,13 @@ body {
   height: 26px;
 }
 
+.guild-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
 .guild-separator {
   width: 32px;
   height: 2px;
