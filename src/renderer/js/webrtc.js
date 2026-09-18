@@ -44,7 +44,15 @@ class WebRTCManager {
       const pc = this.getOrCreatePeer(senderSocketId);
 
       try {
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        if (pc.signalingState !== 'stable') {
+          console.log(`[WebRTC] Rollback collision on ${senderSocketId}`);
+          await Promise.all([
+            pc.setLocalDescription({ type: 'rollback' }).catch(() => {}),
+            pc.setRemoteDescription(new RTCSessionDescription(offer))
+          ]);
+        } else {
+          await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        }
 
         // Process queued ICE candidates
         const queue = this.iceCandidateQueues.get(senderSocketId) || [];
@@ -215,6 +223,7 @@ class WebRTCManager {
       if (audioT) {
         if (audioT.sender.track !== activeMicTrack) {
           audioT.sender.replaceTrack(activeMicTrack).catch(e => console.warn('Audio replaceTrack error:', e));
+          needsRenegotiation = true;
         }
       } else if (activeMicTrack) {
         try {
@@ -228,6 +237,7 @@ class WebRTCManager {
       if (camT) {
         if (camT.sender.track !== activeCamTrack) {
           camT.sender.replaceTrack(activeCamTrack).catch(e => console.warn('Cam replaceTrack error:', e));
+          needsRenegotiation = true;
         }
       } else if (activeCamTrack) {
         try {
@@ -241,6 +251,7 @@ class WebRTCManager {
       if (screenT) {
         if (screenT.sender.track !== activeScreenTrack) {
           screenT.sender.replaceTrack(activeScreenTrack).catch(e => console.warn('Screen replaceTrack error:', e));
+          needsRenegotiation = true;
         }
       } else if (activeScreenTrack) {
         try {
@@ -254,6 +265,7 @@ class WebRTCManager {
       if (screenAudioT) {
         if (screenAudioT.sender.track !== activeScreenAudioTrack) {
           screenAudioT.sender.replaceTrack(activeScreenAudioTrack).catch(e => console.warn('Screen audio replaceTrack error:', e));
+          needsRenegotiation = true;
         }
       } else if (activeScreenAudioTrack) {
         try {
@@ -347,13 +359,6 @@ class WebRTCManager {
           }
         };
 
-        event.track.onmute = () => {
-          console.log(`[WebRTC] Screen track muted from ${socketId}`);
-          if (this.onRemoteStreamRemoved) {
-            this.onRemoteStreamRemoved(socketId, true);
-          }
-        };
-
         event.track.onunmute = () => {
           console.log(`[WebRTC] Screen track unmuted from ${socketId}`);
           if (this.onRemoteStreamAdded) {
@@ -388,12 +393,6 @@ class WebRTCManager {
           console.log(`[WebRTC] Cam/Voice track ended from ${socketId}`);
           try { remoteStream.removeTrack(event.track); } catch (e) {}
           if (this.onRemoteStreamRemoved) {
-            this.onRemoteStreamRemoved(socketId, false);
-          }
-        };
-
-        event.track.onmute = () => {
-          if (event.track.kind === 'video' && this.onRemoteStreamRemoved) {
             this.onRemoteStreamRemoved(socketId, false);
           }
         };
@@ -448,15 +447,24 @@ class WebRTCManager {
 
     if (pc.signalingState !== 'stable') {
       console.log(`[WebRTC] Queuing renegotiation with ${socketId} (state: ${pc.signalingState})`);
-      pc.onnegotiationneeded = () => {
-        pc.onnegotiationneeded = null;
-        this.renegotiatePeer(socketId);
-      };
+      const checkInterval = setInterval(async () => {
+        if (!this.peers.has(socketId)) {
+          clearInterval(checkInterval);
+          return;
+        }
+        if (pc.signalingState === 'stable') {
+          clearInterval(checkInterval);
+          this.renegotiatePeer(socketId);
+        }
+      }, 150);
       return;
     }
 
     try {
-      const offer = await pc.createOffer();
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true
+      });
       if (pc.signalingState !== 'stable') return;
       await pc.setLocalDescription(offer);
 

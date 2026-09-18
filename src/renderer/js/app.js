@@ -700,7 +700,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     tile.innerHTML = `
       <div class="tile-content">
-        <video id="video-screen-${socketId}" autoplay playsinline></video>
+        <video id="video-screen-${socketId}" autoplay playsinline muted></video>
         <div class="live-tag">AO VIVO • TRANSMISSÃO</div>
       </div>
       <div class="tile-overlay">
@@ -718,6 +718,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const videoEl = tile.querySelector(`#video-screen-${socketId}`);
     if (stream) {
       videoEl.srcObject = stream;
+      videoEl.onloadedmetadata = () => {
+        videoEl.play().catch(e => console.warn('Play screen onloadedmetadata error:', e));
+      };
       videoEl.play().catch(e => console.warn('Play screen error:', e));
     }
 
