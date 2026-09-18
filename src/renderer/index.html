@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord Voice & Video</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- 1. Guilds / Servers Left Sidebar -->
+    <aside class="guilds-sidebar">
+      <div class="guild-icon active" title="Servidor Principal">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09-.01-.02-.04-.03-.07-.03-1.5.26-2.93.71-4.27 1.33-.01 0-.02.01-.03.02-2.72 4.07-3.47 8.03-3.1 11.95 0 .02.01.04.03.05 1.8 1.32 3.53 2.12 5.24 2.65.03.01.06 0 .07-.02.4-.55.76-1.13 1.07-1.74.02-.04 0-.08-.04-.09-.57-.22-1.11-.48-1.64-.78-.04-.02-.04-.08-.01-.11.11-.08.22-.17.33-.25.02-.02.05-.02.07-.01 3.44 1.57 7.15 1.57 10.55 0 .02-.01.05-.01.07.01.11.09.22.17.33.26.04.03.04.09-.01.11-.52.31-1.07.56-1.64.78-.04.01-.05.06-.04.09.32.61.68 1.19 1.07 1.74.03.01.06.02.09.01 1.72-.53 3.45-1.33 5.25-2.65.02-.01.03-.03.03-.05.44-4.53-.73-8.46-3.1-11.95-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.83 2.12-1.89 2.12z"/>
+        </svg>
+      </div>
+      <div class="guild-separator"></div>
+      <div class="guild-icon" id="btnCreateRoom" title="Criar Canal de Voz">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </div>
+    </aside>
+
+    <!-- 2. Channels Sidebar -->
+    <aside class="channels-sidebar">
+      <div class="server-header">
+        <span>Galera da Voz 🎙️</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M7 10l5 5 5-5z"/>
+        </svg>
+      </div>
+
+      <div class="channels-scrollable">
+        <div class="channel-category">
+          <span>Canais de Voz</span>
+          <button class="btn-icon-small" id="btnRefreshRooms" title="Atualizar">🔄</button>
+        </div>
+        <div class="channels-list" id="channelsList">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- Bottom User Profile Bar -->
+      <div class="user-panel">
+        <div class="user-profile-summary">
+          <div class="user-avatar-badge">
+            <div class="user-avatar-circle" id="userAvatar">U</div>
+            <div class="status-indicator-dot"></div>
+          </div>
+          <div class="user-text-info">
+            <span class="user-username" id="userUsername">Carregando...</span>
+            <span class="user-status-tag" id="userStatusTag">Online</span>
+          </div>
+        </div>
+
+        <div class="user-controls">
+          <button class="icon-button" id="btnToggleMute" title="Mutar Microfone">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </svg>
+          </button>
+          <button class="icon-button" id="btnToggleDeafen" title="Ensurdecer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+            </svg>
+          </button>
+          <button class="icon-button" id="btnOpenSettings" title="Configurações">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 3. Main Stage / Voice Area -->
+    <main class="main-stage-area">
+      <!-- Stage Top Bar -->
+      <header class="stage-top-bar">
+        <div class="stage-title-info">
+          <span class="channel-title" id="currentChannelHeader">Nenhum canal selecionado</span>
+          <div class="channel-divider"></div>
+          <span class="channel-topic" id="channelTopicHeader">Clique em um canal de voz à esquerda para entrar</span>
+        </div>
+
+        <div class="stage-top-actions">
+          <button class="btn-stage-action btn-update-app" id="btnCheckUpdateTop" title="Buscar e aplicar atualizações do GitHub">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+            </svg>
+            <span>Atualizar App</span>
+          </button>
+
+          <div class="connection-status-badge connecting" id="connectionStatusBadge">
+            <span class="status-dot"></span>
+            <span class="status-text">Conectando...</span>
+          </div>
+
+          <button class="btn-stage-action" id="btnToggleChat" title="Chat de Texto">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+            </svg>
+            <span>Chat</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Stage Content -->
+      <div class="stage-content-wrapper">
+        
+        <!-- Welcome Screen (when not in a voice channel) -->
+        <div class="welcome-stage" id="welcomeStage">
+          <div class="welcome-hero-card">
+            <div class="welcome-icon-glow">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+              </svg>
+            </div>
+            <h2>Pronto para conversar?</h2>
+            <p>Selecione um dos canais de voz à esquerda para entrar na chamada com seus amigos.</p>
+            
+            <div class="welcome-features">
+              <div class="feat-item">
+                <span>🎙️</span>
+                <span>Áudio de alta fidelidade com WebRTC e cancelamento de ruído</span>
+              </div>
+              <div class="feat-item">
+                <span>🖥️</span>
+                <span>Compartilhe telas e janelas de jogos ou programas em 60 FPS</span>
+              </div>
+              <div class="feat-item">
+                <span>📹</span>
+                <span>Câmera e chat de texto integrados na mesma sala</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Voice Stage (when in a voice channel) -->
+        <div class="voice-stage hidden" id="voiceStage">
+          <div class="stage-channel-header-bar">
+            <h3 id="stageChannelTitle"># Geral</h3>
+            <span id="stageUserCount">1 membro</span>
+          </div>
+
+          <div class="video-grid-container">
+            <div class="video-grid grid-1" id="videoGrid">
+              <!-- Dynamically populated video/voice tiles -->
+            </div>
+          </div>
+
+          <!-- Bottom Voice Action Controls -->
+          <div class="voice-action-bar">
+            <button class="btn-voice-control" id="btnToggleCamera">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+              </svg>
+              <span class="btn-label">Câmera</span>
+            </button>
+
+            <button class="btn-voice-control" id="btnToggleScreenShare">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/>
+              </svg>
+              <span class="btn-label">Compartilhar</span>
+            </button>
+
+            <button class="btn-voice-control btn-disconnect" id="btnDisconnectVoice">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4 11H8c-.55 0-1-.45-1-1s.45-1 1-1h8c.55 0 1 .45 1 1s-.45 1-1 1z"/>
+              </svg>
+              <span>Desconectar</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Chat Drawer (Right Side) -->
+        <aside class="chat-drawer hidden" id="chatDrawer">
+          <div class="chat-drawer-header">
+            <span>Chat do Canal</span>
+            <button class="btn-icon-small" id="btnCloseChat">✖</button>
+          </div>
+
+          <div class="chat-messages-container" id="chatMessages">
+            <div class="chat-message-item system-msg">
+              <div class="system-msg-content">Bem-vindo ao chat da sala!</div>
+            </div>
+          </div>
+
+          <div class="chat-input-area">
+            <div class="chat-input-box">
+              <input type="text" id="chatInput" placeholder="Conversar no canal..." />
+              <button id="btnSendChat" title="Enviar Mensagem">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </aside>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Screen Share Picker Modal -->
+  <div class="modal-overlay hidden" id="screenShareModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2>Compartilhar sua Tela</h2>
+      </div>
+
+      <div class="modal-body">
+        <div class="screen-tabs" id="screenShareTabs">
+          <button class="screen-tab-btn active" data-tab="screens">Telas Inteiras</button>
+          <button class="screen-tab-btn" data-tab="windows">Janelas de Programas</button>
+        </div>
+
+        <div class="screen-sources-grid" id="screenSourcesGrid">
+          <!-- Populated dynamically with thumbnails -->
+        </div>
+
+        <div class="screen-options-row">
+          <div class="option-group">
+            <label for="screenQualitySelect">Qualidade:</label>
+            <select id="screenQualitySelect" class="setting-select">
+              <option value="720p30">720p (30 FPS)</option>
+              <option value="1080p30" selected>1080p (30 FPS) - Recomendado</option>
+              <option value="1080p60">1080p (60 FPS) - Suave para Jogos</option>
+            </select>
+          </div>
+
+          <div class="option-group">
+            <input type="checkbox" id="screenAudioCheckbox" checked />
+            <label for="screenAudioCheckbox">Compartilhar Áudio do Sistema</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" id="screenShareCancel">Cancelar</button>
+        <button class="btn-primary" id="screenShareConfirm" disabled>Compartilhar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay hidden" id="settingsModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2>Configurações do Usuário e Conexão</h2>
+        <button class="btn-icon-small" id="btnCloseSettings">✖</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- User Profile Settings -->
+        <div class="setting-section">
+          <label class="setting-label">Seu Nome de Usuário</label>
+          <input type="text" id="settingsUsername" class="setting-input" placeholder="Ex: Lucas_Gamer" />
+        </div>
+
+        <div class="setting-section">
+          <label class="setting-label">Cor do Avatar</label>
+          <div class="avatar-color-picker">
+            <div class="avatar-color-option selected" style="background-color: #5865F2;" data-color="#5865F2"></div>
+            <div class="avatar-color-option" style="background-color: #57F287;" data-color="#57F287"></div>
+            <div class="avatar-color-option" style="background-color: #FEE75C;" data-color="#FEE75C"></div>
+            <div class="avatar-color-option" style="background-color: #EB459E;" data-color="#EB459E"></div>
+            <div class="avatar-color-option" style="background-color: #ED4245;" data-color="#ED4245"></div>
+            <div class="avatar-color-option" style="background-color: #3BA55C;" data-color="#3BA55C"></div>
+            <div class="avatar-color-option" style="background-color: #9B59B6;" data-color="#9B59B6"></div>
+          </div>
+        </div>
+
+        <!-- Server Connection URL -->
+        <div class="setting-section">
+          <label class="setting-label">URL / IP do Servidor</label>
+          <input type="text" id="settingsServerUrl" class="setting-input" placeholder="http://localhost:3000 ou IP do seu amigo" />
+          <small style="color: var(--text-muted); font-size: 11px;">
+            Para jogar com amigos: use o IP local (ex: <code>http://192.168.1.50:3000</code>) ou URL pública / Ngrok / Radmin VPN.
+          </small>
+        </div>
+
+        <!-- Audio Device Settings -->
+        <div class="setting-section">
+          <label class="setting-label">Dispositivo de Microfone (Entrada)</label>
+          <select id="settingsAudioInput" class="setting-select"></select>
+        </div>
+
+        <div class="setting-section">
+          <label class="setting-label">Dispositivo de Áudio (Saída)</label>
+          <select id="settingsAudioOutput" class="setting-select"></select>
+        </div>
+
+        <div class="setting-section">
+          <label class="setting-label">Câmera de Vídeo</label>
+          <select id="settingsVideoInput" class="setting-select"></select>
+        </div>
+
+        <!-- Mic Test & Sensitivity -->
+        <div class="setting-section">
+          <label class="setting-label">Teste de Microfone & Sensibilidade de Voz</label>
+          <label class="setting-checkbox">
+            <input type="checkbox" id="settingsNoiseSuppression" />
+            <span>Supressão de ruído</span>
+          </label>
+          <div class="mic-test-container">
+            <div class="mic-vu-meter-bg">
+              <div class="mic-vu-meter-fill" id="micVuMeterFill"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+              <button class="btn-secondary" id="btnTestMic" style="padding: 4px 8px; font-size: 12px;">Testar Microfone</button>
+              <span id="labelSensitivity" style="font-size: 12px; color: var(--text-muted);">15%</span>
+            </div>
+            <div class="slider-group" style="margin-top: 4px;">
+              <span style="font-size: 11px; color: var(--text-muted);">Mais Sensível</span>
+              <input type="range" id="settingsSensitivity" min="1" max="50" value="15" />
+              <span style="font-size: 11px; color: var(--text-muted);">Menos Sensível</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Update Section -->
+        <div class="setting-section">
+          <label class="setting-label">Atualizações do Aplicativo</label>
+          <div class="update-settings-card">
+            <div class="update-info-text">
+              <span class="update-app-title">Triscord Desktop (v1.0.0)</span>
+              <span class="update-app-sub">Sincroniza automaticamente com o repositório GitHub</span>
+            </div>
+            <button class="btn-primary btn-update-action" id="btnCheckUpdateSettings">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+              </svg>
+              <span>Verificar e Atualizar</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" id="btnSaveSettings">Salvar Alterações</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auto-Update Progress Modal -->
+  <div class="modal-overlay hidden" id="updateModal">
+    <div class="modal-dialog update-dialog">
+      <div class="modal-header">
+        <h2 id="updateModalTitle">Atualizando Aplicativo</h2>
+      </div>
+
+      <div class="modal-body update-modal-body">
+        <div class="update-animation-wrapper">
+          <div class="update-spinner" id="updateSpinner"></div>
+          <div class="update-icon-glow hidden" id="updateSuccessIcon">✓</div>
+          <div class="update-icon-glow error hidden" id="updateErrorIcon">✕</div>
+        </div>
+
+        <h3 class="update-status-title" id="updateStatusTitle">Verificando atualizações...</h3>
+        <p class="update-status-desc" id="updateStatusDesc">Aguarde enquanto buscamos as alterações mais recentes no GitHub.</p>
+
+        <div class="update-progress-bar-container" id="updateProgressContainer">
+          <div class="update-progress-bar-fill" id="updateProgressBar"></div>
+        </div>
+      </div>
+
+      <div class="modal-footer" id="updateModalFooter">
+        <button class="btn-primary hidden" id="btnDismissUpdate">Entendido</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/socket.io.min.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/webrtc.js"></script>
+  <script src="js/screen.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
