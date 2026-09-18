@@ -586,14 +586,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Route a single remote <audio> element to the user-selected output device (speaker/headset)
-  function applyAudioOutputDevice(audioEl) {
+  // Route a single remote <audio> element to the user-selected output device (speaker/headset).
+  // Falls back to the system default (and self-heals the saved preference) if that device
+  // is no longer available, so a stale/invalid deviceId can never silently blackhole audio.
+  async function applyAudioOutputDevice(audioEl) {
     if (!audioEl || typeof audioEl.setSinkId !== 'function') return;
     if (!state.selectedAudioOutput || state.selectedAudioOutput === 'default') return;
 
-    audioEl.setSinkId(state.selectedAudioOutput).catch(e => {
-      console.warn('[Audio] Error setting output device:', e);
-    });
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const stillExists = devices.some(d => d.kind === 'audiooutput' && d.deviceId === state.selectedAudioOutput);
+      if (!stillExists) {
+        console.warn('[Audio] Saved output device is no longer available, reverting to system default');
+        state.selectedAudioOutput = 'default';
+        localStorage.setItem('discord_spk_device', 'default');
+        return;
+      }
+      await audioEl.setSinkId(state.selectedAudioOutput);
+    } catch (e) {
+      console.warn('[Audio] Error setting output device, reverting to system default:', e);
+      state.selectedAudioOutput = 'default';
+      localStorage.setItem('discord_spk_device', 'default');
+    }
   }
 
   // Re-apply the selected output device to every remote audio tag currently on screen
@@ -656,6 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (stream) {
       videoEl.srcObject = stream;
       audioEl.srcObject = stream;
+      audioEl.play().catch(e => console.warn('Audio play error:', e));
       applyUserVolume(socketId, member);
       applyAudioOutputDevice(audioEl);
       setupRemoteSpeakingDetector(socketId, stream);
@@ -783,6 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (stream && audioEl) {
         if (audioEl.srcObject !== stream) {
           audioEl.srcObject = stream;
+          audioEl.play().catch(e => console.warn('Audio play error:', e));
         }
         applyUserVolume(socketId, member);
         applyAudioOutputDevice(audioEl);
