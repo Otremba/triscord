@@ -839,6 +839,58 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Screen Share Tile Styling (Dual Stream Mode) */
+.screen-share-tile {
+  grid-column: span 2;
+  min-height: 240px;
+  background: #000;
+  border: 1px solid rgba(88, 101, 242, 0.4);
+}
+
+.screen-share-tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.tile-screen-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-tile-fullscreen {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-tile-fullscreen:hover {
+  background: var(--accent-blurple);
+  border-color: var(--accent-blurple);
+}
+
+.btn-tile-stop-screen {
+  background: var(--accent-red);
+  border: none;
+  color: #fff;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-tile-stop-screen:hover {
+  background: var(--accent-red-hover);
+}
+
 /* Floating Voice Controls Bar (Discord Bottom Bar) */
 .voice-action-bar {
   display: flex;
@@ -1476,6 +1528,156 @@ body {
   0% { filter: brightness(1); }
   50% { filter: brightness(1.3); }
   100% { filter: brightness(1); }
+}
+
+/* Discord-Style Right-Click Context Menu */
+.user-context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 220px;
+  max-width: 280px;
+  background-color: #111214;
+  border-radius: var(--radius-md);
+  padding: 8px 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: contextMenuPop 0.12s cubic-bezier(0, 0, 0.2, 1);
+}
+
+@keyframes contextMenuPop {
+  0% { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.context-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
+}
+
+.context-menu-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-blurple);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.context-menu-user-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.context-menu-username {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-header);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.context-menu-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.context-menu-divider {
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.08);
+  margin: 4px 6px;
+}
+
+.context-menu-item-volume {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ctx-vol-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.ctx-vol-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-blurple);
+}
+
+.ctx-vol-slider {
+  width: 100%;
+  height: 6px;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  accent-color: var(--accent-blurple);
+}
+
+.ctx-vol-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  transition: transform 0.1s ease;
+}
+
+.ctx-vol-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.context-menu-item:hover {
+  background-color: var(--accent-blurple);
+  color: #fff;
+}
+
+.ctx-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ctx-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent-blurple);
 }
 
 .hidden {

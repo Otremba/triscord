@@ -378,6 +378,50 @@
     </div>
   </div>
 
+  <!-- Right-Click User Context Menu (Discord Style) -->
+  <div class="user-context-menu hidden" id="userContextMenu">
+    <div class="context-menu-header">
+      <div class="context-menu-avatar" id="ctxAvatar">U</div>
+      <div class="context-menu-user-info">
+        <span class="context-menu-username" id="ctxUsername">Usuário</span>
+        <span class="context-menu-tag" id="ctxStatusTag">No Canal de Voz</span>
+      </div>
+    </div>
+
+    <div class="context-menu-divider"></div>
+
+    <!-- Volume Slider (0% - 200%) -->
+    <div class="context-menu-item-volume">
+      <div class="ctx-vol-header">
+        <span>Volume do Usuário</span>
+        <span class="ctx-vol-val" id="ctxVolVal">100%</span>
+      </div>
+      <input type="range" class="ctx-vol-slider" id="ctxVolSlider" min="0" max="200" value="100" />
+    </div>
+
+    <!-- Local Mute Toggle Checkbox -->
+    <div class="context-menu-item" id="ctxToggleMuteItem">
+      <div class="ctx-item-left">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+        </svg>
+        <span>Silenciar Usuário</span>
+      </div>
+      <input type="checkbox" class="ctx-checkbox" id="ctxMuteCheckbox" />
+    </div>
+
+    <div class="context-menu-divider"></div>
+
+    <div class="context-menu-item" id="ctxCopyIdItem">
+      <div class="ctx-item-left">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+        </svg>
+        <span>Copiar ID</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="js/socket.io.min.js"></script>
   <script src="js/audio.js"></script>
