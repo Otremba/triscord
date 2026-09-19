@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: triscord
+    runtime: node
+    plan: free
+    region: virginia
+    # Server only: devDependencies (Electron, electron-builder) are skipped
+    buildCommand: npm ci --omit=dev
+    startCommand: node server/server.js
+    healthCheckPath: /
+    autoDeploy: true

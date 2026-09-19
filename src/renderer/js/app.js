@@ -143,9 +143,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       // Connect using io() from socket.io
+      // Keep retrying: a free-tier host can take up to a minute to wake up
       state.socket = io(state.serverUrl, {
-        reconnectionAttempts: 10,
-        timeout: 10000,
+        reconnectionAttempts: Infinity,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
         transportOptions: {
           polling: {
             extraHeaders: {
@@ -193,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       state.socket.on('connect_error', (err) => {
         console.warn('Socket connection error:', err);
-        setConnectionStatus('disconnected', 'Erro de Conexão');
+        setConnectionStatus('connecting', 'Aguardando servidor...');
       });
 
       state.socket.on('disconnect', () => {
