@@ -636,8 +636,83 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+/* Spotlight / Focus Mode */
+.video-grid.focus-mode {
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-content: stretch;
+}
+
+.focus-main {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+}
+
+.focus-main .video-tile {
+  width: 100%;
+  height: 100%;
+}
+
+.focus-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.focus-strip .video-tile {
+  flex: 0 0 200px;
+  height: 116px;
+  min-height: 0;
+}
+
+.focus-strip .tile-avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+}
+
+.focus-strip .tile-overlay {
+  padding: 6px 9px;
+}
+
+.focus-strip .tile-username {
+  font-size: 11px;
+}
+
+.focus-strip .live-tag {
+  top: 6px;
+  left: 6px;
+  font-size: 9px;
+  padding: 2px 5px;
+}
+
+.tile-focus-hint {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.video-tile:hover .tile-focus-hint {
+  opacity: 1;
+}
+
 /* Video & Voice User Tiles */
 .video-tile {
+  cursor: pointer;
   background-color: var(--bg-tertiary);
   border-radius: var(--radius-lg);
   overflow: hidden;

@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     localSpeakingDetector: null,
     remoteSpeakingDetectors: new Map(), // socketId -> SpeakingDetector
     isChatOpen: false,
+    focusedTileId: null, // spotlighted tile key: 'local', 'screen-local', socketId or 'screen-<socketId>'
     micSensitivity: parseInt(localStorage.getItem('discord_mic_sens') || '15', 10),
     selectedAudioInput: localStorage.getItem('discord_mic_device') || 'default',
     selectedAudioOutput: localStorage.getItem('discord_spk_device') || 'default',
@@ -373,6 +374,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.roomMembers.clear();
     state.user.isCameraOn = false;
     state.user.isScreenSharing = false;
+    state.focusedTileId = null;
 
     updateActionButtonsState();
     updateStageView();
@@ -404,30 +406,80 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderAllVideoTiles() {
     el.videoGrid.innerHTML = '';
 
+    const tiles = [];
+
     // 1. Local user tile (avatar or webcam)
-    el.videoGrid.appendChild(createLocalUserTile());
+    tiles.push({ key: 'local', node: createLocalUserTile() });
 
     // 2. Local screen share tile
     if (state.user.isScreenSharing) {
-      el.videoGrid.appendChild(
-        createScreenTile('local', `${state.user.username} (Você)`, state.webrtc.localScreenStream, true)
-      );
+      tiles.push({
+        key: 'screen-local',
+        node: createScreenTile('local', `${state.user.username} (Você)`, state.webrtc.localScreenStream, true)
+      });
     }
 
     // 3. Remote user tiles (+ their screen share tiles)
     state.roomMembers.forEach((member, socketId) => {
-      el.videoGrid.appendChild(
-        createRemoteUserTile(socketId, member, state.webrtc.remoteStreams.get(socketId))
-      );
+      tiles.push({
+        key: socketId,
+        node: createRemoteUserTile(socketId, member, state.webrtc.remoteStreams.get(socketId))
+      });
 
       if (member.isScreenSharing) {
-        el.videoGrid.appendChild(
-          createScreenTile(socketId, member.username, state.webrtc.remoteScreenStreams.get(socketId), false)
-        );
+        tiles.push({
+          key: `screen-${socketId}`,
+          node: createScreenTile(socketId, member.username, state.webrtc.remoteScreenStreams.get(socketId), false)
+        });
       }
     });
 
+    // A focused tile can vanish (peer left, stopped sharing) — fall back to the grid
+    if (state.focusedTileId && !tiles.some(t => t.key === state.focusedTileId)) {
+      state.focusedTileId = null;
+    }
+
+    tiles.forEach(({ key, node }) => {
+      node.dataset.tileKey = key;
+      node.addEventListener('click', () => toggleTileFocus(key));
+
+      const hint = document.createElement('div');
+      hint.className = 'tile-focus-hint';
+      hint.textContent = state.focusedTileId === key ? '⤡' : '⤢';
+      hint.title = state.focusedTileId === key ? 'Sair do foco (Esc)' : 'Colocar em foco';
+      node.querySelector('.tile-content').appendChild(hint);
+    });
+
+    if (state.focusedTileId) {
+      el.videoGrid.className = 'video-grid focus-mode';
+
+      const main = document.createElement('div');
+      main.className = 'focus-main';
+      const strip = document.createElement('div');
+      strip.className = 'focus-strip';
+
+      tiles.forEach(({ key, node }) => {
+        if (key === state.focusedTileId) {
+          node.classList.add('focused');
+          main.appendChild(node);
+        } else {
+          strip.appendChild(node);
+        }
+      });
+
+      el.videoGrid.appendChild(main);
+      if (strip.children.length) el.videoGrid.appendChild(strip);
+      return;
+    }
+
+    tiles.forEach(({ node }) => el.videoGrid.appendChild(node));
     adjustGridColumns();
+  }
+
+  // Spotlight a stream, Discord-style: clicking it again returns to the grid
+  function toggleTileFocus(key) {
+    state.focusedTileId = state.focusedTileId === key ? null : key;
+    renderAllVideoTiles();
   }
 
   // Dedicated tile for a screen share, separate from the owner's camera tile
@@ -997,6 +1049,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendChatMessage();
+    }
+  });
+
+  // Esc leaves spotlight mode
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && state.focusedTileId) {
+      state.focusedTileId = null;
+      renderAllVideoTiles();
     }
   });
 
