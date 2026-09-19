@@ -3,10 +3,17 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Smart server URL fallback (uses origin if loaded over HTTP/HTTPS, or localhost if Electron file://)
-  const defaultServerUrl = window.location.protocol.startsWith('http') 
-    ? window.location.origin 
-    : 'http://localhost:3000';
+  // In a browser, use the server that served the page; the desktop app (file://) uses the hosted server
+  const HOSTED_SERVER_URL = 'https://triscord.onrender.com';
+  const defaultServerUrl = window.location.protocol.startsWith('http')
+    ? window.location.origin
+    : HOSTED_SERVER_URL;
+
+  // Installs from the ngrok era saved a tunnel URL that no longer runs
+  const savedServerUrl = localStorage.getItem('discord_server_url');
+  if (savedServerUrl && /ngrok/i.test(savedServerUrl)) {
+    localStorage.removeItem('discord_server_url');
+  }
 
   // Application State
   const state = {
