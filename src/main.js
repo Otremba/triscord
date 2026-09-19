@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, session, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 // Disable default menu for clean Discord look
 Menu.setApplicationMenu(null);
@@ -65,6 +66,81 @@ ipcMain.handle('get-screen-sources', async () => {
     console.error('Error fetching screen sources:', err);
     return [];
   }
+});
+
+// System audio for screen sharing: everything the PC plays except this app's
+// own process tree, so the call's voices are never sent back to the call.
+const LOOPBACK_HELPER = app.isPackaged
+  ? path.join(process.resourcesPath, 'loopback-capture.exe')
+  : path.join(__dirname, '../native/bin/loopback-capture.exe');
+
+const systemAudioCaptures = new Map(); // webContents.id -> helper process
+const watchedContents = new WeakSet();
+
+function stopSystemAudio(webContentsId) {
+  const helper = systemAudioCaptures.get(webContentsId);
+  if (helper) {
+    systemAudioCaptures.delete(webContentsId);
+    helper.kill();
+  }
+}
+
+ipcMain.handle('system-audio-start', (event) => {
+  const sender = event.sender;
+  stopSystemAudio(sender.id);
+
+  if (process.platform !== 'win32' || !fs.existsSync(LOOPBACK_HELPER)) {
+    return { ok: false, error: 'unsupported' };
+  }
+
+  return new Promise((resolve) => {
+    const helper = spawn(LOOPBACK_HELPER, ['--exclude-pid', String(process.pid)], { windowsHide: true });
+    systemAudioCaptures.set(sender.id, helper);
+
+    let settled = false;
+    let stderr = '';
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      if (!result.ok) stopSystemAudio(sender.id);
+      resolve(result);
+    };
+
+    helper.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+      if (stderr.includes('READY')) settle({ ok: true });
+      const error = stderr.match(/ERROR (.*)/);
+      if (error) settle({ ok: false, error: error[1].trim() });
+    });
+
+    helper.stdout.on('data', (chunk) => {
+      if (!sender.isDestroyed()) sender.send('system-audio-data', chunk);
+    });
+
+    helper.on('error', (err) => settle({ ok: false, error: err.message }));
+    helper.on('exit', (code) => {
+      if (systemAudioCaptures.get(sender.id) === helper) systemAudioCaptures.delete(sender.id);
+      settle({ ok: false, error: `helper exited with code ${code}` });
+    });
+
+    if (!watchedContents.has(sender)) {
+      watchedContents.add(sender);
+      const id = sender.id;
+      sender.on('destroyed', () => stopSystemAudio(id));
+      sender.on('did-start-navigation', (details) => {
+        if (details.isMainFrame && !details.isSameDocument) stopSystemAudio(id);
+      });
+    }
+  });
+});
+
+ipcMain.handle('system-audio-stop', (event) => {
+  stopSystemAudio(event.sender.id);
+});
+
+app.on('will-quit', () => {
+  systemAudioCaptures.forEach(helper => helper.kill());
+  systemAudioCaptures.clear();
 });
 
 // IPC: Window controls

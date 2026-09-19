@@ -16,6 +16,7 @@ class ScreenSharePicker {
     this.selectedSourceId = null;
     this.sources = [];
     this.resolvePromise = null;
+    this.systemAudio = null;
 
     this.initEvents();
   }
@@ -156,13 +157,10 @@ class ScreenSharePicker {
     }
 
     try {
+      // Chromium's desktop audio is a plain loopback of everything, including
+      // the call's voices; system audio comes from attachSystemAudio instead.
       const constraints = {
-        audio: this.audioCheckbox && this.audioCheckbox.checked ? {
-          mandatory: {
-            chromeMediaSource: 'desktop',
-            chromeMediaSourceId: this.selectedSourceId
-          }
-        } : false,
+        audio: false,
         video: {
           mandatory: {
             chromeMediaSource: 'desktop',
@@ -175,11 +173,39 @@ class ScreenSharePicker {
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+      if (this.audioCheckbox && this.audioCheckbox.checked) {
+        await this.attachSystemAudio(stream);
+      }
+
       return stream;
     } catch (err) {
       console.error('Error starting screen capture with constraints:', err);
       alert('Não foi possível iniciar o compartilhamento de tela: ' + err.message);
       return null;
+    }
+  }
+
+  async attachSystemAudio(stream) {
+    this.releaseSystemAudio();
+
+    if (!window.SystemAudioCapture || !window.SystemAudioCapture.isSupported()) return;
+
+    try {
+      this.systemAudio = await window.SystemAudioCapture.start();
+      stream.addTrack(this.systemAudio.stream.getAudioTracks()[0]);
+    } catch (err) {
+      console.warn('System audio capture unavailable:', err);
+      // Never fall back to the full loopback: it would echo the call's voices
+      alert('Não foi possível capturar o áudio do PC sem as vozes da chamada ' +
+        '(requer Windows 11 ou Windows 10 atualizado). A tela será compartilhada sem áudio.');
+    }
+  }
+
+  releaseSystemAudio() {
+    if (this.systemAudio) {
+      this.systemAudio.stop();
+      this.systemAudio = null;
     }
   }
 

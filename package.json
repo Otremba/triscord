@@ -5,8 +5,11 @@
   "main": "src/main.js",
   "scripts": {
     "start": "concurrently \"npm run server\" \"npm run electron\"",
+    "preelectron": "npm run build:native",
     "electron": "electron .",
     "server": "node server/server.js",
+    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -File native/loopback-capture/build.ps1",
+    "prebuild:win": "npm run build:native",
     "build:win": "electron-builder --win"
   },
   "keywords": [
@@ -40,6 +43,12 @@
       "server/**/*",
       "package.json",
       "!node_modules/.cache/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "native/bin/loopback-capture.exe",
+        "to": "loopback-capture.exe"
+      }
     ],
     "win": {
       "target": "nsis",

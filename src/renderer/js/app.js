@@ -357,6 +357,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.SoundEffects.playLeave();
 
+    state.screenPicker.releaseSystemAudio();
+
     if (state.webrtc) {
       state.webrtc.cleanupAll();
     }
@@ -805,6 +807,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.user.isScreenSharing) {
       state.user.isScreenSharing = false;
       state.webrtc.stopScreenShare();
+      state.screenPicker.releaseSystemAudio();
       updateActionButtonsState();
       renderAllVideoTiles();
       if (state.socket && state.currentRoomId) {
@@ -821,6 +824,7 @@ document.addEventListener('DOMContentLoaded', () => {
       stream.getVideoTracks()[0].onended = () => {
         state.user.isScreenSharing = false;
         state.webrtc.stopScreenShare();
+        state.screenPicker.releaseSystemAudio();
         updateActionButtonsState();
         renderAllVideoTiles();
         if (state.socket && state.currentRoomId) {
