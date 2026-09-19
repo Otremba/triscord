@@ -989,12 +989,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Mic Test Button
-    let testStream = null;
+    let testCapture = null;
     let testDetector = null;
     el.btnTestMic.addEventListener('click', async () => {
-      if (testStream) {
-        testStream.getTracks().forEach(t => t.stop());
-        testStream = null;
+      if (testCapture) {
+        testCapture.release();
+        testCapture = null;
         if (testDetector) testDetector.destroy();
         el.btnTestMic.textContent = 'Testar Microfone';
         el.micVuMeter.style.width = '0%';
@@ -1002,17 +1002,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       try {
-        testStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            noiseSuppression: state.noiseSuppression,
-            echoCancellation: true,
-            autoGainControl: true,
-            deviceId: el.selectAudioInput.value ? { exact: el.selectAudioInput.value } : undefined
-          }
-        });
+        // Uses the checkbox as it is right now, so the filter can be compared before saving
+        testCapture = await window.captureMicrophone({
+          echoCancellation: true,
+          autoGainControl: true,
+          ...(el.selectAudioInput.value ? { deviceId: { exact: el.selectAudioInput.value } } : {})
+        }, el.noiseSuppression.checked);
         el.btnTestMic.textContent = 'Parar Teste';
 
-        testDetector = new window.SpeakingDetector(testStream, (isSpeaking, level) => {
+        testDetector = new window.SpeakingDetector(testCapture.stream, (isSpeaking, level) => {
           const pct = Math.min(100, Math.round((level / 60) * 100));
           el.micVuMeter.style.width = `${pct}%`;
         }, { threshold: 0 });
@@ -1112,9 +1110,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       if (previousNoiseSuppression !== state.noiseSuppression && state.webrtc.localMicStream) {
-        state.webrtc.localMicStream.getTracks().forEach(track => track.stop());
-        state.webrtc.localMicStream = null;
-
         try {
           const micStream = await state.webrtc.startMicrophone(
             state.selectedAudioInput,

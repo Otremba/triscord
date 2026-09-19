@@ -35,6 +35,10 @@ class WebRTCManager {
     this.localCamStream = null;
     this.localScreenStream = null;
 
+    // Owns the raw capture + RNNoise pipeline behind localMicStream
+    this.micCapture = null;
+    this.noiseSuppressionMode = null; // 'rnnoise' | 'native' | 'off'
+
     // Callbacks
     this.onRemoteStreamAdded = null; // (socketId, stream, isScreen)
     this.onRemoteStreamRemoved = null; // (socketId, isScreen)
@@ -128,27 +132,41 @@ class WebRTCManager {
   }
 
   /**
-   * Acquire local microphone audio stream with noise suppression & echo cancellation
+   * Acquire the microphone with echo cancellation and noise suppression
+   * (RNNoise when available, the browser's built-in suppressor otherwise).
    */
   async startMicrophone(audioDeviceId = null, noiseSuppression = true) {
     try {
-      const constraints = {
-        audio: {
-          echoCancellation: true,
-          noiseSuppression,
-          autoGainControl: true,
-          ...(audioDeviceId ? { deviceId: { exact: audioDeviceId } } : {})
-        },
-        video: false
-      };
+      const mic = await window.captureMicrophone({
+        echoCancellation: true,
+        autoGainControl: true,
+        ...(audioDeviceId ? { deviceId: { exact: audioDeviceId } } : {})
+      }, noiseSuppression);
 
-      this.localMicStream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.stopMicrophone();
+      this.micCapture = mic;
+      this.localMicStream = mic.stream;
+      this.noiseSuppressionMode = mic.mode;
+      console.info(`[WebRTC] Microphone started, noise suppression: ${mic.mode}`);
+
       this.applyTrackToPeers('mic', this.localMicStream.getAudioTracks()[0] || null);
       return this.localMicStream;
     } catch (err) {
       console.error('[WebRTC] Error accessing microphone:', err);
       throw err;
     }
+  }
+
+  stopMicrophone() {
+    if (this.micCapture) {
+      this.micCapture.release();
+      this.micCapture = null;
+    }
+    if (this.localMicStream) {
+      this.localMicStream.getTracks().forEach(t => t.stop());
+      this.localMicStream = null;
+    }
+    this.noiseSuppressionMode = null;
   }
 
   /**
@@ -353,10 +371,7 @@ class WebRTCManager {
       streamMap.clear();
     });
 
-    if (this.localMicStream) {
-      this.localMicStream.getTracks().forEach(t => t.stop());
-      this.localMicStream = null;
-    }
+    this.stopMicrophone();
     if (this.localCamStream) {
       this.localCamStream.getTracks().forEach(t => t.stop());
       this.localCamStream = null;
