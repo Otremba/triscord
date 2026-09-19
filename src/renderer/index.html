@@ -327,6 +327,22 @@
   </div>
 
   <!-- Scripts -->
+  <!-- Per-user / per-stream volume (opened from a tile or by right-clicking a user) -->
+  <div id="volumePopover" class="volume-popover hidden" role="dialog" aria-label="Volume">
+    <div class="volume-popover-title" id="volumePopoverTitle"></div>
+    <div class="volume-popover-row">
+      <input type="range" id="volumePopoverSlider" min="0" max="100" step="1" value="100" aria-label="Volume" />
+      <span class="volume-popover-value" id="volumePopoverValue">100%</span>
+    </div>
+    <div class="volume-popover-actions">
+      <label class="setting-checkbox volume-popover-mute">
+        <input type="checkbox" id="volumePopoverMute" />
+        <span>Silenciar</span>
+      </label>
+      <button type="button" class="volume-popover-reset" id="volumePopoverReset">Redefinir</button>
+    </div>
+  </div>
+
   <script src="js/socket.io.min.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/noise-suppression.js"></script>

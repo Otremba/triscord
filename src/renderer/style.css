@@ -710,6 +710,118 @@ body {
   opacity: 1;
 }
 
+/* Per-user / per-stream volume */
+.tile-volume-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.video-tile:hover .tile-volume-btn,
+.tile-volume-btn:focus-visible,
+.tile-volume-btn.adjusted {
+  opacity: 1;
+}
+
+.tile-volume-btn:hover {
+  background-color: rgba(0, 0, 0, 0.85);
+}
+
+/* Lowered or silenced by you: always visible so it isn't forgotten */
+.tile-volume-btn.adjusted {
+  background-color: rgba(242, 63, 67, 0.85);
+}
+
+.focus-strip .tile-volume-btn {
+  width: 24px;
+  height: 24px;
+  right: 6px;
+  bottom: 5px;
+  font-size: 12px;
+}
+
+.volume-popover {
+  position: fixed;
+  z-index: 1000;
+  width: 240px;
+  padding: 12px 14px;
+  background-color: var(--bg-floating);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-high);
+  color: var(--text-normal);
+  font-size: 13px;
+}
+
+.volume-popover-title {
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: var(--text-header);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.volume-popover-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.volume-popover-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent-blurple);
+}
+
+.volume-popover-value {
+  width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.volume-popover-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.volume-popover-mute {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.volume-popover-mute input {
+  accent-color: var(--accent-red);
+}
+
+.volume-popover-reset {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.volume-popover-reset:hover {
+  color: var(--text-interactive-hover);
+  text-decoration: underline;
+}
+
 /* Video & Voice User Tiles */
 .video-tile {
   cursor: pointer;

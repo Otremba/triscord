@@ -32,6 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
     remoteSpeakingDetectors: new Map(), // socketId -> SpeakingDetector
     isChatOpen: false,
     focusedTileId: null, // spotlighted tile key: 'local', 'screen-local', socketId or 'screen-<socketId>'
+    // Per-person playback: { voice: { userId: { volume, muted } }, stream: { ... } }
+    audioPrefs: loadAudioPrefs(),
+    volumePopover: null, // { kind: 'voice' | 'stream', socketId } while the popover is open
     micSensitivity: parseInt(localStorage.getItem('discord_mic_sens') || '15', 10),
     selectedAudioInput: localStorage.getItem('discord_mic_device') || 'default',
     selectedAudioOutput: localStorage.getItem('discord_spk_device') || 'default',
@@ -95,6 +98,14 @@ document.addEventListener('DOMContentLoaded', () => {
     labelSensitivity: document.getElementById('labelSensitivity'),
     noiseSuppression: document.getElementById('settingsNoiseSuppression'),
     micVuMeter: document.getElementById('micVuMeterFill'),
+
+    // Per-user / per-stream volume popover
+    volumePopover: document.getElementById('volumePopover'),
+    volumePopoverTitle: document.getElementById('volumePopoverTitle'),
+    volumePopoverSlider: document.getElementById('volumePopoverSlider'),
+    volumePopoverValue: document.getElementById('volumePopoverValue'),
+    volumePopoverMute: document.getElementById('volumePopoverMute'),
+    volumePopoverReset: document.getElementById('volumePopoverReset'),
     btnTestMic: document.getElementById('btnTestMic'),
     avatarColorPicker: document.querySelectorAll('.avatar-color-option')
   };
@@ -277,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ${room.users && room.users.length > 0 ? `
             <div class="channel-user-list">
               ${room.users.map(u => `
-                <div class="channel-user-item ${u.isSpeaking ? 'speaking' : ''}">
+                <div class="channel-user-item ${u.isSpeaking ? 'speaking' : ''}" data-socket-id="${u.socketId}">
                   <div class="channel-user-avatar" style="background-color: ${u.avatar || '#5865F2'}">
                     ${u.username.charAt(0).toUpperCase()}
                   </div>
@@ -377,6 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.user.isCameraOn = false;
     state.user.isScreenSharing = false;
     state.focusedTileId = null;
+    closeVolumePopover();
 
     updateActionButtonsState();
     updateStageView();
@@ -425,13 +437,15 @@ document.addEventListener('DOMContentLoaded', () => {
     state.roomMembers.forEach((member, socketId) => {
       tiles.push({
         key: socketId,
-        node: createRemoteUserTile(socketId, member, state.webrtc.remoteStreams.get(socketId))
+        node: createRemoteUserTile(socketId, member, state.webrtc.remoteStreams.get(socketId)),
+        audio: { kind: 'voice', socketId }
       });
 
       if (member.isScreenSharing) {
         tiles.push({
           key: `screen-${socketId}`,
-          node: createScreenTile(socketId, member.username, state.webrtc.remoteScreenStreams.get(socketId), false)
+          node: createScreenTile(socketId, member.username, state.webrtc.remoteScreenStreams.get(socketId), false),
+          audio: { kind: 'stream', socketId }
         });
       }
     });
@@ -441,15 +455,27 @@ document.addEventListener('DOMContentLoaded', () => {
       state.focusedTileId = null;
     }
 
-    tiles.forEach(({ key, node }) => {
+    // Same for the volume popover's target
+    if (state.volumePopover && !tiles.some(t => t.audio &&
+        t.audio.kind === state.volumePopover.kind && t.audio.socketId === state.volumePopover.socketId)) {
+      closeVolumePopover();
+    }
+
+    tiles.forEach(({ key, node, audio }) => {
       node.dataset.tileKey = key;
       node.addEventListener('click', () => toggleTileFocus(key));
 
+      const content = node.querySelector('.tile-content');
       const hint = document.createElement('div');
       hint.className = 'tile-focus-hint';
       hint.textContent = state.focusedTileId === key ? '⤡' : '⤢';
       hint.title = state.focusedTileId === key ? 'Sair do foco (Esc)' : 'Colocar em foco';
-      node.querySelector('.tile-content').appendChild(hint);
+      content.appendChild(hint);
+
+      if (audio) {
+        content.appendChild(createVolumeButton(audio.kind, audio.socketId));
+        node.addEventListener('contextmenu', (e) => openVolumeAtPointer(audio.kind, audio.socketId, e));
+      }
     });
 
     if (state.focusedTileId) {
@@ -484,6 +510,146 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAllVideoTiles();
   }
 
+  // ---- Per-user / per-stream volume ----
+
+  function loadAudioPrefs() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('discord_audio_prefs'));
+      if (saved && saved.voice && saved.stream) return saved;
+    } catch (e) {}
+    return { voice: {}, stream: {} };
+  }
+
+  // Keyed by userId so a friend's volume survives reconnects (socketIds change)
+  function audioPrefKey(socketId) {
+    const member = state.roomMembers.get(socketId);
+    return (member && member.userId) || socketId;
+  }
+
+  function getAudioPref(kind, socketId) {
+    return state.audioPrefs[kind][audioPrefKey(socketId)] || { volume: 1, muted: false };
+  }
+
+  function setAudioPref(kind, socketId, changes) {
+    // Re-read first: another window may have saved since this one loaded, and
+    // writing back a stale copy would erase those settings
+    state.audioPrefs = loadAudioPrefs();
+
+    const key = audioPrefKey(socketId);
+    const pref = { ...getAudioPref(kind, socketId), ...changes };
+
+    if (pref.volume === 1 && !pref.muted) {
+      delete state.audioPrefs[kind][key];
+    } else {
+      state.audioPrefs[kind][key] = pref;
+    }
+    localStorage.setItem('discord_audio_prefs', JSON.stringify(state.audioPrefs));
+
+    applyPeerAudio(socketId);
+    refreshVolumeButtons(socketId);
+  }
+
+  function applyAudioPref(audioEl, kind, socketId) {
+    const pref = getAudioPref(kind, socketId);
+    audioEl.volume = pref.volume;
+    audioEl.muted = state.user.isDeafened || pref.muted;
+  }
+
+  function applyPeerAudio(socketId) {
+    const voiceEl = document.getElementById(`audio-${socketId}`);
+    if (voiceEl) applyAudioPref(voiceEl, 'voice', socketId);
+
+    const streamEl = document.getElementById(`audio-screen-${socketId}`);
+    if (streamEl) applyAudioPref(streamEl, 'stream', socketId);
+  }
+
+  function applyAllPeerAudio() {
+    state.roomMembers.forEach((_, socketId) => applyPeerAudio(socketId));
+  }
+
+  function createVolumeButton(kind, socketId) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tile-volume-btn';
+    btn.dataset.volumeKind = kind;
+    btn.dataset.socketId = socketId;
+    refreshVolumeButton(btn);
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // don't toggle tile focus
+      const current = state.volumePopover;
+      if (current && current.kind === kind && current.socketId === socketId) {
+        closeVolumePopover();
+      } else {
+        openVolumePopover(kind, socketId, btn.getBoundingClientRect());
+      }
+    });
+    return btn;
+  }
+
+  function refreshVolumeButton(btn) {
+    const pref = getAudioPref(btn.dataset.volumeKind, btn.dataset.socketId);
+    const pct = Math.round(pref.volume * 100);
+    const silenced = pref.muted || pct === 0;
+
+    btn.textContent = silenced ? '🔇' : pct < 100 ? '🔉' : '🔊';
+    btn.classList.toggle('adjusted', silenced || pct < 100);
+    btn.title = pref.muted ? 'Silenciado por você' : `Volume: ${pct}%`;
+    btn.setAttribute('aria-label', btn.title);
+  }
+
+  function refreshVolumeButtons(socketId) {
+    document.querySelectorAll(`.tile-volume-btn[data-socket-id="${CSS.escape(socketId)}"]`)
+      .forEach(refreshVolumeButton);
+  }
+
+  // anchorRect: a button's rect (opens above it), or a pointer position with
+  // atPointer = true (opens down-right like a context menu)
+  function openVolumePopover(kind, socketId, anchorRect, atPointer = false) {
+    const member = state.roomMembers.get(socketId);
+    if (!member) return;
+
+    state.volumePopover = { kind, socketId };
+    const pref = getAudioPref(kind, socketId);
+
+    el.volumePopoverTitle.textContent = kind === 'voice'
+      ? `Volume de ${member.username}`
+      : `Transmissão de ${member.username}`;
+    el.volumePopoverSlider.value = Math.round(pref.volume * 100);
+    el.volumePopoverValue.textContent = `${Math.round(pref.volume * 100)}%`;
+    el.volumePopoverMute.checked = pref.muted;
+
+    const popover = el.volumePopover;
+    popover.classList.remove('hidden');
+
+    // Prefer above the button (flip below if there's no room), stay on screen
+    const margin = 8;
+    const width = popover.offsetWidth;
+    const height = popover.offsetHeight;
+    let left = atPointer ? anchorRect.left : anchorRect.right - width;
+    let top = atPointer ? anchorRect.top : anchorRect.top - height - margin;
+    if (!atPointer && top < margin) top = anchorRect.bottom + margin;
+    left = Math.min(Math.max(left, margin), window.innerWidth - width - margin);
+    top = Math.min(Math.max(top, margin), window.innerHeight - height - margin);
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+
+    el.volumePopoverSlider.focus();
+  }
+
+  function closeVolumePopover() {
+    state.volumePopover = null;
+    el.volumePopover.classList.add('hidden');
+  }
+
+  function openVolumeAtPointer(kind, socketId, event) {
+    event.preventDefault();
+    event.stopPropagation();
+    openVolumePopover(kind, socketId, {
+      left: event.clientX, right: event.clientX, top: event.clientY, bottom: event.clientY
+    }, true);
+  }
+
   // Dedicated tile for a screen share, separate from the owner's camera tile
   function createScreenTile(id, label, stream, isLocal) {
     const tile = document.createElement('div');
@@ -509,7 +675,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const audioEl = tile.querySelector('audio');
       if (audioEl) {
         audioEl.srcObject = stream;
-        audioEl.muted = state.user.isDeafened;
+        applyAudioPref(audioEl, 'stream', id);
       }
     }
 
@@ -592,7 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (stream) {
       videoEl.srcObject = stream;
       audioEl.srcObject = stream;
-      audioEl.muted = state.user.isDeafened;
+      applyAudioPref(audioEl, 'voice', socketId);
 
       // Attach speaking detector to remote stream
       setupRemoteSpeakingDetector(socketId, stream);
@@ -617,7 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const audioEl = document.getElementById(`audio-screen-${socketId}`);
       if (audioEl && audioEl.srcObject !== stream) {
         audioEl.srcObject = stream;
-        audioEl.muted = state.user.isDeafened;
+        applyAudioPref(audioEl, 'stream', socketId);
       }
       return;
     }
@@ -636,7 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (audioEl && audioEl.srcObject !== stream) {
       audioEl.srcObject = stream;
-      audioEl.muted = state.user.isDeafened;
+      applyAudioPref(audioEl, 'voice', socketId);
     }
 
     if (member.isCameraOn) {
@@ -753,10 +919,8 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleMute();
     }
 
-    // Mute all remote audio tags
-    document.querySelectorAll('audio').forEach(audio => {
-      audio.muted = state.user.isDeafened;
-    });
+    // Deafen overrides everyone; undeafening restores each person's own setting
+    applyAllPeerAudio();
 
     window.SoundEffects.playMute(state.user.isDeafened);
     updateUserProfileUI();
@@ -1054,12 +1218,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Esc leaves spotlight mode
+  // Esc closes the volume popover first, then leaves spotlight mode
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && state.focusedTileId) {
+    if (e.key !== 'Escape') return;
+    if (state.volumePopover) {
+      closeVolumePopover();
+    } else if (state.focusedTileId) {
       state.focusedTileId = null;
       renderAllVideoTiles();
     }
+  });
+
+  // Right-click someone in your current channel to adjust their volume.
+  // Delegated and checked at click time, so it never depends on whether the
+  // sidebar was rendered before or after the room's members were known.
+  el.channelsList.addEventListener('contextmenu', (e) => {
+    const item = e.target.closest('.channel-user-item');
+    if (!item || !state.roomMembers.has(item.dataset.socketId)) return;
+    openVolumeAtPointer('voice', item.dataset.socketId, e);
+  });
+
+  // Volume changes made in another window apply here too
+  window.addEventListener('storage', (e) => {
+    if (e.key !== 'discord_audio_prefs') return;
+    state.audioPrefs = loadAudioPrefs();
+    applyAllPeerAudio();
+    document.querySelectorAll('.tile-volume-btn').forEach(refreshVolumeButton);
+  });
+
+  // Volume popover
+  el.volumePopoverSlider.addEventListener('input', () => {
+    if (!state.volumePopover) return;
+    const pct = parseInt(el.volumePopoverSlider.value, 10);
+    el.volumePopoverValue.textContent = `${pct}%`;
+    setAudioPref(state.volumePopover.kind, state.volumePopover.socketId, { volume: pct / 100 });
+  });
+
+  el.volumePopoverMute.addEventListener('change', () => {
+    if (!state.volumePopover) return;
+    setAudioPref(state.volumePopover.kind, state.volumePopover.socketId, { muted: el.volumePopoverMute.checked });
+  });
+
+  el.volumePopoverReset.addEventListener('click', () => {
+    if (!state.volumePopover) return;
+    setAudioPref(state.volumePopover.kind, state.volumePopover.socketId, { volume: 1, muted: false });
+    el.volumePopoverSlider.value = 100;
+    el.volumePopoverValue.textContent = '100%';
+    el.volumePopoverMute.checked = false;
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (!state.volumePopover) return;
+    if (el.volumePopover.contains(e.target) || e.target.closest('.tile-volume-btn')) return;
+    closeVolumePopover();
   });
 
   // Create Custom Room
