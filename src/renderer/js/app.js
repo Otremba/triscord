@@ -31,6 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
     localSpeakingDetector: null,
     remoteSpeakingDetectors: new Map(), // socketId -> SpeakingDetector
     isChatOpen: false,
+    // Which tile is currently enlarged in focus mode, e.g. 'cam-local', 'screen-<socketId>'. null = grid view.
+    focusedKey: null,
     micSensitivity: parseInt(localStorage.getItem('discord_mic_sens') || '15', 10),
     selectedAudioInput: localStorage.getItem('discord_mic_device') || 'default',
     selectedAudioOutput: localStorage.getItem('discord_spk_device') || 'default',
@@ -66,6 +68,9 @@ document.addEventListener('DOMContentLoaded', () => {
     welcomeStage: document.getElementById('welcomeStage'),
     voiceStage: document.getElementById('voiceStage'),
     videoGrid: document.getElementById('videoGrid'),
+    focusStage: document.getElementById('focusStage'),
+    focusMain: document.getElementById('focusMain'),
+    focusFilmstrip: document.getElementById('focusFilmstrip'),
     stageChannelTitle: document.getElementById('stageChannelTitle'),
     stageUserCount: document.getElementById('stageUserCount'),
 
@@ -90,8 +95,11 @@ document.addEventListener('DOMContentLoaded', () => {
     selectAudioInput: document.getElementById('settingsAudioInput'),
     selectAudioOutput: document.getElementById('settingsAudioOutput'),
     selectVideoInput: document.getElementById('settingsVideoInput'),
+    noiseSuppression: document.getElementById('settingsNoiseSuppression'),
     sliderSensitivity: document.getElementById('settingsSensitivity'),
     labelSensitivity: document.getElementById('labelSensitivity'),
+    btnTestMic: document.getElementById('btnTestMic'),
+    micVuMeter: document.getElementById('micVuMeterFill'),
     avatarColorPicker: document.querySelectorAll('.avatar-color-option')
   };
 
@@ -129,16 +137,16 @@ document.addEventListener('DOMContentLoaded', () => {
       // Initialize WebRTC Manager with socket
       state.webrtc = new window.WebRTCManager(state.socket, state.user.userId);
 
-      // Handle Remote Stream Added
-      state.webrtc.onRemoteStreamAdded = (socketId, stream) => {
-        console.log(`[App] Remote stream received from ${socketId}`);
-        renderUserTile(socketId, stream);
+      // Handle Remote Stream Added (kind: 'cam' or 'screen')
+      state.webrtc.onRemoteStreamAdded = (socketId, kind, stream) => {
+        console.log(`[App] Remote ${kind} stream received from ${socketId}`);
+        updateTileMedia(`${kind}-${socketId}`, stream);
       };
 
       // Handle Remote Stream Removed
-      state.webrtc.onRemoteStreamRemoved = (socketId) => {
-        console.log(`[App] Remote stream removed from ${socketId}`);
-        renderUserTile(socketId, null);
+      state.webrtc.onRemoteStreamRemoved = (socketId, kind) => {
+        console.log(`[App] Remote ${kind} stream removed from ${socketId}`);
+        updateTileMedia(`${kind}-${socketId}`, null);
       };
 
       // Socket Events
@@ -202,8 +210,10 @@ document.addEventListener('DOMContentLoaded', () => {
       state.socket.on('user-state-updated', ({ socketId, state: newState }) => {
         if (state.roomMembers.has(socketId)) {
           const user = state.roomMembers.get(socketId);
+          const justStartedScreenShare = newState.isScreenSharing === true && !user.isScreenSharing;
           Object.assign(user, newState);
-          updateUserTileState(socketId, user);
+          if (justStartedScreenShare) focusIfFree(`screen-${socketId}`);
+          renderStage();
         }
       });
 
@@ -359,6 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.roomMembers.clear();
     state.user.isCameraOn = false;
     state.user.isScreenSharing = false;
+    state.focusedKey = null;
 
     updateActionButtonsState();
     updateStageView();
@@ -381,25 +392,134 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalMembers = state.roomMembers.size + 1; // peers + self
     el.stageUserCount.textContent = `${totalMembers} ${totalMembers === 1 ? 'membro' : 'membros'} no canal`;
 
-    renderAllVideoTiles();
+    renderStage();
   }
 
-  // Render all tiles in the stage grid
-  function renderAllVideoTiles() {
-    el.videoGrid.innerHTML = '';
+  // Build the flat list of renderable tiles: one 'cam' tile per participant (camera or
+  // avatar placeholder) plus one extra 'screen' tile for each participant currently sharing.
+  function buildTileDescriptors() {
+    const list = [];
 
-    // 1. Render Local User Tile
-    const localTile = createLocalUserTile();
-    el.videoGrid.appendChild(localTile);
-
-    // 2. Render Remote User Tiles
-    state.roomMembers.forEach((member, socketId) => {
-      const remoteStream = state.webrtc.remoteStreams.get(socketId);
-      const remoteTile = createRemoteUserTile(socketId, member, remoteStream);
-      el.videoGrid.appendChild(remoteTile);
+    list.push({
+      key: 'cam-local',
+      kind: 'cam',
+      participantId: 'local',
+      isLocal: true,
+      username: `${state.user.username} (Você)`,
+      avatarColor: state.user.avatarColor,
+      isMuted: state.user.isMuted,
+      isDeafened: state.user.isDeafened,
+      isSpeaking: state.user.isSpeaking,
+      hasVideo: state.user.isCameraOn,
+      stream: state.user.isCameraOn ? state.webrtc.localCamStream : null
     });
 
-    adjustGridColumns();
+    if (state.user.isScreenSharing) {
+      list.push({
+        key: 'screen-local',
+        kind: 'screen',
+        participantId: 'local',
+        isLocal: true,
+        username: `${state.user.username} — Tela`,
+        avatarColor: state.user.avatarColor,
+        isMuted: false,
+        isDeafened: false,
+        isSpeaking: false,
+        hasVideo: true,
+        stream: state.webrtc.localScreenStream
+      });
+    }
+
+    state.roomMembers.forEach((member, socketId) => {
+      list.push({
+        key: `cam-${socketId}`,
+        kind: 'cam',
+        participantId: socketId,
+        isLocal: false,
+        username: member.username,
+        avatarColor: member.avatar,
+        isMuted: member.isMuted,
+        isDeafened: member.isDeafened,
+        isSpeaking: member.isSpeaking,
+        hasVideo: member.isCameraOn,
+        stream: state.webrtc.remoteCamStreams.get(socketId) || null
+      });
+
+      if (member.isScreenSharing) {
+        list.push({
+          key: `screen-${socketId}`,
+          kind: 'screen',
+          participantId: socketId,
+          isLocal: false,
+          username: `${member.username} — Tela`,
+          avatarColor: member.avatar,
+          isMuted: false,
+          isDeafened: false,
+          isSpeaking: false,
+          hasVideo: true,
+          stream: state.webrtc.remoteScreenStreams.get(socketId) || null
+        });
+      }
+    });
+
+    return list;
+  }
+
+  // Auto-focus a newly appeared screen share, but only if nothing is focused yet
+  // (never steals focus from something the user deliberately pinned).
+  function focusIfFree(key) {
+    if (!state.focusedKey) {
+      state.focusedKey = key;
+    }
+  }
+
+  function setFocus(key) {
+    state.focusedKey = key;
+    renderStage();
+  }
+
+  // Render the stage: either the responsive grid, or (when a tile is focused) a big
+  // main view + a filmstrip of the remaining participants, Discord-call style.
+  function renderStage() {
+    const tiles = buildTileDescriptors();
+
+    // If whatever was focused disappeared (stopped sharing / left), fall back to grid.
+    if (state.focusedKey && !tiles.some(t => t.key === state.focusedKey)) {
+      state.focusedKey = null;
+    }
+
+    el.videoGrid.innerHTML = '';
+    el.focusMain.innerHTML = '';
+    el.focusFilmstrip.innerHTML = '';
+
+    if (!state.focusedKey) {
+      el.focusStage.classList.add('hidden');
+      el.videoGrid.classList.remove('hidden');
+      tiles.forEach(t => el.videoGrid.appendChild(buildTileElement(t, 'grid')));
+      adjustGridColumns();
+      return;
+    }
+
+    el.videoGrid.classList.add('hidden');
+    el.focusStage.classList.remove('hidden');
+
+    const focusedTile = tiles.find(t => t.key === state.focusedKey);
+    el.focusMain.appendChild(buildTileElement(focusedTile, 'focus'));
+
+    // If we're focused on someone's screen and that same person also has their camera on,
+    // show their camera as a floating bubble on top of the screen instead of duplicating
+    // it down in the filmstrip - matches how Discord overlays the presenter's own camera.
+    let filmstripTiles = tiles.filter(t => t.key !== state.focusedKey);
+    if (focusedTile.kind === 'screen') {
+      const camKey = `cam-${focusedTile.participantId}`;
+      const pipIndex = filmstripTiles.findIndex(t => t.key === camKey && t.hasVideo && t.stream);
+      if (pipIndex !== -1) {
+        el.focusMain.appendChild(buildPipElement(filmstripTiles[pipIndex]));
+        filmstripTiles.splice(pipIndex, 1);
+      }
+    }
+
+    filmstripTiles.forEach(t => el.focusFilmstrip.appendChild(buildTileElement(t, 'mini')));
   }
 
   function adjustGridColumns() {
@@ -412,188 +532,136 @@ document.addEventListener('DOMContentLoaded', () => {
     else el.videoGrid.classList.add('grid-many');
   }
 
-  function createLocalUserTile() {
+  // Build a tile element. `size` is 'grid' | 'mini' | 'focus' and controls click behavior:
+  // grid/mini tiles focus themselves on click, the focus tile only unfocuses via its own button.
+  function buildTileElement(t, size) {
     const tile = document.createElement('div');
-    tile.className = `video-tile local-tile ${state.user.isSpeaking ? 'speaking' : ''}`;
-    tile.id = 'tile-local';
+    const clickable = size === 'grid' || size === 'mini';
+    tile.className = [
+      'video-tile',
+      clickable ? 'tile-clickable' : '',
+      t.isSpeaking ? 'speaking' : ''
+    ].filter(Boolean).join(' ');
+    tile.id = `tile-${t.key}`;
 
-    const hasVideo = state.user.isCameraOn || state.user.isScreenSharing;
-    const isScreen = state.user.isScreenSharing;
+    const showVideo = t.hasVideo && t.stream && t.stream.getVideoTracks().length > 0;
 
     tile.innerHTML = `
       <div class="tile-content">
-        <video id="video-local" autoplay playsinline muted class="${hasVideo ? '' : 'hidden'}"></video>
-        <div class="avatar-view ${hasVideo ? 'hidden' : ''}">
-          <div class="tile-avatar" style="background-color: ${state.user.avatarColor}">
-            ${state.user.username.charAt(0).toUpperCase()}
+        <video id="video-${t.key}" autoplay playsinline ${t.isLocal ? 'muted' : ''} class="${showVideo ? '' : 'hidden'}"></video>
+        ${!t.isLocal ? `<audio id="audio-${t.key}" autoplay></audio>` : ''}
+        <div class="avatar-view ${showVideo ? 'hidden' : ''}">
+          <div class="tile-avatar" style="background-color: ${t.avatarColor || '#5865F2'}">
+            ${t.username.charAt(0).toUpperCase()}
           </div>
         </div>
-        ${isScreen ? '<div class="live-tag">TRANSMITINDO TELA</div>' : ''}
+        ${t.kind === 'screen' ? '<div class="live-tag">AO VIVO</div>' : ''}
+        ${clickable ? `<button class="tile-focus-toggle" title="Focar">⤢</button>` : ''}
+        ${size === 'focus' ? `<button class="tile-focus-toggle" title="Voltar para o grid">✕</button>` : ''}
       </div>
       <div class="tile-overlay">
         <div class="tile-username">
-          <span>${state.user.username} (Você)</span>
-          ${state.user.isMuted ? '<span class="status-badge-mini red">🔇</span>' : ''}
-          ${state.user.isDeafened ? '<span class="status-badge-mini red">🔕</span>' : ''}
+          <span>${t.username}</span>
+          ${t.isMuted ? '<span class="status-badge-mini red">🔇</span>' : ''}
+          ${t.isDeafened ? '<span class="status-badge-mini red">🔕</span>' : ''}
         </div>
       </div>
     `;
 
-    const videoEl = tile.querySelector('#video-local');
-    if (isScreen && state.webrtc.localScreenStream) {
-      videoEl.srcObject = state.webrtc.localScreenStream;
-    } else if (state.user.isCameraOn && state.webrtc.localCamStream) {
-      videoEl.srcObject = state.webrtc.localCamStream;
+    const videoEl = tile.querySelector(`#video-${t.key}`);
+    if (showVideo) {
+      videoEl.srcObject = t.stream;
+    }
+
+    if (!t.isLocal) {
+      const audioEl = tile.querySelector(`#audio-${t.key}`);
+      if (t.stream) {
+        audioEl.srcObject = t.stream;
+        audioEl.muted = state.user.isDeafened;
+      }
+      if (t.kind === 'cam' && t.stream) {
+        setupRemoteSpeakingDetector(t.participantId, t.stream);
+      }
+    }
+
+    if (clickable) {
+      tile.addEventListener('click', () => setFocus(t.key));
+    } else if (size === 'focus') {
+      const btn = tile.querySelector('.tile-focus-toggle');
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setFocus(null);
+      });
     }
 
     return tile;
   }
 
-  function createRemoteUserTile(socketId, member, stream) {
-    const tile = document.createElement('div');
-    tile.className = `video-tile ${member.isSpeaking ? 'speaking' : ''}`;
-    tile.id = `tile-${socketId}`;
+  // A small circular floating video bubble (the presenter's own camera over their screen share)
+  function buildPipElement(t) {
+    const pip = document.createElement('div');
+    pip.className = `pip-camera-bubble ${t.isSpeaking ? 'speaking' : ''}`;
+    pip.id = `tile-${t.key}`;
 
-    const hasVideo = stream && stream.getVideoTracks().length > 0;
-
-    tile.innerHTML = `
-      <div class="tile-content">
-        <video id="video-${socketId}" autoplay playsinline class="${hasVideo ? '' : 'hidden'}"></video>
-        <audio id="audio-${socketId}" autoplay></audio>
-        <div class="avatar-view ${hasVideo ? 'hidden' : ''}">
-          <div class="tile-avatar" style="background-color: ${member.avatar || '#5865F2'}">
-            ${member.username.charAt(0).toUpperCase()}
-          </div>
-        </div>
-        ${member.isScreenSharing ? '<div class="live-tag">AO VIVO</div>' : ''}
-      </div>
-      <div class="tile-overlay">
-        <div class="tile-username">
-          <span>${member.username}</span>
-          ${member.isMuted ? '<span class="status-badge-mini red">🔇</span>' : ''}
-          ${member.isDeafened ? '<span class="status-badge-mini red">🔕</span>' : ''}
-        </div>
-      </div>
+    pip.innerHTML = `
+      <video id="video-${t.key}" autoplay playsinline ${t.isLocal ? 'muted' : ''}></video>
+      ${!t.isLocal ? `<audio id="audio-${t.key}" autoplay></audio>` : ''}
     `;
 
-    const videoEl = tile.querySelector(`#video-${socketId}`);
-    const audioEl = tile.querySelector(`#audio-${socketId}`);
+    const videoEl = pip.querySelector(`#video-${t.key}`);
+    if (t.stream) videoEl.srcObject = t.stream;
 
-    if (stream) {
-      videoEl.srcObject = stream;
-      audioEl.srcObject = stream;
-      audioEl.muted = state.user.isDeafened;
-
-      // Attach speaking detector to remote stream
-      setupRemoteSpeakingDetector(socketId, stream);
+    if (!t.isLocal) {
+      const audioEl = pip.querySelector(`#audio-${t.key}`);
+      if (t.stream) {
+        audioEl.srcObject = t.stream;
+        audioEl.muted = state.user.isDeafened;
+        setupRemoteSpeakingDetector(t.participantId, t.stream);
+      }
     }
 
-    return tile;
+    return pip;
   }
 
-  function renderUserTile(socketId, stream) {
-    const existingTile = document.getElementById(`tile-${socketId}`);
-    const member = state.roomMembers.get(socketId);
-    if (!member) return;
+  // Lightweight update path for a single stream arriving/leaving (fired per WebRTC track
+  // event), so we don't tear down and rebuild every tile on the stage each time. Falls back
+  // to a full render if the tile doesn't exist yet (e.g. this track just made it appear).
+  function updateTileMedia(key, stream) {
+    const tile = document.getElementById(`tile-${key}`);
+    if (!tile) {
+      renderStage();
+      return;
+    }
 
-    if (existingTile) {
-      const videoEl = existingTile.querySelector(`#video-${socketId}`);
-      const audioEl = existingTile.querySelector(`#audio-${socketId}`);
-      const avatarView = existingTile.querySelector('.avatar-view');
-      const tileContent = existingTile.querySelector('.tile-content');
-      let liveTag = existingTile.querySelector('.live-tag');
+    const videoEl = tile.querySelector(`#video-${key}`);
+    const audioEl = tile.querySelector(`#audio-${key}`);
+    const avatarView = tile.querySelector('.avatar-view');
+    const hasVideo = stream && stream.getVideoTracks().some(t => t.readyState === 'live' && !t.muted);
 
-      const hasVideo = stream && stream.getVideoTracks().some(t => t.readyState === 'live' && !t.muted);
-      const shouldShowVideo = hasVideo && (member.isCameraOn || member.isScreenSharing);
-
-      if (shouldShowVideo) {
-        if (videoEl.srcObject !== stream) {
-          videoEl.srcObject = stream;
-        }
+    if (videoEl) {
+      if (hasVideo) {
+        if (videoEl.srcObject !== stream) videoEl.srcObject = stream;
         videoEl.classList.remove('hidden');
-        avatarView.classList.add('hidden');
+        if (avatarView) avatarView.classList.add('hidden');
         videoEl.play().catch(e => console.warn('Video play error:', e));
       } else {
         videoEl.classList.add('hidden');
         videoEl.srcObject = null;
-        avatarView.classList.remove('hidden');
+        if (avatarView) avatarView.classList.remove('hidden');
       }
-
-      if (member.isScreenSharing) {
-        if (!liveTag && tileContent) {
-          liveTag = document.createElement('div');
-          liveTag.className = 'live-tag';
-          liveTag.textContent = 'AO VIVO';
-          tileContent.appendChild(liveTag);
-        }
-      } else if (liveTag) {
-        liveTag.remove();
-      }
-
-      if (stream && audioEl) {
-        if (audioEl.srcObject !== stream) {
-          audioEl.srcObject = stream;
-        }
-        setupRemoteSpeakingDetector(socketId, stream);
-      }
-    } else {
-      renderAllVideoTiles();
-    }
-  }
-
-  function updateUserTileState(socketId, member) {
-    const tile = document.getElementById(`tile-${socketId}`);
-    if (!tile) return;
-
-    if (member.isSpeaking) {
-      tile.classList.add('speaking');
-    } else {
-      tile.classList.remove('speaking');
     }
 
-    // Update icons in tag
-    const usernameSpan = tile.querySelector('.tile-username');
-    if (usernameSpan) {
-      usernameSpan.innerHTML = `
-        <span>${member.username}</span>
-        ${member.isMuted ? '<span class="status-badge-mini red">🔇</span>' : ''}
-        ${member.isDeafened ? '<span class="status-badge-mini red">🔕</span>' : ''}
-      `;
+    if (audioEl) {
+      if (stream) {
+        if (audioEl.srcObject !== stream) audioEl.srcObject = stream;
+        audioEl.muted = state.user.isDeafened;
+      } else {
+        audioEl.srcObject = null;
+      }
     }
 
-    // Update Video / Avatar visibility
-    const videoEl = tile.querySelector(`#video-${socketId}`);
-    const avatarView = tile.querySelector('.avatar-view');
-    const tileContent = tile.querySelector('.tile-content');
-    let liveTag = tile.querySelector('.live-tag');
-
-    const hasVideo = member.isCameraOn || member.isScreenSharing;
-
-    if (hasVideo) {
-      const stream = state.webrtc.remoteStreams.get(socketId);
-      if (stream && stream.getVideoTracks().length > 0) {
-        if (videoEl.srcObject !== stream) {
-          videoEl.srcObject = stream;
-        }
-        videoEl.classList.remove('hidden');
-        avatarView.classList.add('hidden');
-        videoEl.play().catch(e => console.warn('Video play error:', e));
-      }
-    } else {
-      videoEl.classList.add('hidden');
-      videoEl.srcObject = null;
-      avatarView.classList.remove('hidden');
-    }
-
-    if (member.isScreenSharing) {
-      if (!liveTag && tileContent) {
-        liveTag = document.createElement('div');
-        liveTag.className = 'live-tag';
-        liveTag.textContent = 'AO VIVO';
-        tileContent.appendChild(liveTag);
-      }
-    } else if (liveTag) {
-      liveTag.remove();
+    if (stream && key.startsWith('cam-') && key !== 'cam-local') {
+      setupRemoteSpeakingDetector(key.slice('cam-'.length), stream);
     }
   }
 
@@ -608,7 +676,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state.user.isSpeaking !== isSpeaking) {
         state.user.isSpeaking = isSpeaking;
 
-        const localTile = document.getElementById('tile-local');
+        const localTile = document.getElementById('tile-cam-local');
         if (localTile) {
           if (isSpeaking) localTile.classList.add('speaking');
           else localTile.classList.remove('speaking');
@@ -629,7 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const detector = new window.SpeakingDetector(stream, (isSpeaking) => {
-      const tile = document.getElementById(`tile-${socketId}`);
+      const tile = document.getElementById(`tile-cam-${socketId}`);
       if (tile) {
         if (isSpeaking) tile.classList.add('speaking');
         else tile.classList.remove('speaking');
@@ -664,7 +732,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.socket.emit('user-state-change', { isMuted: state.user.isMuted });
     }
 
-    renderAllVideoTiles();
+    renderStage();
   }
 
   // Toggle Deafen
@@ -688,7 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.socket.emit('user-state-change', { isDeafened: state.user.isDeafened });
     }
 
-    renderAllVideoTiles();
+    renderStage();
   }
 
   // Toggle Webcam
@@ -712,7 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     updateActionButtonsState();
-    renderAllVideoTiles();
+    renderStage();
 
     if (state.socket && state.currentRoomId) {
       state.socket.emit('user-state-change', { isCameraOn: state.user.isCameraOn });
@@ -730,7 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.user.isScreenSharing = false;
       state.webrtc.stopScreenShare();
       updateActionButtonsState();
-      renderAllVideoTiles();
+      renderStage();
       if (state.socket && state.currentRoomId) {
         state.socket.emit('user-state-change', { isScreenSharing: false });
       }
@@ -740,20 +808,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
       state.webrtc.setScreenStream(stream);
       state.user.isScreenSharing = true;
+      focusIfFree('screen-local');
 
       // Handle user stopping stream from OS prompt
       stream.getVideoTracks()[0].onended = () => {
         state.user.isScreenSharing = false;
         state.webrtc.stopScreenShare();
         updateActionButtonsState();
-        renderAllVideoTiles();
+        renderStage();
         if (state.socket && state.currentRoomId) {
           state.socket.emit('user-state-change', { isScreenSharing: false });
         }
       };
 
       updateActionButtonsState();
-      renderAllVideoTiles();
+      renderStage();
 
       if (state.socket && state.currentRoomId) {
         state.socket.emit('user-state-change', { isScreenSharing: true });

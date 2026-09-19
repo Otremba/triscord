@@ -11,8 +11,12 @@ class WebRTCManager {
 
     // Map: socketId -> RTCPeerConnection
     this.peers = new Map();
-    // Map: socketId -> remote MediaStream
-    this.remoteStreams = new Map();
+    // Map: socketId -> { micT, camT, screenVideoT, screenAudioT } RTCRtpTransceivers
+    this.peerMeta = new Map();
+    // Map: socketId -> remote MediaStream (camera video + mic audio)
+    this.remoteCamStreams = new Map();
+    // Map: socketId -> remote MediaStream (screen video + screen audio)
+    this.remoteScreenStreams = new Map();
     // Map: socketId -> Array<RTCIceCandidate> (queued candidates before remote description)
     this.iceCandidateQueues = new Map();
 
@@ -25,8 +29,8 @@ class WebRTCManager {
     this.localCombinedStream = new MediaStream();
 
     // Callbacks
-    this.onRemoteStreamAdded = null; // (socketId, stream)
-    this.onRemoteStreamRemoved = null; // (socketId, isVideo)
+    this.onRemoteStreamAdded = null; // (socketId, kind: 'cam'|'screen', stream)
+    this.onRemoteStreamRemoved = null; // (socketId, kind: 'cam'|'screen')
 
     this.iceServers = [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -192,75 +196,35 @@ class WebRTCManager {
   }
 
   /**
-   * Update active tracks in all peer connections using replaceTrack for seamless video toggling
+   * Push the current local tracks (mic / camera / screen video / screen audio) onto every
+   * peer connection's dedicated transceiver slots. Each slot is pre-created once per peer
+   * (see getOrCreatePeer) and never renegotiated again - toggling a source on/off is just a
+   * replaceTrack, which is what lets camera and screen share run at the same time.
    */
   updateLocalCombinedTracks() {
-    // Determine active video track (screen share takes priority over camera)
-    let activeVideoTrack = null;
-    if (this.localScreenStream && this.localScreenStream.getVideoTracks().length > 0) {
-      activeVideoTrack = this.localScreenStream.getVideoTracks()[0];
-      activeVideoTrack.contentHint = 'detail';
-    } else if (this.localCamStream && this.localCamStream.getVideoTracks().length > 0) {
-      activeVideoTrack = this.localCamStream.getVideoTracks()[0];
-      activeVideoTrack.contentHint = 'motion';
-    }
+    const micTrack = (this.localMicStream && this.localMicStream.getAudioTracks()[0]) || null;
+    const camTrack = (this.localCamStream && this.localCamStream.getVideoTracks()[0]) || null;
+    const screenVideoTrack = (this.localScreenStream && this.localScreenStream.getVideoTracks()[0]) || null;
+    const screenAudioTrack = (this.localScreenStream && this.localScreenStream.getAudioTracks()[0]) || null;
 
-    // Determine active audio track
-    let activeAudioTrack = null;
-    if (this.localMicStream && this.localMicStream.getAudioTracks().length > 0) {
-      activeAudioTrack = this.localMicStream.getAudioTracks()[0];
-    }
+    if (camTrack) camTrack.contentHint = 'motion';
+    if (screenVideoTrack) screenVideoTrack.contentHint = 'detail';
 
-    // Update tracks on all peer connections
-    this.peers.forEach((pc, targetSocketId) => {
-      let videoNeedsRenegotiation = false;
-      let audioNeedsRenegotiation = false;
+    this.peers.forEach((pc, socketId) => {
+      const meta = this.peerMeta.get(socketId);
+      if (!meta) return;
 
-      // 1. Handle Video Sender
-      const videoTransceiver = pc.getTransceivers().find(
-        t => (t.sender.track && t.sender.track.kind === 'video') || t.receiver.track.kind === 'video'
-      );
+      this._replaceTrack(meta.micT, micTrack);
+      this._replaceTrack(meta.camT, camTrack);
+      this._replaceTrack(meta.screenVideoT, screenVideoTrack);
+      this._replaceTrack(meta.screenAudioT, screenAudioTrack);
+    });
+  }
 
-      if (videoTransceiver) {
-        // Use replaceTrack on existing transceiver (works without renegotiation glitch!)
-        if (videoTransceiver.sender.track !== activeVideoTrack) {
-          videoTransceiver.sender.replaceTrack(activeVideoTrack).catch(err => {
-            console.warn('[WebRTC] Error replacing video track:', err);
-          });
-        }
-      } else if (activeVideoTrack) {
-        // No video transceiver exists yet, add track and trigger renegotiation
-        try {
-          pc.addTrack(activeVideoTrack, this.localCombinedStream);
-          videoNeedsRenegotiation = true;
-        } catch (e) {
-          console.warn('[WebRTC] Error adding video track:', e);
-        }
-      }
-
-      // 2. Handle Audio Sender
-      const audioTransceiver = pc.getTransceivers().find(
-        t => (t.sender.track && t.sender.track.kind === 'audio') || t.receiver.track.kind === 'audio'
-      );
-
-      if (audioTransceiver) {
-        if (audioTransceiver.sender.track !== activeAudioTrack) {
-          audioTransceiver.sender.replaceTrack(activeAudioTrack).catch(err => {
-            console.warn('[WebRTC] Error replacing audio track:', err);
-          });
-        }
-      } else if (activeAudioTrack) {
-        try {
-          pc.addTrack(activeAudioTrack, this.localCombinedStream);
-          audioNeedsRenegotiation = true;
-        } catch (e) {
-          console.warn('[WebRTC] Error adding audio track:', e);
-        }
-      }
-
-      if (videoNeedsRenegotiation || audioNeedsRenegotiation) {
-        this.renegotiatePeer(targetSocketId);
-      }
+  _replaceTrack(transceiver, track) {
+    if (!transceiver || transceiver.sender.track === track) return;
+    transceiver.sender.replaceTrack(track).catch(err => {
+      console.warn('[WebRTC] Error replacing track:', err);
     });
   }
 
@@ -284,78 +248,85 @@ class WebRTCManager {
       }
     };
 
-    // Pre-create transceivers for both audio and video to ensure stable m-lines
-    const activeVideoTrack = (this.localScreenStream && this.localScreenStream.getVideoTracks()[0]) ||
-                             (this.localCamStream && this.localCamStream.getVideoTracks()[0]) ||
-                             null;
-    const activeAudioTrack = (this.localMicStream && this.localMicStream.getAudioTracks()[0]) || null;
+    // Pre-create 4 fixed transceivers up-front, in a stable order: mic audio, camera video,
+    // screen video, screen audio. Both peers always create them in this same order, so WebRTC's
+    // standard "match unassociated transceivers by kind and order" negotiation binds each side's
+    // slots to the same semantic slot on the other side - no extra signaling needed to tell the
+    // camera and screen-share video tracks apart, and no renegotiation is needed later since the
+    // m-lines never change shape again (toggling a source is just a replaceTrack).
+    const micT = pc.addTransceiver('audio', { direction: 'sendrecv' });
+    const camT = pc.addTransceiver('video', { direction: 'sendrecv' });
+    const screenVideoT = pc.addTransceiver('video', { direction: 'sendrecv' });
+    const screenAudioT = pc.addTransceiver('audio', { direction: 'sendrecv' });
+    const meta = { micT, camT, screenVideoT, screenAudioT };
+    this.peerMeta.set(socketId, meta);
 
-    if (activeAudioTrack) {
-      pc.addTrack(activeAudioTrack, this.localCombinedStream);
-    } else {
-      pc.addTransceiver('audio', { direction: 'sendrecv' });
+    // Seed any already-active local tracks (e.g. joining with camera already on)
+    this._replaceTrack(micT, (this.localMicStream && this.localMicStream.getAudioTracks()[0]) || null);
+    this._replaceTrack(camT, (this.localCamStream && this.localCamStream.getVideoTracks()[0]) || null);
+    if (this.localScreenStream) {
+      this._replaceTrack(screenVideoT, this.localScreenStream.getVideoTracks()[0] || null);
+      this._replaceTrack(screenAudioT, this.localScreenStream.getAudioTracks()[0] || null);
     }
 
-    if (activeVideoTrack) {
-      pc.addTrack(activeVideoTrack, this.localCombinedStream);
-    } else {
-      pc.addTransceiver('video', { direction: 'sendrecv' });
-    }
+    const ensureRemoteStream = (map) => {
+      let s = map.get(socketId);
+      if (!s) {
+        s = new MediaStream();
+        map.set(socketId, s);
+      }
+      return s;
+    };
 
-    // Receive remote tracks
+    // Receive remote tracks, routed to 'cam' or 'screen' by which transceiver they arrived on
     pc.ontrack = (event) => {
-      console.log(`[WebRTC] Received remote track (${event.track.kind}) from ${socketId}`);
-
-      let remoteStream = this.remoteStreams.get(socketId);
-      if (!remoteStream) {
-        remoteStream = new MediaStream();
-        this.remoteStreams.set(socketId, remoteStream);
+      let kind = null;
+      let streamMap = null;
+      if (event.transceiver === meta.camT || event.transceiver === meta.micT) {
+        kind = 'cam';
+        streamMap = this.remoteCamStreams;
+      } else if (event.transceiver === meta.screenVideoT || event.transceiver === meta.screenAudioT) {
+        kind = 'screen';
+        streamMap = this.remoteScreenStreams;
+      } else {
+        return;
       }
 
-      if (event.track.kind === 'video') {
-        // Clean up any stale or previous video tracks in the stream
+      console.log(`[WebRTC] Received remote ${kind} track (${event.track.kind}) from ${socketId}`);
+      const remoteStream = ensureRemoteStream(streamMap);
+      const track = event.track;
+
+      if (track.kind === 'video') {
         remoteStream.getVideoTracks().forEach(oldTrack => {
-          if (oldTrack !== event.track) {
+          if (oldTrack !== track) {
             remoteStream.removeTrack(oldTrack);
             try { oldTrack.stop(); } catch (e) {}
           }
         });
-        remoteStream.addTrack(event.track);
-      } else if (event.track.kind === 'audio') {
-        // Clean up stale audio tracks
+      } else {
         remoteStream.getAudioTracks().forEach(oldTrack => {
-          if (oldTrack !== event.track) {
-            remoteStream.removeTrack(oldTrack);
-          }
+          if (oldTrack !== track) remoteStream.removeTrack(oldTrack);
         });
-        remoteStream.addTrack(event.track);
       }
+      remoteStream.addTrack(track);
 
-      event.track.onended = () => {
-        console.log(`[WebRTC] Remote track ended (${event.track.kind}) from ${socketId}`);
-        try { remoteStream.removeTrack(event.track); } catch (e) {}
-        if (this.onRemoteStreamRemoved) {
-          this.onRemoteStreamRemoved(socketId, event.track.kind === 'video');
+      track.onended = () => {
+        console.log(`[WebRTC] Remote ${kind} track ended (${track.kind}) from ${socketId}`);
+        try { remoteStream.removeTrack(track); } catch (e) {}
+        if (this.onRemoteStreamRemoved) this.onRemoteStreamRemoved(socketId, kind);
+      };
+
+      track.onmute = () => {
+        if (track.kind === 'video' && this.onRemoteStreamRemoved) {
+          this.onRemoteStreamRemoved(socketId, kind);
         }
       };
 
-      event.track.onmute = () => {
-        console.log(`[WebRTC] Remote track muted (${event.track.kind}) from ${socketId}`);
-        if (event.track.kind === 'video' && this.onRemoteStreamRemoved) {
-          this.onRemoteStreamRemoved(socketId, true);
-        }
+      track.onunmute = () => {
+        if (this.onRemoteStreamAdded) this.onRemoteStreamAdded(socketId, kind, remoteStream);
       };
 
-      event.track.onunmute = () => {
-        console.log(`[WebRTC] Remote track unmuted (${event.track.kind}) from ${socketId}`);
-        if (this.onRemoteStreamAdded) {
-          this.onRemoteStreamAdded(socketId, remoteStream);
-        }
-      };
-
-      if (this.onRemoteStreamAdded) {
-        this.onRemoteStreamAdded(socketId, remoteStream);
-      }
+      if (this.onRemoteStreamAdded) this.onRemoteStreamAdded(socketId, kind, remoteStream);
     };
 
     pc.onconnectionstatechange = () => {
@@ -374,10 +345,7 @@ class WebRTCManager {
     const pc = this.getOrCreatePeer(socketId);
 
     try {
-      const offer = await pc.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true
-      });
+      const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
       this.socket.emit('webrtc-offer', {
@@ -390,34 +358,6 @@ class WebRTCManager {
     }
   }
 
-  async renegotiatePeer(socketId) {
-    const pc = this.peers.get(socketId);
-    if (!pc) return;
-
-    if (pc.signalingState !== 'stable') {
-      console.log(`[WebRTC] Queuing renegotiation with ${socketId} (state: ${pc.signalingState})`);
-      pc.onnegotiationneeded = () => {
-        pc.onnegotiationneeded = null;
-        this.renegotiatePeer(socketId);
-      };
-      return;
-    }
-
-    try {
-      const offer = await pc.createOffer();
-      if (pc.signalingState !== 'stable') return;
-      await pc.setLocalDescription(offer);
-
-      this.socket.emit('webrtc-offer', {
-        targetSocketId: socketId,
-        offer: pc.localDescription,
-        type: 'renegotiate'
-      });
-    } catch (err) {
-      console.error(`[WebRTC] Error renegotiating with peer ${socketId}:`, err);
-    }
-  }
-
   removePeer(socketId) {
     if (this.peers.has(socketId)) {
       const pc = this.peers.get(socketId);
@@ -425,32 +365,39 @@ class WebRTCManager {
       this.peers.delete(socketId);
     }
 
+    this.peerMeta.delete(socketId);
     this.iceCandidateQueues.delete(socketId);
 
-    if (this.remoteStreams.has(socketId)) {
-      const stream = this.remoteStreams.get(socketId);
-      stream.getTracks().forEach(t => {
-        try { t.stop(); } catch (e) {}
-      });
-      this.remoteStreams.delete(socketId);
-    }
+    [this.remoteCamStreams, this.remoteScreenStreams].forEach(map => {
+      const stream = map.get(socketId);
+      if (stream) {
+        stream.getTracks().forEach(t => {
+          try { t.stop(); } catch (e) {}
+        });
+        map.delete(socketId);
+      }
+    });
 
     if (this.onRemoteStreamRemoved) {
-      this.onRemoteStreamRemoved(socketId, true);
+      this.onRemoteStreamRemoved(socketId, 'cam');
+      this.onRemoteStreamRemoved(socketId, 'screen');
     }
   }
 
   cleanupAll() {
     this.peers.forEach((pc) => pc.close());
     this.peers.clear();
+    this.peerMeta.clear();
     this.iceCandidateQueues.clear();
 
-    this.remoteStreams.forEach(stream => {
-      stream.getTracks().forEach(t => {
-        try { t.stop(); } catch (e) {}
+    [this.remoteCamStreams, this.remoteScreenStreams].forEach(map => {
+      map.forEach(stream => {
+        stream.getTracks().forEach(t => {
+          try { t.stop(); } catch (e) {}
+        });
       });
+      map.clear();
     });
-    this.remoteStreams.clear();
 
     if (this.localMicStream) {
       this.localMicStream.getTracks().forEach(t => t.stop());
