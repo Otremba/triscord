@@ -133,15 +133,15 @@ document.addEventListener('DOMContentLoaded', () => {
       state.webrtc = new window.WebRTCManager(state.socket, state.user.userId);
 
       // Handle Remote Stream Added
-      state.webrtc.onRemoteStreamAdded = (socketId, stream) => {
-        console.log(`[App] Remote stream received from ${socketId}`);
-        renderUserTile(socketId, stream);
+      state.webrtc.onRemoteStreamAdded = (socketId, stream, isScreen) => {
+        console.log(`[App] Remote stream received from ${socketId} (${isScreen ? 'screen' : 'main'})`);
+        renderUserTile(socketId, stream, isScreen);
       };
 
       // Handle Remote Stream Removed
       state.webrtc.onRemoteStreamRemoved = (socketId) => {
         console.log(`[App] Remote stream removed from ${socketId}`);
-        renderUserTile(socketId, null);
+        renderAllVideoTiles();
       };
 
       // Socket Events
@@ -205,8 +205,19 @@ document.addEventListener('DOMContentLoaded', () => {
       state.socket.on('user-state-updated', ({ socketId, state: newState }) => {
         if (state.roomMembers.has(socketId)) {
           const user = state.roomMembers.get(socketId);
+
+          // Camera/screen changes add or remove whole tiles, so they need a full pass
+          const layoutChanged =
+            ('isCameraOn' in newState && newState.isCameraOn !== user.isCameraOn) ||
+            ('isScreenSharing' in newState && newState.isScreenSharing !== user.isScreenSharing);
+
           Object.assign(user, newState);
-          updateUserTileState(socketId, user);
+
+          if (layoutChanged) {
+            renderAllVideoTiles();
+          } else {
+            updateUserTileState(socketId, user);
+          }
         }
       });
 
@@ -387,22 +398,68 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAllVideoTiles();
   }
 
-  // Render all tiles in the stage grid
+  // Render all tiles in the stage grid.
+  // Camera and screen share are independent tiles, like Discord: sharing your
+  // screen while the webcam is on produces two tiles for the same person.
   function renderAllVideoTiles() {
     el.videoGrid.innerHTML = '';
 
-    // 1. Render Local User Tile
-    const localTile = createLocalUserTile();
-    el.videoGrid.appendChild(localTile);
+    // 1. Local user tile (avatar or webcam)
+    el.videoGrid.appendChild(createLocalUserTile());
 
-    // 2. Render Remote User Tiles
+    // 2. Local screen share tile
+    if (state.user.isScreenSharing) {
+      el.videoGrid.appendChild(
+        createScreenTile('local', `${state.user.username} (Você)`, state.webrtc.localScreenStream, true)
+      );
+    }
+
+    // 3. Remote user tiles (+ their screen share tiles)
     state.roomMembers.forEach((member, socketId) => {
-      const remoteStream = state.webrtc.remoteStreams.get(socketId);
-      const remoteTile = createRemoteUserTile(socketId, member, remoteStream);
-      el.videoGrid.appendChild(remoteTile);
+      el.videoGrid.appendChild(
+        createRemoteUserTile(socketId, member, state.webrtc.remoteStreams.get(socketId))
+      );
+
+      if (member.isScreenSharing) {
+        el.videoGrid.appendChild(
+          createScreenTile(socketId, member.username, state.webrtc.remoteScreenStreams.get(socketId), false)
+        );
+      }
     });
 
     adjustGridColumns();
+  }
+
+  // Dedicated tile for a screen share, separate from the owner's camera tile
+  function createScreenTile(id, label, stream, isLocal) {
+    const tile = document.createElement('div');
+    tile.className = 'video-tile screen-tile';
+    tile.id = `tile-screen-${id}`;
+
+    tile.innerHTML = `
+      <div class="tile-content">
+        <video id="video-screen-${id}" autoplay playsinline muted></video>
+        ${isLocal ? '' : `<audio id="audio-screen-${id}" autoplay></audio>`}
+        <div class="live-tag">${isLocal ? 'TRANSMITINDO TELA' : 'AO VIVO'}</div>
+      </div>
+      <div class="tile-overlay">
+        <div class="tile-username">
+          <span>🖥️ Tela de ${escapeHtml(label)}</span>
+        </div>
+      </div>
+    `;
+
+    if (stream) {
+      tile.querySelector('video').srcObject = stream;
+
+      const audioEl = tile.querySelector('audio');
+      if (audioEl) {
+        audioEl.srcObject = stream;
+        audioEl.muted = state.user.isDeafened;
+      }
+    }
+
+    return tile;
   }
 
   function adjustGridColumns() {
@@ -420,8 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
     tile.className = `video-tile local-tile ${state.user.isSpeaking ? 'speaking' : ''}`;
     tile.id = 'tile-local';
 
-    const hasVideo = state.user.isCameraOn || state.user.isScreenSharing;
-    const isScreen = state.user.isScreenSharing;
+    const hasVideo = state.user.isCameraOn;
 
     tile.innerHTML = `
       <div class="tile-content">
@@ -431,7 +487,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ${state.user.username.charAt(0).toUpperCase()}
           </div>
         </div>
-        ${isScreen ? '<div class="live-tag">TRANSMITINDO TELA</div>' : ''}
       </div>
       <div class="tile-overlay">
         <div class="tile-username">
@@ -442,11 +497,8 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
 
-    const videoEl = tile.querySelector('#video-local');
-    if (isScreen && state.webrtc.localScreenStream) {
-      videoEl.srcObject = state.webrtc.localScreenStream;
-    } else if (state.user.isCameraOn && state.webrtc.localCamStream) {
-      videoEl.srcObject = state.webrtc.localCamStream;
+    if (hasVideo && state.webrtc.localCamStream) {
+      tile.querySelector('#video-local').srcObject = state.webrtc.localCamStream;
     }
 
     return tile;
@@ -457,18 +509,19 @@ document.addEventListener('DOMContentLoaded', () => {
     tile.className = `video-tile ${member.isSpeaking ? 'speaking' : ''}`;
     tile.id = `tile-${socketId}`;
 
-    const hasVideo = stream && stream.getVideoTracks().length > 0;
+    // The receiving track exists from negotiation onward even while the peer's
+    // camera is off, so visibility follows their broadcast state instead.
+    const hasVideo = !!member.isCameraOn;
 
     tile.innerHTML = `
       <div class="tile-content">
-        <video id="video-${socketId}" autoplay playsinline class="${hasVideo ? '' : 'hidden'}"></video>
+        <video id="video-${socketId}" autoplay playsinline muted class="${hasVideo ? '' : 'hidden'}"></video>
         <audio id="audio-${socketId}" autoplay></audio>
         <div class="avatar-view ${hasVideo ? 'hidden' : ''}">
           <div class="tile-avatar" style="background-color: ${member.avatar || '#5865F2'}">
             ${member.username.charAt(0).toUpperCase()}
           </div>
         </div>
-        ${member.isScreenSharing ? '<div class="live-tag">AO VIVO</div>' : ''}
       </div>
       <div class="tile-overlay">
         <div class="tile-username">
@@ -494,32 +547,53 @@ document.addEventListener('DOMContentLoaded', () => {
     return tile;
   }
 
-  function renderUserTile(socketId, stream) {
-    const existingTile = document.getElementById(`tile-${socketId}`);
+  function renderUserTile(socketId, stream, isScreen) {
     const member = state.roomMembers.get(socketId);
     if (!member) return;
 
-    if (existingTile) {
-      const videoEl = existingTile.querySelector(`#video-${socketId}`);
-      const audioEl = existingTile.querySelector(`#audio-${socketId}`);
-      const avatarView = existingTile.querySelector('.avatar-view');
-
-      if (stream && stream.getVideoTracks().length > 0) {
-        videoEl.srcObject = stream;
-        videoEl.classList.remove('hidden');
-        avatarView.classList.add('hidden');
-      } else {
-        videoEl.classList.add('hidden');
-        avatarView.classList.remove('hidden');
+    if (isScreen) {
+      const videoEl = document.getElementById(`video-screen-${socketId}`);
+      if (!videoEl) {
+        if (member.isScreenSharing) renderAllVideoTiles();
+        return;
       }
 
-      if (stream && audioEl) {
+      if (videoEl.srcObject !== stream) videoEl.srcObject = stream;
+
+      const audioEl = document.getElementById(`audio-screen-${socketId}`);
+      if (audioEl && audioEl.srcObject !== stream) {
         audioEl.srcObject = stream;
-        setupRemoteSpeakingDetector(socketId, stream);
+        audioEl.muted = state.user.isDeafened;
       }
-    } else {
-      renderAllVideoTiles();
+      return;
     }
+
+    const existingTile = document.getElementById(`tile-${socketId}`);
+    if (!existingTile) {
+      renderAllVideoTiles();
+      return;
+    }
+
+    const videoEl = existingTile.querySelector(`#video-${socketId}`);
+    const audioEl = existingTile.querySelector(`#audio-${socketId}`);
+    const avatarView = existingTile.querySelector('.avatar-view');
+
+    if (videoEl && videoEl.srcObject !== stream) videoEl.srcObject = stream;
+
+    if (audioEl && audioEl.srcObject !== stream) {
+      audioEl.srcObject = stream;
+      audioEl.muted = state.user.isDeafened;
+    }
+
+    if (member.isCameraOn) {
+      videoEl.classList.remove('hidden');
+      avatarView.classList.add('hidden');
+    } else {
+      videoEl.classList.add('hidden');
+      avatarView.classList.remove('hidden');
+    }
+
+    if (stream) setupRemoteSpeakingDetector(socketId, stream);
   }
 
   function updateUserTileState(socketId, member) {
@@ -570,8 +644,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Speaking Detection for Remote Peers
   function setupRemoteSpeakingDetector(socketId, stream) {
-    if (state.remoteSpeakingDetectors.has(socketId)) {
-      state.remoteSpeakingDetectors.get(socketId).destroy();
+    const existing = state.remoteSpeakingDetectors.get(socketId);
+
+    // Tiles re-render often; rebuilding the AudioContext each time would glitch audio
+    if (existing) {
+      if (existing.stream === stream) return;
+      existing.destroy();
     }
 
     const detector = new window.SpeakingDetector(stream, (isSpeaking) => {
