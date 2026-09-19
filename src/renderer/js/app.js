@@ -92,12 +92,26 @@ document.addEventListener('DOMContentLoaded', () => {
     selectVideoInput: document.getElementById('settingsVideoInput'),
     sliderSensitivity: document.getElementById('settingsSensitivity'),
     labelSensitivity: document.getElementById('labelSensitivity'),
+    // Auto-Updater Elements
+    btnCheckUpdateTop: document.getElementById('btnCheckUpdateTop'),
+    btnCheckUpdateSettings: document.getElementById('btnCheckUpdateSettings'),
+    updateModal: document.getElementById('updateModal'),
+    updateModalTitle: document.getElementById('updateModalTitle'),
+    updateSpinner: document.getElementById('updateSpinner'),
+    updateSuccessIcon: document.getElementById('updateSuccessIcon'),
+    updateErrorIcon: document.getElementById('updateErrorIcon'),
+    updateStatusTitle: document.getElementById('updateStatusTitle'),
+    updateStatusDesc: document.getElementById('updateStatusDesc'),
+    updateProgressContainer: document.getElementById('updateProgressContainer'),
+    updateProgressBar: document.getElementById('updateProgressBar'),
+    btnDismissUpdate: document.getElementById('btnDismissUpdate'),
     avatarColorPicker: document.querySelectorAll('.avatar-color-option')
   };
 
   // Initialize UI
   updateUserProfileUI();
   initSettingsUI();
+  initAutoUpdater();
 
   // Initialize Screen Share Picker
   state.screenPicker = new window.ScreenSharePicker();
@@ -858,81 +872,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return div.innerHTML;
   }
 
-  // Enumerate and fill the microphone/speaker/camera dropdowns.
-  // Chromium hides device labels (and sometimes the devices themselves)
-  // until a getUserMedia permission has actually been granted, so we
-  // request a throwaway audio+video stream first to unlock the real list.
-  async function populateDeviceLists() {
-    try {
-      let devices = await navigator.mediaDevices.enumerateDevices();
-      const hasLabels = devices.some(d => d.label);
-
-      if (!hasLabels) {
-        let unlockStream = null;
-        try {
-          unlockStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-        } catch (permErr) {
-          try {
-            unlockStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          } catch (audioErr) {
-            console.warn('Could not get device permission to list devices:', audioErr);
-          }
-        }
-        if (unlockStream) {
-          unlockStream.getTracks().forEach(t => t.stop());
-          devices = await navigator.mediaDevices.enumerateDevices();
-        }
-      }
-
-      const prevAudioInput = el.selectAudioInput.value || state.selectedAudioInput;
-      const prevAudioOutput = el.selectAudioOutput.value || state.selectedAudioOutput;
-      const prevVideoInput = el.selectVideoInput.value || state.selectedVideoInput;
-
-      el.selectAudioInput.innerHTML = '';
-      el.selectAudioOutput.innerHTML = '';
-      el.selectVideoInput.innerHTML = '';
-
-      devices.forEach(device => {
-        if (!device.kind) return;
-        const opt = document.createElement('option');
-        opt.value = device.deviceId;
-        opt.text = device.label || `${device.kind} (${device.deviceId.slice(0, 5)}...)`;
-
-        if (device.kind === 'audioinput') {
-          if (device.deviceId === prevAudioInput) opt.selected = true;
-          el.selectAudioInput.appendChild(opt);
-        } else if (device.kind === 'audiooutput') {
-          if (device.deviceId === prevAudioOutput) opt.selected = true;
-          el.selectAudioOutput.appendChild(opt);
-        } else if (device.kind === 'videoinput') {
-          if (device.deviceId === prevVideoInput) opt.selected = true;
-          el.selectVideoInput.appendChild(opt);
-        }
-      });
-
-      if (!el.selectAudioInput.options.length) {
-        const opt = document.createElement('option');
-        opt.text = 'Nenhum microfone encontrado';
-        opt.value = '';
-        el.selectAudioInput.appendChild(opt);
-      }
-      if (!el.selectAudioOutput.options.length) {
-        const opt = document.createElement('option');
-        opt.text = 'Padrão do sistema';
-        opt.value = '';
-        el.selectAudioOutput.appendChild(opt);
-      }
-      if (!el.selectVideoInput.options.length) {
-        const opt = document.createElement('option');
-        opt.text = 'Nenhuma câmera encontrada';
-        opt.value = '';
-        el.selectVideoInput.appendChild(opt);
-      }
-    } catch (err) {
-      console.warn('Could not enumerate media devices:', err);
-    }
-  }
-
   // Initialize Settings UI & Audio Device Enumeration
   async function initSettingsUI() {
     el.inputSettingsUsername.value = state.user.username;
@@ -952,11 +891,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Populate Audio/Video Device Selectors
-    await populateDeviceLists();
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      el.selectAudioInput.innerHTML = '';
+      el.selectAudioOutput.innerHTML = '';
+      el.selectVideoInput.innerHTML = '';
 
-    // Refresh the list whenever a device is plugged/unplugged
-    if (navigator.mediaDevices.addEventListener) {
-      navigator.mediaDevices.addEventListener('devicechange', populateDeviceLists);
+      devices.forEach(device => {
+        const opt = document.createElement('option');
+        opt.value = device.deviceId;
+        opt.text = device.label || `${device.kind} (${device.deviceId.slice(0, 5)}...)`;
+
+        if (device.kind === 'audioinput') {
+          if (device.deviceId === state.selectedAudioInput) opt.selected = true;
+          el.selectAudioInput.appendChild(opt);
+        } else if (device.kind === 'audiooutput') {
+          if (device.deviceId === state.selectedAudioOutput) opt.selected = true;
+          el.selectAudioOutput.appendChild(opt);
+        } else if (device.kind === 'videoinput') {
+          if (device.deviceId === state.selectedVideoInput) opt.selected = true;
+          el.selectVideoInput.appendChild(opt);
+        }
+      });
+    } catch (err) {
+      console.warn('Could not enumerate media devices:', err);
     }
 
     // Avatar Color Selection
@@ -1044,7 +1002,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Open Settings Modal
   el.btnSettings.addEventListener('click', () => {
     el.settingsModal.classList.remove('hidden');
-    populateDeviceLists();
   });
 
   el.btnCloseSettings.addEventListener('click', () => {
@@ -1105,4 +1062,98 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.settingsModal.classList.add('hidden');
   });
+
+  // Auto-Updater Controller
+  function initAutoUpdater() {
+    async function triggerUpdate() {
+      if (!window.electronAPI || !window.electronAPI.checkForUpdates) {
+        alert('A atualização automática com reinicialização está disponível no aplicativo Desktop Electron.');
+        return;
+      }
+
+      // Reset modal UI
+      el.updateModal.classList.remove('hidden');
+      el.updateModalTitle.textContent = 'Atualizando Aplicativo';
+      el.updateStatusTitle.textContent = 'Buscando atualizações no GitHub...';
+      el.updateStatusDesc.textContent = 'Aguarde enquanto verificamos se há novas versões disponíveis.';
+      el.updateSpinner.classList.remove('hidden');
+      el.updateSuccessIcon.classList.add('hidden');
+      el.updateErrorIcon.classList.add('hidden');
+      el.updateProgressContainer.classList.remove('hidden');
+      el.updateProgressBar.style.width = '20%';
+      el.btnDismissUpdate.classList.add('hidden');
+
+      try {
+        await window.electronAPI.checkForUpdates();
+      } catch (err) {
+        console.error('Error triggering auto update:', err);
+        showUpdateError(err.message || 'Falha ao conectar com o GitHub.');
+      }
+    }
+
+    // Attach click listeners to update buttons
+    if (el.btnCheckUpdateTop) {
+      el.btnCheckUpdateTop.addEventListener('click', triggerUpdate);
+    }
+    if (el.btnCheckUpdateSettings) {
+      el.btnCheckUpdateSettings.addEventListener('click', () => {
+        el.settingsModal.classList.add('hidden');
+        triggerUpdate();
+      });
+    }
+
+    // Close / Dismiss modal
+    if (el.btnDismissUpdate) {
+      el.btnDismissUpdate.addEventListener('click', () => {
+        el.updateModal.classList.add('hidden');
+      });
+    }
+
+    // Listen to real-time progress from Electron main process
+    if (window.electronAPI && window.electronAPI.onUpdateProgress) {
+      window.electronAPI.onUpdateProgress((data) => {
+        console.log('[AutoUpdater]', data);
+        const { stage, message, percent } = data;
+
+        if (stage === 'checking') {
+          el.updateStatusTitle.textContent = 'Verificando atualizações...';
+          el.updateStatusDesc.textContent = message;
+          el.updateProgressBar.style.width = '25%';
+        } else if (stage === 'downloading') {
+          el.updateStatusTitle.textContent = 'Baixando atualizações do GitHub...';
+          el.updateStatusDesc.textContent = message;
+          el.updateProgressBar.style.width = `${percent || 50}%`;
+        } else if (stage === 'dependencies') {
+          el.updateStatusTitle.textContent = 'Instalando novas dependências...';
+          el.updateStatusDesc.textContent = message;
+          el.updateProgressBar.style.width = `${percent || 80}%`;
+        } else if (stage === 'restarting') {
+          el.updateSpinner.classList.add('hidden');
+          el.updateSuccessIcon.classList.remove('hidden');
+          el.updateStatusTitle.textContent = 'Atualizado com Sucesso!';
+          el.updateStatusDesc.textContent = message;
+          el.updateProgressBar.style.width = '100%';
+        } else if (stage === 'up-to-date') {
+          el.updateSpinner.classList.add('hidden');
+          el.updateSuccessIcon.classList.remove('hidden');
+          el.updateStatusTitle.textContent = 'Você já está atualizado!';
+          el.updateStatusDesc.textContent = message;
+          el.updateProgressBar.style.width = '100%';
+          el.btnDismissUpdate.classList.remove('hidden');
+        } else if (stage === 'error') {
+          showUpdateError(message);
+        }
+      });
+    }
+
+    function showUpdateError(errorMsg) {
+      el.updateSpinner.classList.add('hidden');
+      el.updateSuccessIcon.classList.add('hidden');
+      el.updateErrorIcon.classList.remove('hidden');
+      el.updateStatusTitle.textContent = 'Erro ao Atualizar';
+      el.updateStatusDesc.textContent = errorMsg;
+      el.updateProgressContainer.classList.add('hidden');
+      el.btnDismissUpdate.classList.remove('hidden');
+    }
+  }
 });
