@@ -35,6 +35,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Per-person playback: { voice: { userId: { volume, muted } }, stream: { ... } }
     audioPrefs: loadAudioPrefs(),
     volumePopover: null, // { kind: 'voice' | 'stream', socketId } while the popover is open
+    cameraEffect: loadCameraEffect(), // { type: 'none' | 'blur-light' | 'blur-strong' | 'image', image? }
+    effectsPreview: null, // own camera + processor while the effects modal is open with the camera off
     micSensitivity: parseInt(localStorage.getItem('discord_mic_sens') || '15', 10),
     selectedAudioInput: localStorage.getItem('discord_mic_device') || 'default',
     selectedAudioOutput: localStorage.getItem('discord_spk_device') || 'default',
@@ -99,6 +101,18 @@ document.addEventListener('DOMContentLoaded', () => {
     noiseSuppression: document.getElementById('settingsNoiseSuppression'),
     micVuMeter: document.getElementById('micVuMeterFill'),
 
+    // Camera effects modal
+    btnCameraEffects: document.getElementById('btnCameraEffects'),
+    effectsModal: document.getElementById('effectsModal'),
+    btnCloseEffects: document.getElementById('btnCloseEffects'),
+    effectsPreviewVideo: document.getElementById('effectsPreviewVideo'),
+    effectsPreviewStatus: document.getElementById('effectsPreviewStatus'),
+    effectOptions: document.querySelectorAll('.effect-option[data-effect]'),
+    effectCustomImage: document.getElementById('effectCustomImage'),
+    btnUploadBackground: document.getElementById('btnUploadBackground'),
+    backgroundFileInput: document.getElementById('backgroundFileInput'),
+    effectsUnsupported: document.getElementById('effectsUnsupported'),
+
     // Per-user / per-stream volume popover
     volumePopover: document.getElementById('volumePopover'),
     volumePopoverTitle: document.getElementById('volumePopoverTitle'),
@@ -143,6 +157,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Initialize WebRTC Manager with socket
       state.webrtc = new window.WebRTCManager(state.socket, state.user.userId);
+      state.webrtc.cameraEffect = state.cameraEffect;
+
+      // The call's camera switched between raw and effect-processed video
+      state.webrtc.onLocalCameraChanged = (stream) => {
+        const localVideo = document.getElementById('video-local');
+        if (localVideo) localVideo.srcObject = stream;
+        if (!state.effectsPreview && !el.effectsModal.classList.contains('hidden')) {
+          el.effectsPreviewVideo.srcObject = stream;
+        }
+      };
 
       // Handle Remote Stream Added
       state.webrtc.onRemoteStreamAdded = (socketId, stream, isScreen) => {
@@ -389,6 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.user.isScreenSharing = false;
     state.focusedTileId = null;
     closeVolumePopover();
+    closeEffectsModal();
 
     updateActionButtonsState();
     updateStageView();
@@ -648,6 +673,172 @@ document.addEventListener('DOMContentLoaded', () => {
     openVolumePopover(kind, socketId, {
       left: event.clientX, right: event.clientX, top: event.clientY, bottom: event.clientY
     }, true);
+  }
+
+  // ---- Camera background effects ----
+
+  const BACKGROUND_MAX_WIDTH = 1280;
+  const BACKGROUND_MAX_HEIGHT = 720;
+
+  function loadCameraEffect() {
+    const type = localStorage.getItem('discord_camera_effect');
+    if (type === 'blur-light' || type === 'blur-strong') return { type };
+    if (type === 'image') {
+      const image = localStorage.getItem('discord_camera_background');
+      if (image) return { type, image };
+    }
+    return { type: 'none' };
+  }
+
+  function renderEffectOptions() {
+    const supported = window.CameraEffectsProcessor.isSupported();
+    const image = localStorage.getItem('discord_camera_background');
+
+    el.effectCustomImage.classList.toggle('hidden', !image);
+    el.effectCustomImage.style.backgroundImage = image ? `url("${image}")` : '';
+
+    el.effectOptions.forEach(btn => {
+      btn.classList.toggle('selected', btn.dataset.effect === state.cameraEffect.type);
+      if (btn.dataset.effect !== 'none') btn.disabled = !supported;
+    });
+    el.btnUploadBackground.disabled = !supported;
+    el.effectsUnsupported.classList.toggle('hidden', supported);
+  }
+
+  function setEffectsStatus(text) {
+    el.effectsPreviewStatus.textContent = text || '';
+    el.effectsPreviewStatus.classList.toggle('hidden', !text);
+  }
+
+  async function openEffectsModal() {
+    el.effectsModal.classList.remove('hidden');
+    renderEffectOptions();
+
+    // Camera already on: preview exactly what the call is receiving
+    if (state.user.isCameraOn && state.webrtc && state.webrtc.localCamStream) {
+      el.effectsPreviewVideo.srcObject = state.webrtc.localCamStream;
+      return;
+    }
+
+    // Camera off: open it just for the preview, without sending anything
+    const preview = { raw: null, processor: null, version: 0 };
+    state.effectsPreview = preview;
+    setEffectsStatus('Abrindo câmera...');
+
+    const deviceId = state.selectedVideoInput && state.selectedVideoInput !== 'default'
+      ? { deviceId: { exact: state.selectedVideoInput } }
+      : {};
+    let raw;
+    try {
+      raw = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, ...deviceId },
+        audio: false
+      });
+    } catch (err) {
+      if (state.effectsPreview === preview) setEffectsStatus('Não foi possível abrir a câmera para a prévia.');
+      return;
+    }
+
+    if (state.effectsPreview !== preview) { // closed while the camera was opening
+      raw.getTracks().forEach(t => t.stop());
+      return;
+    }
+
+    preview.raw = raw;
+    el.effectsPreviewVideo.srcObject = raw;
+    setEffectsStatus('');
+    await applyPreviewEffect(state.cameraEffect).catch(err => {
+      console.warn('Preview effect failed:', err);
+    });
+  }
+
+  async function applyPreviewEffect(effect) {
+    const preview = state.effectsPreview;
+    if (!preview || !preview.raw) return;
+    const version = ++preview.version;
+
+    if (effect.type === 'none') {
+      setEffectsStatus('');
+      if (preview.processor) {
+        preview.processor.stop();
+        preview.processor = null;
+      }
+      el.effectsPreviewVideo.srcObject = preview.raw;
+      return;
+    }
+
+    if (preview.processor) {
+      await preview.processor.setEffect(effect);
+      return;
+    }
+
+    setEffectsStatus('Carregando efeito...');
+    try {
+      const processor = await window.CameraEffectsProcessor.create(preview.raw.getVideoTracks()[0], effect);
+      if (state.effectsPreview !== preview || version !== preview.version) {
+        processor.stop();
+        return;
+      }
+      preview.processor = processor;
+      el.effectsPreviewVideo.srcObject = processor.stream;
+    } finally {
+      if (state.effectsPreview === preview && version === preview.version) setEffectsStatus('');
+    }
+  }
+
+  function closeEffectsModal() {
+    el.effectsModal.classList.add('hidden');
+
+    const preview = state.effectsPreview;
+    state.effectsPreview = null;
+    if (preview) {
+      if (preview.processor) preview.processor.stop();
+      if (preview.raw) preview.raw.getTracks().forEach(t => t.stop());
+    }
+
+    el.effectsPreviewVideo.srcObject = null;
+    setEffectsStatus('');
+  }
+
+  async function selectCameraEffect(effect) {
+    state.cameraEffect = effect;
+    localStorage.setItem('discord_camera_effect', effect.type);
+    renderEffectOptions();
+
+    const liveLoading = state.user.isCameraOn && state.webrtc &&
+      effect.type !== 'none' && !state.webrtc.cameraEffects;
+    if (liveLoading) setEffectsStatus('Carregando efeito...');
+
+    try {
+      await Promise.all([
+        state.webrtc ? state.webrtc.setCameraEffect(effect) : null,
+        applyPreviewEffect(effect)
+      ]);
+    } catch (err) {
+      console.error('Camera effect failed:', err);
+      alert('Não foi possível aplicar o efeito de câmera: ' + err.message);
+    } finally {
+      if (liveLoading) setEffectsStatus('');
+    }
+  }
+
+  async function useBackgroundImageFile(file) {
+    if (!file) return;
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, BACKGROUND_MAX_WIDTH / bitmap.width, BACKGROUND_MAX_HEIGHT / bitmap.height);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+
+      const image = canvas.toDataURL('image/jpeg', 0.85);
+      localStorage.setItem('discord_camera_background', image);
+      await selectCameraEffect({ type: 'image', image });
+    } catch (err) {
+      alert('Não foi possível usar essa imagem: ' + err.message);
+    }
   }
 
   // Dedicated tile for a screen share, separate from the owner's camera tile
@@ -1218,10 +1409,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Esc closes the volume popover first, then leaves spotlight mode
+  // Camera effects
+  el.btnCameraEffects.addEventListener('click', openEffectsModal);
+  el.btnCloseEffects.addEventListener('click', closeEffectsModal);
+  el.effectsModal.addEventListener('click', (e) => {
+    if (e.target === el.effectsModal) closeEffectsModal();
+  });
+
+  el.effectOptions.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.effect;
+      if (type === 'image') {
+        const image = localStorage.getItem('discord_camera_background');
+        if (image) selectCameraEffect({ type, image });
+        return;
+      }
+      selectCameraEffect({ type });
+    });
+  });
+
+  el.btnUploadBackground.addEventListener('click', () => el.backgroundFileInput.click());
+  el.backgroundFileInput.addEventListener('change', () => {
+    useBackgroundImageFile(el.backgroundFileInput.files[0]);
+    el.backgroundFileInput.value = '';
+  });
+
+  // Esc closes the effects modal, then the volume popover, then leaves spotlight mode
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (state.volumePopover) {
+    if (!el.effectsModal.classList.contains('hidden')) {
+      closeEffectsModal();
+    } else if (state.volumePopover) {
       closeVolumePopover();
     } else if (state.focusedTileId) {
       state.focusedTileId = null;

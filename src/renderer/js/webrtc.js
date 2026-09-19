@@ -35,6 +35,13 @@ class WebRTCManager {
     this.localCamStream = null;
     this.localScreenStream = null;
 
+    // Camera background effects (see startCamera / setCameraEffect)
+    this.rawCamStream = null;
+    this.cameraEffects = null;
+    this.cameraEffect = { type: 'none' };
+    this.cameraEffectVersion = 0;
+    this.onLocalCameraChanged = null; // (stream)
+
     // Owns the raw capture + RNNoise pipeline behind localMicStream
     this.micCapture = null;
     this.noiseSuppressionMode = null; // 'rnnoise' | 'native' | 'off'
@@ -170,7 +177,9 @@ class WebRTCManager {
   }
 
   /**
-   * Acquire local webcam video stream
+   * Acquire the webcam. rawCamStream is the device capture; localCamStream is
+   * what peers and the local preview see: the raw stream, or the background
+   * effects output once it is ready.
    */
   async startCamera(videoDeviceId = null) {
     try {
@@ -184,11 +193,15 @@ class WebRTCManager {
         }
       };
 
-      this.localCamStream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.rawCamStream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.useCameraStream(this.rawCamStream);
 
-      const camTrack = this.localCamStream.getVideoTracks()[0];
-      if (camTrack) camTrack.contentHint = 'motion';
-      this.applyTrackToPeers('cam', camTrack || null);
+      // The camera shows up immediately; the effect takes over when the model has loaded
+      if (this.cameraEffect.type !== 'none') {
+        this.setCameraEffect(this.cameraEffect).catch(err => {
+          console.warn('[WebRTC] Camera effect unavailable:', err);
+        });
+      }
 
       return this.localCamStream;
     } catch (err) {
@@ -197,13 +210,69 @@ class WebRTCManager {
     }
   }
 
+  /**
+   * Switch the background effect, live if the camera is on. Swapping between
+   * raw and processed video is a replaceTrack, so no renegotiation happens.
+   */
+  async setCameraEffect(effect) {
+    this.cameraEffect = effect;
+    const version = ++this.cameraEffectVersion;
+    if (!this.rawCamStream) return;
+
+    if (effect.type === 'none') {
+      this.useCameraStream(this.rawCamStream);
+      this.stopCameraEffects();
+      return;
+    }
+
+    if (this.cameraEffects) {
+      await this.cameraEffects.setEffect(effect);
+      return;
+    }
+
+    const rawTrack = this.rawCamStream.getVideoTracks()[0];
+    const processor = await window.CameraEffectsProcessor.create(rawTrack, effect);
+
+    // The camera was turned off or another effect was picked while loading
+    const stale = version !== this.cameraEffectVersion ||
+      !this.rawCamStream || this.rawCamStream.getVideoTracks()[0] !== rawTrack;
+    if (stale) {
+      processor.stop();
+      return;
+    }
+
+    this.cameraEffects = processor;
+    this.useCameraStream(processor.stream);
+  }
+
+  useCameraStream(stream) {
+    if (this.localCamStream === stream) return;
+    this.localCamStream = stream;
+
+    const track = stream.getVideoTracks()[0] || null;
+    if (track) track.contentHint = 'motion';
+    this.applyTrackToPeers('cam', track);
+
+    if (this.onLocalCameraChanged) this.onLocalCameraChanged(stream);
+  }
+
+  stopCameraEffects() {
+    if (this.cameraEffects) {
+      this.cameraEffects.stop();
+      this.cameraEffects = null;
+    }
+  }
+
   stopCamera() {
     this.applyTrackToPeers('cam', null);
+    this.cameraEffectVersion++;
+    this.stopCameraEffects();
 
-    if (this.localCamStream) {
-      this.localCamStream.getTracks().forEach(t => t.stop());
-      this.localCamStream = null;
+    if (this.rawCamStream) {
+      this.rawCamStream.getTracks().forEach(t => t.stop());
+      this.rawCamStream = null;
     }
+    this.localCamStream = null;
   }
 
   /**
@@ -372,10 +441,7 @@ class WebRTCManager {
     });
 
     this.stopMicrophone();
-    if (this.localCamStream) {
-      this.localCamStream.getTracks().forEach(t => t.stop());
-      this.localCamStream = null;
-    }
+    this.stopCamera();
     if (this.localScreenStream) {
       this.localScreenStream.getTracks().forEach(t => t.stop());
       this.localScreenStream = null;
