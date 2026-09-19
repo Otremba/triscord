@@ -1,6 +1,6 @@
-# Discord Voice & Video Desktop App 🎙️📹🖥️
+# Triscord 🎙️📹🖥️
 
-Um aplicativo desktop completo estilo **Discord** construído com **Electron**, **WebRTC** e **Node.js** com suporte a chat de voz em tempo real, compartilhamento de tela com 60 FPS, webcam, indicador de fala e chat de texto integrado.
+O **Triscord** é um aplicativo desktop de voz, vídeo e compartilhamento de tela construído com **Electron**, **WebRTC** e **Node.js** com suporte a chat de voz em tempo real, compartilhamento de tela com 60 FPS, webcam, indicador de fala e chat de texto integrado.
 
 ---
 
@@ -19,7 +19,7 @@ Um aplicativo desktop completo estilo **Discord** construído com **Electron**, 
 
 ## 🚀 Como Iniciar
 
-No terminal, dentro da pasta `discord-voice-app`:
+No terminal, dentro da pasta do projeto:
 
 ### Iniciar Servidor e App Desktop juntos:
 ```bash
@@ -63,4 +63,4 @@ Você pode usar qualquer uma dessas opções gratuitas:
 - **Mídia em Tempo Real**: WebRTC (`RTCPeerConnection`, `getUserMedia`, `desktopCapturer`)
 - **Backend & Sinalização**: Node.js, Express, Socket.io
 - **Áudio & Processamento**: Web Audio API
-- **Design & UI**: HTML5, Vanilla CSS com tema escuro Discord Glassmorphism
+- **Design & UI**: HTML5, Vanilla CSS com tema escuro Glassmorphism

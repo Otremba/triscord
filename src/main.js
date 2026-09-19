@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 
-// Disable default menu for clean Discord look
+// Disable default menu for a clean look
 Menu.setApplicationMenu(null);
 
 let mainWindow = null;
@@ -17,7 +17,7 @@ function createWindow() {
     minWidth: 960,
     minHeight: 600,
     backgroundColor: '#1e1f22',
-    title: 'Discord Voice & Video Client',
+    title: 'Triscord',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,

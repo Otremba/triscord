@@ -3,6 +3,15 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Settings saved before the app was renamed still live under the old prefix
+  Object.keys(localStorage)
+    .filter(key => key.startsWith('discord_'))
+    .forEach(key => {
+      const renamed = 'triscord_' + key.slice('discord_'.length);
+      if (localStorage.getItem(renamed) === null) localStorage.setItem(renamed, localStorage.getItem(key));
+      localStorage.removeItem(key);
+    });
+
   // In a browser, use the server that served the page; the desktop app (file://) uses the hosted server
   const HOSTED_SERVER_URL = 'https://triscord.onrender.com';
   const defaultServerUrl = window.location.protocol.startsWith('http')
@@ -10,18 +19,18 @@ document.addEventListener('DOMContentLoaded', () => {
     : HOSTED_SERVER_URL;
 
   // Installs from the ngrok era saved a tunnel URL that no longer runs
-  const savedServerUrl = localStorage.getItem('discord_server_url');
+  const savedServerUrl = localStorage.getItem('triscord_server_url');
   if (savedServerUrl && /ngrok/i.test(savedServerUrl)) {
-    localStorage.removeItem('discord_server_url');
+    localStorage.removeItem('triscord_server_url');
   }
 
   // Application State
   const state = {
-    serverUrl: localStorage.getItem('discord_server_url') || defaultServerUrl,
+    serverUrl: localStorage.getItem('triscord_server_url') || defaultServerUrl,
     user: {
-      userId: localStorage.getItem('discord_user_id') || `user_${Math.random().toString(36).substr(2, 9)}`,
-      username: localStorage.getItem('discord_username') || `Amigo_${Math.floor(1000 + Math.random() * 9000)}`,
-      avatarColor: localStorage.getItem('discord_avatar_color') || '#5865F2',
+      userId: localStorage.getItem('triscord_user_id') || `user_${Math.random().toString(36).substr(2, 9)}`,
+      username: localStorage.getItem('triscord_username') || `Amigo_${Math.floor(1000 + Math.random() * 9000)}`,
+      avatarColor: localStorage.getItem('triscord_avatar_color') || '#5865F2',
       isMuted: false,
       isDeafened: false,
       isCameraOn: false,
@@ -44,16 +53,16 @@ document.addEventListener('DOMContentLoaded', () => {
     volumePopover: null, // { kind: 'voice' | 'stream', socketId } while the popover is open
     cameraEffect: loadCameraEffect(), // { type: 'none' | 'blur-light' | 'blur-strong' | 'image', image? }
     effectsPreview: null, // own camera + processor while the effects modal is open with the camera off
-    micSensitivity: parseInt(localStorage.getItem('discord_mic_sens') || '15', 10),
-    selectedAudioInput: localStorage.getItem('discord_mic_device') || 'default',
-    selectedAudioOutput: localStorage.getItem('discord_spk_device') || 'default',
-    selectedVideoInput: localStorage.getItem('discord_cam_device') || 'default',
-    noiseSuppression: localStorage.getItem('discord_noise_suppression') !== 'false'
+    micSensitivity: parseInt(localStorage.getItem('triscord_mic_sens') || '15', 10),
+    selectedAudioInput: localStorage.getItem('triscord_mic_device') || 'default',
+    selectedAudioOutput: localStorage.getItem('triscord_spk_device') || 'default',
+    selectedVideoInput: localStorage.getItem('triscord_cam_device') || 'default',
+    noiseSuppression: localStorage.getItem('triscord_noise_suppression') !== 'false'
   };
 
-  localStorage.setItem('discord_user_id', state.user.userId);
-  localStorage.setItem('discord_username', state.user.username);
-  localStorage.setItem('discord_avatar_color', state.user.avatarColor);
+  localStorage.setItem('triscord_user_id', state.user.userId);
+  localStorage.setItem('triscord_username', state.user.username);
+  localStorage.setItem('triscord_avatar_color', state.user.avatarColor);
 
   // DOM Elements
   const el = {
@@ -449,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Render all tiles in the stage grid.
-  // Camera and screen share are independent tiles, like Discord: sharing your
+  // Camera and screen share are independent tiles, like a real client: sharing your
   // screen while the webcam is on produces two tiles for the same person.
   function renderAllVideoTiles() {
     el.videoGrid.innerHTML = '';
@@ -538,7 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
     adjustGridColumns();
   }
 
-  // Spotlight a stream, Discord-style: clicking it again returns to the grid
+  // Spotlight a stream: clicking it again returns to the grid
   function toggleTileFocus(key) {
     state.focusedTileId = state.focusedTileId === key ? null : key;
     renderAllVideoTiles();
@@ -548,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function loadAudioPrefs() {
     try {
-      const saved = JSON.parse(localStorage.getItem('discord_audio_prefs'));
+      const saved = JSON.parse(localStorage.getItem('triscord_audio_prefs'));
       if (saved && saved.voice && saved.stream) return saved;
     } catch (e) {}
     return { voice: {}, stream: {} };
@@ -577,7 +586,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       state.audioPrefs[kind][key] = pref;
     }
-    localStorage.setItem('discord_audio_prefs', JSON.stringify(state.audioPrefs));
+    localStorage.setItem('triscord_audio_prefs', JSON.stringify(state.audioPrefs));
 
     applyPeerAudio(socketId);
     refreshVolumeButtons(socketId);
@@ -690,10 +699,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const BACKGROUND_MAX_HEIGHT = 720;
 
   function loadCameraEffect() {
-    const type = localStorage.getItem('discord_camera_effect');
+    const type = localStorage.getItem('triscord_camera_effect');
     if (type === 'blur-light' || type === 'blur-strong') return { type };
     if (type === 'image') {
-      const image = localStorage.getItem('discord_camera_background');
+      const image = localStorage.getItem('triscord_camera_background');
       if (image) return { type, image };
     }
     return { type: 'none' };
@@ -701,7 +710,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderEffectOptions() {
     const supported = window.CameraEffectsProcessor.isSupported();
-    const image = localStorage.getItem('discord_camera_background');
+    const image = localStorage.getItem('triscord_camera_background');
 
     el.effectCustomImage.classList.toggle('hidden', !image);
     el.effectCustomImage.style.backgroundImage = image ? `url("${image}")` : '';
@@ -811,7 +820,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function selectCameraEffect(effect) {
     state.cameraEffect = effect;
-    localStorage.setItem('discord_camera_effect', effect.type);
+    localStorage.setItem('triscord_camera_effect', effect.type);
     renderEffectOptions();
 
     const liveLoading = state.user.isCameraOn && state.webrtc &&
@@ -843,7 +852,7 @@ document.addEventListener('DOMContentLoaded', () => {
       bitmap.close();
 
       const image = canvas.toDataURL('image/jpeg', 0.85);
-      localStorage.setItem('discord_camera_background', image);
+      localStorage.setItem('triscord_camera_background', image);
       await selectCameraEffect({ type: 'image', image });
     } catch (err) {
       alert('Não foi possível usar essa imagem: ' + err.message);
@@ -1314,7 +1323,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const val = parseInt(e.target.value, 10);
       state.micSensitivity = val;
       el.labelSensitivity.textContent = `${val}%`;
-      localStorage.setItem('discord_mic_sens', val);
+      localStorage.setItem('triscord_mic_sens', val);
       if (state.localSpeakingDetector) {
         state.localSpeakingDetector.setThreshold(val);
       }
@@ -1429,7 +1438,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => {
       const type = btn.dataset.effect;
       if (type === 'image') {
-        const image = localStorage.getItem('discord_camera_background');
+        const image = localStorage.getItem('triscord_camera_background');
         if (image) selectCameraEffect({ type, image });
         return;
       }
@@ -1467,7 +1476,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Volume changes made in another window apply here too
   window.addEventListener('storage', (e) => {
-    if (e.key !== 'discord_audio_prefs') return;
+    if (e.key !== 'triscord_audio_prefs') return;
     state.audioPrefs = loadAudioPrefs();
     applyAllPeerAudio();
     document.querySelectorAll('.tile-volume-btn').forEach(refreshVolumeButton);
@@ -1525,7 +1534,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (newUsername) {
       state.user.username = newUsername;
-      localStorage.setItem('discord_username', newUsername);
+      localStorage.setItem('triscord_username', newUsername);
     }
 
     state.selectedAudioInput = el.selectAudioInput.value;
@@ -1533,17 +1542,17 @@ document.addEventListener('DOMContentLoaded', () => {
     state.selectedVideoInput = el.selectVideoInput.value;
     state.noiseSuppression = el.noiseSuppression.checked;
 
-    localStorage.setItem('discord_mic_device', state.selectedAudioInput);
-    localStorage.setItem('discord_spk_device', state.selectedAudioOutput);
-    localStorage.setItem('discord_cam_device', state.selectedVideoInput);
-    localStorage.setItem('discord_noise_suppression', state.noiseSuppression);
-    localStorage.setItem('discord_avatar_color', state.user.avatarColor);
+    localStorage.setItem('triscord_mic_device', state.selectedAudioInput);
+    localStorage.setItem('triscord_spk_device', state.selectedAudioOutput);
+    localStorage.setItem('triscord_cam_device', state.selectedVideoInput);
+    localStorage.setItem('triscord_noise_suppression', state.noiseSuppression);
+    localStorage.setItem('triscord_avatar_color', state.user.avatarColor);
 
     updateUserProfileUI();
 
     if (newServerUrl && newServerUrl !== state.serverUrl) {
       state.serverUrl = newServerUrl;
-      localStorage.setItem('discord_server_url', newServerUrl);
+      localStorage.setItem('triscord_server_url', newServerUrl);
       connectToServer();
     } else if (state.socket && state.currentRoomId) {
       state.socket.emit('user-state-change', {

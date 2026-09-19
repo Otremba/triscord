@@ -1,7 +1,7 @@
 {
-  "name": "discord-voice-app",
+  "name": "triscord",
   "version": "1.0.0",
-  "description": "Discord-like Voice, Video and Screen Sharing Desktop Application with Electron and WebRTC",
+  "description": "Triscord: aplicativo de voz, vídeo e compartilhamento de tela com Electron e WebRTC",
   "main": "src/main.js",
   "scripts": {
     "start": "concurrently \"npm run server\" \"npm run electron\"",
@@ -16,7 +16,7 @@
     "electron",
     "webrtc",
     "voice-chat",
-    "discord-clone",
+    "triscord",
     "screen-sharing"
   ],
   "author": "",
@@ -36,8 +36,8 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.discordvoice.app",
-    "productName": "Discord Voice App",
+    "appId": "com.triscord.app",
+    "productName": "Triscord",
     "directories": {
       "output": "release"
     },
@@ -55,13 +55,13 @@
     ],
     "win": {
       "target": "nsis",
-      "artifactName": "Discord-Voice-App-Setup-${version}.${ext}"
+      "artifactName": "Triscord-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Discord Voice App"
+      "shortcutName": "Triscord"
     }
   }
 }

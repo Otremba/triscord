@@ -24,7 +24,7 @@ class SoundEffects {
     const ctx = this.getAudioContext();
     const now = ctx.currentTime;
     
-    // Smooth dual chime (Discord-style join)
+    // Smooth dual chime on join
     const osc1 = ctx.createOscillator();
     const osc2 = ctx.createOscillator();
     const gain = ctx.createGain();
