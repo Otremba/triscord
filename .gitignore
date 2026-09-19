@@ -1,11 +1,2 @@
 node_modules/
 release/
-dist/
-build/
-*.exe
-*.blockmap
-*.zip
-*.log
-.DS_Store
-Thumbs.db
-.env

@@ -92,26 +92,15 @@ document.addEventListener('DOMContentLoaded', () => {
     selectVideoInput: document.getElementById('settingsVideoInput'),
     sliderSensitivity: document.getElementById('settingsSensitivity'),
     labelSensitivity: document.getElementById('labelSensitivity'),
-    // Auto-Updater Elements
-    btnCheckUpdateTop: document.getElementById('btnCheckUpdateTop'),
-    btnCheckUpdateSettings: document.getElementById('btnCheckUpdateSettings'),
-    updateModal: document.getElementById('updateModal'),
-    updateModalTitle: document.getElementById('updateModalTitle'),
-    updateSpinner: document.getElementById('updateSpinner'),
-    updateSuccessIcon: document.getElementById('updateSuccessIcon'),
-    updateErrorIcon: document.getElementById('updateErrorIcon'),
-    updateStatusTitle: document.getElementById('updateStatusTitle'),
-    updateStatusDesc: document.getElementById('updateStatusDesc'),
-    updateProgressContainer: document.getElementById('updateProgressContainer'),
-    updateProgressBar: document.getElementById('updateProgressBar'),
-    btnDismissUpdate: document.getElementById('btnDismissUpdate'),
+    noiseSuppression: document.getElementById('settingsNoiseSuppression'),
+    micVuMeter: document.getElementById('micVuMeterFill'),
+    btnTestMic: document.getElementById('btnTestMic'),
     avatarColorPicker: document.querySelectorAll('.avatar-color-option')
   };
 
   // Initialize UI
   updateUserProfileUI();
   initSettingsUI();
-  initAutoUpdater();
 
   // Initialize Screen Share Picker
   state.screenPicker = new window.ScreenSharePicker();
@@ -514,40 +503,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const videoEl = existingTile.querySelector(`#video-${socketId}`);
       const audioEl = existingTile.querySelector(`#audio-${socketId}`);
       const avatarView = existingTile.querySelector('.avatar-view');
-      const tileContent = existingTile.querySelector('.tile-content');
-      let liveTag = existingTile.querySelector('.live-tag');
 
-      const hasVideo = stream && stream.getVideoTracks().some(t => t.readyState === 'live' && !t.muted);
-      const shouldShowVideo = hasVideo && (member.isCameraOn || member.isScreenSharing);
-
-      if (shouldShowVideo) {
-        if (videoEl.srcObject !== stream) {
-          videoEl.srcObject = stream;
-        }
+      if (stream && stream.getVideoTracks().length > 0) {
+        videoEl.srcObject = stream;
         videoEl.classList.remove('hidden');
         avatarView.classList.add('hidden');
-        videoEl.play().catch(e => console.warn('Video play error:', e));
       } else {
         videoEl.classList.add('hidden');
-        videoEl.srcObject = null;
         avatarView.classList.remove('hidden');
       }
 
-      if (member.isScreenSharing) {
-        if (!liveTag && tileContent) {
-          liveTag = document.createElement('div');
-          liveTag.className = 'live-tag';
-          liveTag.textContent = 'AO VIVO';
-          tileContent.appendChild(liveTag);
-        }
-      } else if (liveTag) {
-        liveTag.remove();
-      }
-
       if (stream && audioEl) {
-        if (audioEl.srcObject !== stream) {
-          audioEl.srcObject = stream;
-        }
+        audioEl.srcObject = stream;
         setupRemoteSpeakingDetector(socketId, stream);
       }
     } else {
@@ -573,41 +540,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ${member.isMuted ? '<span class="status-badge-mini red">🔇</span>' : ''}
         ${member.isDeafened ? '<span class="status-badge-mini red">🔕</span>' : ''}
       `;
-    }
-
-    // Update Video / Avatar visibility
-    const videoEl = tile.querySelector(`#video-${socketId}`);
-    const avatarView = tile.querySelector('.avatar-view');
-    const tileContent = tile.querySelector('.tile-content');
-    let liveTag = tile.querySelector('.live-tag');
-
-    const hasVideo = member.isCameraOn || member.isScreenSharing;
-
-    if (hasVideo) {
-      const stream = state.webrtc.remoteStreams.get(socketId);
-      if (stream && stream.getVideoTracks().length > 0) {
-        if (videoEl.srcObject !== stream) {
-          videoEl.srcObject = stream;
-        }
-        videoEl.classList.remove('hidden');
-        avatarView.classList.add('hidden');
-        videoEl.play().catch(e => console.warn('Video play error:', e));
-      }
-    } else {
-      videoEl.classList.add('hidden');
-      videoEl.srcObject = null;
-      avatarView.classList.remove('hidden');
-    }
-
-    if (member.isScreenSharing) {
-      if (!liveTag && tileContent) {
-        liveTag = document.createElement('div');
-        liveTag.className = 'live-tag';
-        liveTag.textContent = 'AO VIVO';
-        tileContent.appendChild(liveTag);
-      }
-    } else if (liveTag) {
-      liveTag.remove();
     }
   }
 
@@ -1062,98 +994,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.settingsModal.classList.add('hidden');
   });
-
-  // Auto-Updater Controller
-  function initAutoUpdater() {
-    async function triggerUpdate() {
-      if (!window.electronAPI || !window.electronAPI.checkForUpdates) {
-        alert('A atualização automática com reinicialização está disponível no aplicativo Desktop Electron.');
-        return;
-      }
-
-      // Reset modal UI
-      el.updateModal.classList.remove('hidden');
-      el.updateModalTitle.textContent = 'Atualizando Aplicativo';
-      el.updateStatusTitle.textContent = 'Buscando atualizações no GitHub...';
-      el.updateStatusDesc.textContent = 'Aguarde enquanto verificamos se há novas versões disponíveis.';
-      el.updateSpinner.classList.remove('hidden');
-      el.updateSuccessIcon.classList.add('hidden');
-      el.updateErrorIcon.classList.add('hidden');
-      el.updateProgressContainer.classList.remove('hidden');
-      el.updateProgressBar.style.width = '20%';
-      el.btnDismissUpdate.classList.add('hidden');
-
-      try {
-        await window.electronAPI.checkForUpdates();
-      } catch (err) {
-        console.error('Error triggering auto update:', err);
-        showUpdateError(err.message || 'Falha ao conectar com o GitHub.');
-      }
-    }
-
-    // Attach click listeners to update buttons
-    if (el.btnCheckUpdateTop) {
-      el.btnCheckUpdateTop.addEventListener('click', triggerUpdate);
-    }
-    if (el.btnCheckUpdateSettings) {
-      el.btnCheckUpdateSettings.addEventListener('click', () => {
-        el.settingsModal.classList.add('hidden');
-        triggerUpdate();
-      });
-    }
-
-    // Close / Dismiss modal
-    if (el.btnDismissUpdate) {
-      el.btnDismissUpdate.addEventListener('click', () => {
-        el.updateModal.classList.add('hidden');
-      });
-    }
-
-    // Listen to real-time progress from Electron main process
-    if (window.electronAPI && window.electronAPI.onUpdateProgress) {
-      window.electronAPI.onUpdateProgress((data) => {
-        console.log('[AutoUpdater]', data);
-        const { stage, message, percent } = data;
-
-        if (stage === 'checking') {
-          el.updateStatusTitle.textContent = 'Verificando atualizações...';
-          el.updateStatusDesc.textContent = message;
-          el.updateProgressBar.style.width = '25%';
-        } else if (stage === 'downloading') {
-          el.updateStatusTitle.textContent = 'Baixando atualizações do GitHub...';
-          el.updateStatusDesc.textContent = message;
-          el.updateProgressBar.style.width = `${percent || 50}%`;
-        } else if (stage === 'dependencies') {
-          el.updateStatusTitle.textContent = 'Instalando novas dependências...';
-          el.updateStatusDesc.textContent = message;
-          el.updateProgressBar.style.width = `${percent || 80}%`;
-        } else if (stage === 'restarting') {
-          el.updateSpinner.classList.add('hidden');
-          el.updateSuccessIcon.classList.remove('hidden');
-          el.updateStatusTitle.textContent = 'Atualizado com Sucesso!';
-          el.updateStatusDesc.textContent = message;
-          el.updateProgressBar.style.width = '100%';
-        } else if (stage === 'up-to-date') {
-          el.updateSpinner.classList.add('hidden');
-          el.updateSuccessIcon.classList.remove('hidden');
-          el.updateStatusTitle.textContent = 'Você já está atualizado!';
-          el.updateStatusDesc.textContent = message;
-          el.updateProgressBar.style.width = '100%';
-          el.btnDismissUpdate.classList.remove('hidden');
-        } else if (stage === 'error') {
-          showUpdateError(message);
-        }
-      });
-    }
-
-    function showUpdateError(errorMsg) {
-      el.updateSpinner.classList.add('hidden');
-      el.updateSuccessIcon.classList.add('hidden');
-      el.updateErrorIcon.classList.remove('hidden');
-      el.updateStatusTitle.textContent = 'Erro ao Atualizar';
-      el.updateStatusDesc.textContent = errorMsg;
-      el.updateProgressContainer.classList.add('hidden');
-      el.btnDismissUpdate.classList.remove('hidden');
-    }
-  }
 });

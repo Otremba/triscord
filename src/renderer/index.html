@@ -88,13 +88,6 @@
         </div>
 
         <div class="stage-top-actions">
-          <button class="btn-stage-action btn-update-app" id="btnCheckUpdateTop" title="Buscar e aplicar atualizações do GitHub">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
-            </svg>
-            <span>Atualizar App</span>
-          </button>
-
           <div class="connection-status-badge connecting" id="connectionStatusBadge">
             <span class="status-dot"></span>
             <span class="status-text">Conectando...</span>
@@ -325,55 +318,10 @@
           </div>
         </div>
 
-        <!-- Update Section -->
-        <div class="setting-section">
-          <label class="setting-label">Atualizações do Aplicativo</label>
-          <div class="update-settings-card">
-            <div class="update-info-text">
-              <span class="update-app-title">Triscord Desktop (v1.0.0)</span>
-              <span class="update-app-sub">Sincroniza automaticamente com o repositório GitHub</span>
-            </div>
-            <button class="btn-primary btn-update-action" id="btnCheckUpdateSettings">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
-              </svg>
-              <span>Verificar e Atualizar</span>
-            </button>
-          </div>
-        </div>
-
       </div>
 
       <div class="modal-footer">
         <button class="btn-primary" id="btnSaveSettings">Salvar Alterações</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Auto-Update Progress Modal -->
-  <div class="modal-overlay hidden" id="updateModal">
-    <div class="modal-dialog update-dialog">
-      <div class="modal-header">
-        <h2 id="updateModalTitle">Atualizando Aplicativo</h2>
-      </div>
-
-      <div class="modal-body update-modal-body">
-        <div class="update-animation-wrapper">
-          <div class="update-spinner" id="updateSpinner"></div>
-          <div class="update-icon-glow hidden" id="updateSuccessIcon">✓</div>
-          <div class="update-icon-glow error hidden" id="updateErrorIcon">✕</div>
-        </div>
-
-        <h3 class="update-status-title" id="updateStatusTitle">Verificando atualizações...</h3>
-        <p class="update-status-desc" id="updateStatusDesc">Aguarde enquanto buscamos as alterações mais recentes no GitHub.</p>
-
-        <div class="update-progress-bar-container" id="updateProgressContainer">
-          <div class="update-progress-bar-fill" id="updateProgressBar"></div>
-        </div>
-      </div>
-
-      <div class="modal-footer" id="updateModalFooter">
-        <button class="btn-primary hidden" id="btnDismissUpdate">Entendido</button>
       </div>
     </div>
   </div>
