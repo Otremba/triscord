@@ -29,8 +29,23 @@ const CONNECT_TIMEOUT_MS = 12000;
 const DISCONNECT_GRACE_MS = 6000;
 const MAX_RESTART_ATTEMPTS = 10;
 
+// Public, rate-limited TURN relay (Open Relay Project) used as a fallback so
+// calls still connect behind strict NATs/symmetric firewalls where STUN alone
+// fails. It's a shared testing service, not meant for heavy daily use — add
+// your own TURN server (coturn, or a paid provider) in Configurações >
+// Servidor for reliable long-term use; anything entered there is prepended
+// ahead of this fallback.
+const DEFAULT_TURN_SERVERS = [
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+];
+
+// How often to sample getStats() for the on-tile connection quality indicator
+const QUALITY_POLL_MS = 3000;
+
 class WebRTCManager {
-  constructor(socket, currentUserId) {
+  constructor(socket, currentUserId, options = {}) {
     this.socket = socket;
     this.currentUserId = currentUserId;
 
@@ -66,13 +81,18 @@ class WebRTCManager {
     // Callbacks
     this.onRemoteStreamAdded = null; // (socketId, stream, isScreen)
     this.onRemoteStreamRemoved = null; // (socketId, isScreen)
+    this.onConnectionQualityChanged = null; // (socketId, { level: 'good'|'ok'|'bad', rttMs, lossPct })
 
     this.iceServers = [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
       { urls: 'stun:stun3.l.google.com:19302' },
-      { urls: 'stun:stun4.l.google.com:19302' }
+      { urls: 'stun:stun4.l.google.com:19302' },
+      // A user-supplied TURN server (Configurações > Servidor) goes first so it
+      // wins over the shared fallback below when both are reachable
+      ...(Array.isArray(options.iceServers) ? options.iceServers : []),
+      ...DEFAULT_TURN_SERVERS
     ];
 
     this.setupSocketListeners();
@@ -437,8 +457,14 @@ class WebRTCManager {
       if (pc.connectionState === 'connected') {
         this.clearRecoveryTimers(socketId);
         negotiation.restartAttempts = 0;
+        if (!negotiation.statsInterval) {
+          negotiation.statsInterval = setInterval(() => this.pollConnectionQuality(socketId), QUALITY_POLL_MS);
+          this.pollConnectionQuality(socketId);
+        }
         return;
       }
+
+      this.stopQualityPolling(socketId);
 
       if (pc.connectionState === 'failed') {
         this.scheduleRestart(socketId);
@@ -559,6 +585,51 @@ class WebRTCManager {
     negotiation.graceTimer = null;
   }
 
+  stopQualityPolling(socketId) {
+    const negotiation = this.peerState.get(socketId);
+    if (!negotiation || !negotiation.statsInterval) return;
+    clearInterval(negotiation.statsInterval);
+    negotiation.statsInterval = null;
+  }
+
+  /**
+   * Sample getStats() for a rough, cheap-to-compute signal: round-trip time on
+   * the active candidate pair plus inbound packet loss, bucketed into
+   * good/ok/bad for the little indicator on each tile.
+   */
+  async pollConnectionQuality(socketId) {
+    const pc = this.peers.get(socketId);
+    if (!pc || pc.connectionState !== 'connected' || !this.onConnectionQualityChanged) return;
+
+    try {
+      const stats = await pc.getStats();
+      let rttMs = null;
+      let packetsLost = 0;
+      let packetsTotal = 0;
+
+      stats.forEach((report) => {
+        if (report.type === 'candidate-pair' && report.state === 'succeeded' &&
+            (report.nominated || report.selected) && typeof report.currentRoundTripTime === 'number') {
+          rttMs = report.currentRoundTripTime * 1000;
+        }
+        if (report.type === 'inbound-rtp' && !report.isRemote) {
+          const lost = report.packetsLost || 0;
+          packetsLost += lost;
+          packetsTotal += lost + (report.packetsReceived || 0);
+        }
+      });
+
+      const lossPct = packetsTotal > 0 ? (packetsLost / packetsTotal) * 100 : 0;
+      let level = 'good';
+      if ((rttMs !== null && rttMs > 300) || lossPct > 8) level = 'bad';
+      else if ((rttMs !== null && rttMs > 150) || lossPct > 3) level = 'ok';
+
+      this.onConnectionQualityChanged(socketId, { level, rttMs, lossPct });
+    } catch (err) {
+      // getStats() rejecting mid-teardown isn't worth logging
+    }
+  }
+
   /**
    * Push whatever is currently live locally onto one peer's senders.
    */
@@ -603,6 +674,7 @@ class WebRTCManager {
 
   removePeer(socketId) {
     this.clearRecoveryTimers(socketId);
+    this.stopQualityPolling(socketId);
 
     if (this.peers.has(socketId)) {
       const pc = this.peers.get(socketId);

@@ -58,23 +58,23 @@ class ScreenSharePicker {
     this.btnConfirm.disabled = true;
     this.gridEl.innerHTML = '<div class="loading-sources"><div class="spinner"></div><p>Buscando telas e janelas...</p></div>';
 
-    return new Promise(async (resolve) => {
-      this.resolvePromise = resolve;
+    const opened = new Promise((resolve) => { this.resolvePromise = resolve; });
 
-      // Check if Electron desktopCapturer is available
-      if (window.electronAPI && window.electronAPI.getScreenSources) {
-        try {
-          this.sources = await window.electronAPI.getScreenSources();
-          this.renderSources();
-        } catch (err) {
-          console.error('Failed to get Electron screen sources:', err);
-          this.fallbackBrowserPicker();
-        }
-      } else {
-        // Fallback for browser testing
+    // Check if Electron desktopCapturer is available
+    if (window.electronAPI && window.electronAPI.getScreenSources) {
+      try {
+        this.sources = await window.electronAPI.getScreenSources();
+        this.renderSources();
+      } catch (err) {
+        console.error('Failed to get Electron screen sources:', err);
         this.fallbackBrowserPicker();
       }
-    });
+    } else {
+      // Fallback for browser testing
+      this.fallbackBrowserPicker();
+    }
+
+    return opened;
   }
 
   async fallbackBrowserPicker() {
@@ -108,14 +108,20 @@ class ScreenSharePicker {
       return;
     }
 
+    const escapeHtml = (s) => {
+      const div = document.createElement('div');
+      div.innerText = s == null ? '' : String(s);
+      return div.innerHTML;
+    };
+
     this.gridEl.innerHTML = filtered.map(source => `
       <div class="source-card ${this.selectedSourceId === source.id ? 'selected' : ''}" data-id="${source.id}">
         <div class="source-thumb-container">
-          <img src="${source.thumbnail}" class="source-thumbnail" alt="${source.name}" />
+          <img src="${source.thumbnail}" class="source-thumbnail" alt="${escapeHtml(source.name)}" />
           ${source.appIcon ? `<img src="${source.appIcon}" class="source-app-icon" />` : ''}
         </div>
         <div class="source-info">
-          <span class="source-name" title="${source.name}">${source.name}</span>
+          <span class="source-name" title="${escapeHtml(source.name)}">${escapeHtml(source.name)}</span>
         </div>
       </div>
     `).join('');

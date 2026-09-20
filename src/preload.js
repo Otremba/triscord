@@ -12,5 +12,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   minimize: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
-  close: () => ipcRenderer.send('window-close')
+  close: () => ipcRenderer.send('window-close'),
+  setGlobalMuteShortcut: (accelerator) => ipcRenderer.invoke('set-global-mute-shortcut', accelerator),
+  onGlobalMuteToggle: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('global-mute-toggle', listener);
+    return () => ipcRenderer.removeListener('global-mute-toggle', listener);
+  },
+  onUpdateDownloaded: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('update-downloaded', listener);
+    return () => ipcRenderer.removeListener('update-downloaded', listener);
+  },
+  restartToUpdate: () => ipcRenderer.send('restart-to-update')
 });

@@ -48,6 +48,7 @@
           <div class="user-text-info">
             <span class="user-username" id="userUsername">Carregando...</span>
             <span class="user-status-tag" id="userStatusTag">Online</span>
+            <span class="user-custom-status hidden" id="userCustomStatus"></span>
           </div>
         </div>
 
@@ -147,6 +148,11 @@
               <span class="btn-label">Compartilhar</span>
             </button>
 
+            <button class="btn-voice-control hidden" id="btnToggleRecording" title="Gravar chamada">
+              <i data-lucide="circle-dot"></i>
+              <span class="btn-label">Gravar</span>
+            </button>
+
             <button class="btn-voice-control btn-disconnect" id="btnDisconnectVoice">
               <i data-lucide="phone-off"></i>
               <span>Desconectar</span>
@@ -168,8 +174,16 @@
           </div>
 
           <div class="chat-input-area">
+            <div class="chat-attachment-preview hidden" id="chatAttachmentPreview">
+              <img id="chatAttachmentThumb" alt="Anexo" />
+              <button type="button" id="btnRemoveAttachment" aria-label="Remover anexo"><i data-lucide="x"></i></button>
+            </div>
             <div class="chat-input-box">
+              <button id="btnAttachImage" title="Enviar imagem" type="button">
+                <i data-lucide="paperclip"></i>
+              </button>
               <input type="text" id="chatInput" placeholder="Conversar no canal..." />
+              <input type="file" id="chatAttachmentInput" accept="image/*" hidden />
               <button id="btnSendChat" title="Enviar Mensagem">
                 <i data-lucide="send-horizontal"></i>
               </button>
@@ -249,6 +263,8 @@
             <button class="effect-option" data-effect="blur-strong" title="Desfoque forte" aria-label="Desfoque forte">
               <i data-lucide="droplets"></i>
             </button>
+            <button class="effect-option effect-image" data-effect="image" data-preset="gradient-blue" title="Fundo azul" aria-label="Fundo azul"></button>
+            <button class="effect-option effect-image" data-effect="image" data-preset="gradient-sunset" title="Fundo pôr do sol" aria-label="Fundo pôr do sol"></button>
             <button class="effect-option effect-image hidden" data-effect="image" id="effectCustomImage" title="Seu fundo" aria-label="Seu fundo"></button>
             <button class="effect-option effect-upload" id="btnUploadBackground" title="Enviar imagem de fundo" aria-label="Enviar imagem de fundo">
               <i data-lucide="image-plus"></i>
@@ -276,6 +292,11 @@
         <div class="setting-section">
           <label class="setting-label">Seu Nome de Usuário</label>
           <input type="text" id="settingsUsername" class="setting-input" placeholder="Ex: Lucas_Gamer" />
+        </div>
+
+        <div class="setting-section">
+          <label class="setting-label">Status Personalizado</label>
+          <input type="text" id="settingsStatus" class="setting-input" maxlength="64" placeholder="Ex: Jogando algo, De boa..." />
         </div>
 
         <div class="setting-section">
@@ -339,6 +360,49 @@
           </div>
         </div>
 
+        <!-- Push-to-talk -->
+        <div class="setting-section">
+          <label class="setting-label">Modo de Transmissão de Voz</label>
+          <label class="setting-checkbox">
+            <input type="radio" name="voiceMode" id="settingsModeVAD" value="vad" checked />
+            <span>Detecção automática por voz</span>
+          </label>
+          <label class="setting-checkbox">
+            <input type="radio" name="voiceMode" id="settingsModePTT" value="ptt" />
+            <span>Falar para Transmitir (Push-to-Talk)</span>
+          </label>
+          <div class="ptt-key-row" id="pttKeyRow" style="display:none;">
+            <span style="font-size: 12px; color: var(--text-muted);">Tecla:</span>
+            <button type="button" class="btn-secondary" id="btnCapturePttKey" style="padding: 4px 10px; font-size: 12px;">Barra de espaço</button>
+          </div>
+        </div>
+
+        <!-- Appearance -->
+        <div class="setting-section">
+          <label class="setting-label">Aparência</label>
+          <label class="setting-checkbox">
+            <input type="checkbox" id="settingsLightTheme" />
+            <span>Usar tema claro</span>
+          </label>
+        </div>
+
+        <!-- Global shortcut (Electron only) -->
+        <div class="setting-section hidden" id="globalShortcutSection">
+          <label class="setting-label">Atalho Global para Mutar (funciona com o app em segundo plano)</label>
+          <input type="text" id="settingsGlobalShortcut" class="setting-input" placeholder="CommandOrControl+Shift+M" />
+        </div>
+
+        <!-- TURN server -->
+        <div class="setting-section">
+          <label class="setting-label">Servidor TURN Personalizado (opcional)</label>
+          <small style="color: var(--text-muted); font-size: 11px; display:block; margin-bottom: 6px;">
+            Melhora a conexão atrás de redes restritas/CGNAT. Sem isso, um relay público de testes é usado como reserva.
+          </small>
+          <input type="text" id="settingsTurnUrl" class="setting-input" placeholder="turn:seu-servidor.com:3478" style="margin-bottom: 6px;" />
+          <input type="text" id="settingsTurnUsername" class="setting-input" placeholder="usuário" style="margin-bottom: 6px;" />
+          <input type="password" id="settingsTurnCredential" class="setting-input" placeholder="senha/credencial" />
+        </div>
+
       </div>
 
       <div class="modal-footer">
@@ -363,6 +427,9 @@
       <button type="button" class="volume-popover-reset" id="volumePopoverReset">Redefinir</button>
     </div>
   </div>
+
+  <!-- Toast notifications (kicked, force-muted, rate limits, recording status...) -->
+  <div id="toastContainer" class="app-toast-container" aria-live="polite"></div>
 
   <script src="js/vendor/lucide/lucide.min.js"></script>
   <script src="js/icons.js"></script>

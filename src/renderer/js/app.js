@@ -24,6 +24,91 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem('triscord_server_url');
   }
 
+  function escapeHtml(string) {
+    const div = document.createElement('div');
+    div.innerText = string == null ? '' : String(string);
+    return div.innerHTML;
+  }
+
+  function escapeRegExp(string) {
+    return String(string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  // Anything rendered as a CSS color value must be validated first: a peer
+  // could send an arbitrary string trying to break out of a style attribute
+  function safeColor(color) {
+    return typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#5865F2';
+  }
+
+  function isTypingTarget(target) {
+    if (!target) return false;
+    const tag = target.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
+  }
+
+  const KEY_CODE_LABELS = {
+    Space: 'Barra de espaço',
+    ControlLeft: 'Ctrl Esquerdo', ControlRight: 'Ctrl Direito',
+    ShiftLeft: 'Shift Esquerdo', ShiftRight: 'Shift Direito',
+    AltLeft: 'Alt Esquerdo', AltRight: 'Alt Direito',
+    Backquote: '` (crase)'
+  };
+  function describeKeyCode(code) {
+    if (KEY_CODE_LABELS[code]) return KEY_CODE_LABELS[code];
+    if (code.startsWith('Key')) return code.slice(3);
+    if (code.startsWith('Digit')) return code.slice(5);
+    return code;
+  }
+
+  // Built-in camera backgrounds, generated on the fly as gradients so no
+  // extra image assets need to ship with the app
+  const PRESET_BACKGROUNDS = {
+    'gradient-blue': ['#1e3c72', '#2a5298'],
+    'gradient-sunset': ['#ff7e5f', '#feb47b']
+  };
+  const presetDataUrlCache = {};
+  function getPresetDataUrl(id) {
+    const colors = PRESET_BACKGROUNDS[id];
+    if (!colors) return null;
+    if (presetDataUrlCache[id]) return presetDataUrlCache[id];
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280;
+    canvas.height = 720;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, colors[0]);
+    gradient.addColorStop(1, colors[1]);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    presetDataUrlCache[id] = dataUrl;
+    return dataUrl;
+  }
+
+  function loadCameraEffect() {
+    const type = localStorage.getItem('triscord_camera_effect');
+    if (type === 'blur-light' || type === 'blur-strong') return { type };
+    if (type === 'image') {
+      const source = localStorage.getItem('triscord_camera_background_source') || 'custom';
+      if (source === 'custom') {
+        const image = localStorage.getItem('triscord_camera_background');
+        if (image) return { type, image, source: 'custom' };
+      } else {
+        const image = getPresetDataUrl(source);
+        if (image) return { type, image, source };
+      }
+    }
+    return { type: 'none' };
+  }
+
+  function loadTheme() {
+    return localStorage.getItem('triscord_theme') === 'light' ? 'light' : 'dark';
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+  }
+
   // Application State
   const state = {
     serverUrl: localStorage.getItem('triscord_server_url') || defaultServerUrl,
@@ -31,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
       userId: localStorage.getItem('triscord_user_id') || `user_${Math.random().toString(36).substr(2, 9)}`,
       username: localStorage.getItem('triscord_username') || `Amigo_${Math.floor(1000 + Math.random() * 9000)}`,
       avatarColor: localStorage.getItem('triscord_avatar_color') || '#5865F2',
+      status: localStorage.getItem('triscord_status') || '',
       isMuted: false,
       isDeafened: false,
       isCameraOn: false,
@@ -51,18 +137,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // Per-person playback: { voice: { userId: { volume, muted } }, stream: { ... } }
     audioPrefs: loadAudioPrefs(),
     volumePopover: null, // { kind: 'voice' | 'stream', socketId } while the popover is open
-    cameraEffect: loadCameraEffect(), // { type: 'none' | 'blur-light' | 'blur-strong' | 'image', image? }
+    cameraEffect: loadCameraEffect(), // { type: 'none' | 'blur-light' | 'blur-strong' | 'image', image?, source? }
     effectsPreview: null, // own camera + processor while the effects modal is open with the camera off
     micSensitivity: parseInt(localStorage.getItem('triscord_mic_sens') || '15', 10),
     selectedAudioInput: localStorage.getItem('triscord_mic_device') || 'default',
     selectedAudioOutput: localStorage.getItem('triscord_spk_device') || 'default',
     selectedVideoInput: localStorage.getItem('triscord_cam_device') || 'default',
-    noiseSuppression: localStorage.getItem('triscord_noise_suppression') !== 'false'
+    noiseSuppression: localStorage.getItem('triscord_noise_suppression') !== 'false',
+    theme: loadTheme(),
+    pttMode: localStorage.getItem('triscord_voice_mode') === 'ptt' ? 'ptt' : 'vad',
+    pttKey: localStorage.getItem('triscord_ptt_key') || 'Space',
+    pttActive: false,
+    turnServer: {
+      url: localStorage.getItem('triscord_turn_url') || '',
+      username: localStorage.getItem('triscord_turn_username') || '',
+      credential: localStorage.getItem('triscord_turn_credential') || ''
+    },
+    isRoomOwner: false,
+    currentRoomLocked: false,
+    currentRoomMaxUsers: null,
+    connectionQuality: new Map(), // socketId -> { level, rttMs, lossPct }
+    chatMessagesById: new Map(), // messageId -> message (for re-rendering reactions)
+    pendingAttachment: null, // image attachment staged for the next chat message
+    recording: null // { recorder, stop } while a call recording is in progress
   };
+
+  applyTheme(state.theme);
 
   localStorage.setItem('triscord_user_id', state.user.userId);
   localStorage.setItem('triscord_username', state.user.username);
   localStorage.setItem('triscord_avatar_color', state.user.avatarColor);
+  localStorage.setItem('triscord_status', state.user.status);
 
   // DOM Elements
   const el = {
@@ -80,6 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
     userAvatar: document.getElementById('userAvatar'),
     userUsername: document.getElementById('userUsername'),
     userStatusTag: document.getElementById('userStatusTag'),
+    userCustomStatus: document.getElementById('userCustomStatus'),
     btnMute: document.getElementById('btnToggleMute'),
     btnDeafen: document.getElementById('btnToggleDeafen'),
     btnSettings: document.getElementById('btnOpenSettings'),
@@ -94,6 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Voice Action Bar
     btnCamera: document.getElementById('btnToggleCamera'),
     btnScreenShare: document.getElementById('btnToggleScreenShare'),
+    btnToggleRecording: document.getElementById('btnToggleRecording'),
     btnDisconnect: document.getElementById('btnDisconnectVoice'),
 
     // Chat Drawer
@@ -102,12 +209,18 @@ document.addEventListener('DOMContentLoaded', () => {
     chatInput: document.getElementById('chatInput'),
     btnSendChat: document.getElementById('btnSendChat'),
     btnCloseChat: document.getElementById('btnCloseChat'),
+    btnAttachImage: document.getElementById('btnAttachImage'),
+    chatAttachmentInput: document.getElementById('chatAttachmentInput'),
+    chatAttachmentPreview: document.getElementById('chatAttachmentPreview'),
+    chatAttachmentThumb: document.getElementById('chatAttachmentThumb'),
+    btnRemoveAttachment: document.getElementById('btnRemoveAttachment'),
 
     // Settings Modal
     settingsModal: document.getElementById('settingsModal'),
     btnCloseSettings: document.getElementById('btnCloseSettings'),
     btnSaveSettings: document.getElementById('btnSaveSettings'),
     inputSettingsUsername: document.getElementById('settingsUsername'),
+    inputSettingsStatus: document.getElementById('settingsStatus'),
     inputSettingsServerUrl: document.getElementById('settingsServerUrl'),
     selectAudioInput: document.getElementById('settingsAudioInput'),
     selectAudioOutput: document.getElementById('settingsAudioOutput'),
@@ -115,6 +228,16 @@ document.addEventListener('DOMContentLoaded', () => {
     sliderSensitivity: document.getElementById('settingsSensitivity'),
     labelSensitivity: document.getElementById('labelSensitivity'),
     noiseSuppression: document.getElementById('settingsNoiseSuppression'),
+    settingsLightTheme: document.getElementById('settingsLightTheme'),
+    settingsModeVAD: document.getElementById('settingsModeVAD'),
+    settingsModePTT: document.getElementById('settingsModePTT'),
+    pttKeyRow: document.getElementById('pttKeyRow'),
+    btnCapturePttKey: document.getElementById('btnCapturePttKey'),
+    globalShortcutSection: document.getElementById('globalShortcutSection'),
+    settingsGlobalShortcut: document.getElementById('settingsGlobalShortcut'),
+    settingsTurnUrl: document.getElementById('settingsTurnUrl'),
+    settingsTurnUsername: document.getElementById('settingsTurnUsername'),
+    settingsTurnCredential: document.getElementById('settingsTurnCredential'),
     micVuMeter: document.getElementById('micVuMeterFill'),
 
     // Camera effects modal
@@ -137,12 +260,14 @@ document.addEventListener('DOMContentLoaded', () => {
     volumePopoverMute: document.getElementById('volumePopoverMute'),
     volumePopoverReset: document.getElementById('volumePopoverReset'),
     btnTestMic: document.getElementById('btnTestMic'),
-    avatarColorPicker: document.querySelectorAll('.avatar-color-option')
+    avatarColorPicker: document.querySelectorAll('.avatar-color-option'),
+    toastContainer: document.getElementById('toastContainer')
   };
 
   // Initialize UI
   updateUserProfileUI();
   initSettingsUI();
+  initPresetBackgroundButtons();
 
   // Initialize Screen Share Picker
   state.screenPicker = new window.ScreenSharePicker();
@@ -174,8 +299,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       // Initialize WebRTC Manager with socket
-      state.webrtc = new window.WebRTCManager(state.socket, state.user.userId);
+      state.webrtc = new window.WebRTCManager(state.socket, state.user.userId, {
+        iceServers: buildCustomIceServers()
+      });
       state.webrtc.cameraEffect = state.cameraEffect;
+      state.webrtc.onConnectionQualityChanged = (socketId, quality) => {
+        updateConnectionQualityIndicator(socketId, quality);
+      };
 
       // The call's camera switched between raw and effect-processed video
       state.webrtc.onLocalCameraChanged = (stream) => {
@@ -225,9 +355,12 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       // Successfully joined room
-      state.socket.on('room-joined', ({ roomId, existingUsers }) => {
+      state.socket.on('room-joined', ({ roomId, existingUsers, chatHistory, isOwner, locked, maxUsers }) => {
         state.currentRoomId = roomId;
         state.roomMembers.clear();
+        state.isRoomOwner = !!isOwner;
+        state.currentRoomLocked = !!locked;
+        state.currentRoomMaxUsers = maxUsers || null;
 
         existingUsers.forEach(u => {
           state.roomMembers.set(u.socketId, u);
@@ -236,10 +369,21 @@ document.addEventListener('DOMContentLoaded', () => {
         window.SoundEffects.playJoin();
         updateStageView();
 
+        clearChat();
+        (chatHistory || []).forEach(msg => addChatMessage(msg));
+
         // Connect WebRTC to all existing members
         existingUsers.forEach(u => {
           state.webrtc.connectToPeer(u.socketId);
         });
+      });
+
+      // The server refused to let us in (room locked or at its user limit)
+      state.socket.on('room-join-denied', ({ reason }) => {
+        state.currentRoomId = null;
+        state.currentRoomName = '';
+        updateStageView();
+        showToast(reason === 'locked' ? 'Esta sala está trancada pelo dono.' : 'Esta sala está cheia.', 'error');
       });
 
       // Another user joined our current room
@@ -253,6 +397,28 @@ document.addEventListener('DOMContentLoaded', () => {
           timestamp: Date.now(),
           isSystem: true
         });
+        notify('Triscord', `${userData.username} entrou no canal #${state.currentRoomName}`);
+      });
+
+      // A room owner kicked us out
+      state.socket.on('kicked', ({ byUsername }) => {
+        showToast(`Você foi removido da sala por ${byUsername}.`, 'error');
+        leaveCurrentRoom();
+      });
+
+      // A room owner force-muted us
+      state.socket.on('force-muted', ({ byUsername }) => {
+        if (!state.user.isMuted) toggleMute();
+        showToast(`${byUsername} silenciou seu microfone.`, 'error');
+      });
+
+      state.socket.on('chat-rate-limited', () => {
+        showToast('Você está enviando mensagens rápido demais.', 'error');
+      });
+
+      // Someone reacted (or removed a reaction) on a chat message
+      state.socket.on('message-reaction-updated', ({ messageId, reactions }) => {
+        updateMessageReactionsUI(messageId, reactions);
       });
 
       // User state update (muted, camera, screen, speaking)
@@ -297,6 +463,13 @@ document.addEventListener('DOMContentLoaded', () => {
           window.SoundEffects.playMessage();
           el.btnToggleChat.classList.add('has-unread');
         }
+
+        if (msg.senderSocketId !== state.socket.id && msg.text && state.user.username) {
+          const mentionRe = new RegExp(`\\b${escapeRegExp(state.user.username)}\\b`, 'i');
+          if (mentionRe.test(msg.text)) {
+            notify(`${msg.senderName} mencionou você`, msg.text);
+          }
+        }
       });
 
     } catch (err) {
@@ -310,32 +483,102 @@ document.addEventListener('DOMContentLoaded', () => {
     el.connectionBadge.querySelector('.status-text').textContent = text;
   }
 
+  function buildCustomIceServers() {
+    const { url, username, credential } = state.turnServer;
+    if (!url) return [];
+    return [{ urls: url, username: username || undefined, credential: credential || undefined }];
+  }
+
+  // ---- Toasts & desktop notifications ----
+
+  function showToast(message, kind = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `app-toast ${kind}`;
+    toast.textContent = message;
+    el.toastContainer.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('visible'));
+    setTimeout(() => {
+      toast.classList.remove('visible');
+      setTimeout(() => toast.remove(), 250);
+    }, 4000);
+  }
+
+  function shouldSendDesktopNotification() {
+    return document.hidden || !document.hasFocus();
+  }
+
+  function notify(title, body) {
+    if (!shouldSendDesktopNotification()) return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    try {
+      new Notification(title, { body, icon: 'assets/icon.png' });
+    } catch (err) {
+      console.warn('Notification failed:', err);
+    }
+  }
+
+  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {});
+  }
+
+  // ---- Per-peer connection quality indicator ----
+
+  function updateConnectionQualityIndicator(socketId, quality) {
+    state.connectionQuality.set(socketId, quality);
+    const tile = document.getElementById(`tile-${socketId}`);
+    if (!tile) return;
+    const overlay = tile.querySelector('.tile-overlay');
+    if (!overlay) return;
+
+    let dot = overlay.querySelector('.quality-dot');
+    if (!dot) {
+      dot = document.createElement('span');
+      dot.className = 'quality-dot';
+      overlay.appendChild(dot);
+    }
+    dot.className = `quality-dot quality-${quality.level}`;
+    dot.title = quality.rttMs != null
+      ? `Conexão ${quality.level === 'good' ? 'boa' : quality.level === 'ok' ? 'razoável' : 'ruim'} • Ping: ${Math.round(quality.rttMs)}ms`
+      : 'Qualidade da conexão';
+  }
+
   // Render list of voice channels in the left sidebar
   function renderChannelsList() {
     el.channelsList.innerHTML = state.rooms.map(room => {
       const isCurrent = state.currentRoomId === room.id;
       const userCount = room.users ? room.users.length : 0;
+      const iOwnThisRoom = !!room.ownerUserId && room.ownerUserId === state.user.userId;
+      const isOwnerHere = isCurrent && state.isRoomOwner;
 
       return `
-        <div class="channel-item ${isCurrent ? 'active' : ''}" data-room-id="${room.id}" data-room-name="${room.name}">
+        <div class="channel-item ${isCurrent ? 'active' : ''}" data-room-id="${room.id}" data-room-name="${escapeHtml(room.name)}">
           <div class="channel-main">
             <div class="channel-icon"><i data-lucide="mic"></i></div>
-            <span class="channel-name">${room.name}</span>
-            ${userCount > 0 ? `<span class="channel-badge">${userCount}</span>` : ''}
+            <span class="channel-name">${escapeHtml(room.name)}</span>
+            ${room.maxUsers ? `<span class="channel-badge" title="Limite de usuários">${userCount}/${room.maxUsers}</span>`
+              : userCount > 0 ? `<span class="channel-badge">${userCount}</span>` : ''}
+            ${room.locked
+              ? `<span class="status-mini-icon ${iOwnThisRoom ? 'yellow lock-toggle' : 'yellow'}" ${iOwnThisRoom ? `data-action="toggle-lock" data-room-id="${room.id}"` : ''} title="${iOwnThisRoom ? 'Sala trancada — clique para destrancar' : 'Sala trancada pelo dono'}"><i data-lucide="lock"></i></span>`
+              : iOwnThisRoom ? `<span class="status-mini-icon lock-toggle" data-action="toggle-lock" data-room-id="${room.id}" title="Sala aberta — clique para trancar"><i data-lucide="lock-open"></i></span>` : ''}
+            ${iOwnThisRoom ? `<span class="status-mini-icon lock-toggle" data-action="set-limit" data-room-id="${room.id}" title="Definir limite de usuários"><i data-lucide="users"></i></span>` : ''}
           </div>
           ${room.users && room.users.length > 0 ? `
             <div class="channel-user-list">
               ${room.users.map(u => `
-                <div class="channel-user-item ${u.isSpeaking ? 'speaking' : ''}" data-socket-id="${u.socketId}">
-                  <div class="channel-user-avatar" style="background-color: ${u.avatar || '#5865F2'}">
-                    ${u.username.charAt(0).toUpperCase()}
+                <div class="channel-user-item ${u.isSpeaking ? 'speaking' : ''}" data-socket-id="${u.socketId}" ${u.status ? `title="${escapeHtml(u.status)}"` : ''}>
+                  <div class="channel-user-avatar" style="background-color: ${safeColor(u.avatar)}">
+                    ${escapeHtml(u.username).charAt(0).toUpperCase()}
                   </div>
-                  <span class="channel-user-name">${u.username}</span>
+                  <span class="channel-user-name">${escapeHtml(u.username)}</span>
                   <div class="channel-user-icons">
                     ${u.isMuted ? '<span class="status-mini-icon red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
                     ${u.isDeafened ? '<span class="status-mini-icon red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
                     ${u.isCameraOn ? '<span class="status-mini-icon green" title="Câmera Ativa"><i data-lucide="video"></i></span>' : ''}
                     ${u.isScreenSharing ? '<span class="status-mini-icon blurple" title="Compartilhando Tela"><i data-lucide="screen-share"></i></span>' : ''}
+                    ${isOwnerHere && u.socketId !== state.socket?.id ? `
+                      <button type="button" class="status-mini-icon owner-action" data-action="force-mute" data-socket-id="${u.socketId}" title="Silenciar à força"><i data-lucide="mic-off"></i></button>
+                      <button type="button" class="status-mini-icon owner-action" data-action="kick" data-socket-id="${u.socketId}" title="Expulsar da sala"><i data-lucide="user-x"></i></button>
+                    ` : ''}
                   </div>
                 </div>
               `).join('')}
@@ -349,7 +592,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Channel click listeners
     el.channelsList.querySelectorAll('.channel-item').forEach(item => {
-      item.querySelector('.channel-main').addEventListener('click', () => {
+      item.querySelector('.channel-main').addEventListener('click', (e) => {
+        if (e.target.closest('[data-action]')) return; // lock/limit icon handled below
         const roomId = item.dataset.roomId;
         const roomName = item.dataset.roomName;
         if (state.currentRoomId !== roomId) {
@@ -358,6 +602,46 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+
+  // Room owner controls + per-user moderation (event-delegated: the list is
+  // rebuilt on every rooms-update, so per-node listeners would leak/vanish)
+  el.channelsList.addEventListener('click', (e) => {
+    const ownerBtn = e.target.closest('.owner-action');
+    if (ownerBtn) {
+      e.stopPropagation();
+      const socketId = ownerBtn.dataset.socketId;
+      if (ownerBtn.dataset.action === 'kick') {
+        if (confirm('Expulsar este usuário da sala?')) state.socket.emit('kick-user', { socketId });
+      } else if (ownerBtn.dataset.action === 'force-mute') {
+        state.socket.emit('force-mute-user', { socketId });
+      }
+      return;
+    }
+
+    const lockToggle = e.target.closest('[data-action="toggle-lock"]');
+    if (lockToggle) {
+      e.stopPropagation();
+      const room = state.rooms.find(r => r.id === lockToggle.dataset.roomId);
+      if (room) state.socket.emit('update-room-settings', { locked: !room.locked });
+      return;
+    }
+
+    const limitBtn = e.target.closest('[data-action="set-limit"]');
+    if (limitBtn) {
+      e.stopPropagation();
+      const room = state.rooms.find(r => r.id === limitBtn.dataset.roomId);
+      const current = room && room.maxUsers ? String(room.maxUsers) : '';
+      const input = prompt('Limite de usuários nesta sala (deixe em branco para não ter limite):', current);
+      if (input === null) return;
+      const trimmed = input.trim();
+      if (trimmed === '') {
+        state.socket.emit('update-room-settings', { maxUsers: null });
+      } else {
+        const num = parseInt(trimmed, 10);
+        if (Number.isFinite(num) && num >= 1) state.socket.emit('update-room-settings', { maxUsers: num });
+      }
+    }
+  });
 
   // Join a voice channel
   async function joinRoom(roomId, roomName) {
@@ -386,6 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
           state.noiseSuppression
         );
         setupLocalSpeakingDetector(micStream);
+        applyMicEnabledState();
       }
     } catch (err) {
       console.warn('Microphone permission denied or not found:', err);
@@ -398,6 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
         userId: state.user.userId,
         username: state.user.username,
         avatar: state.user.avatarColor,
+        status: state.user.status,
         isMuted: state.user.isMuted,
         isDeafened: state.user.isDeafened,
         isCameraOn: state.user.isCameraOn,
@@ -414,6 +700,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.currentRoomId && state.socket) {
       state.socket.emit('leave-room');
     }
+
+    if (state.recording) stopRecording();
 
     window.SoundEffects.playLeave();
 
@@ -434,6 +722,10 @@ document.addEventListener('DOMContentLoaded', () => {
     state.currentRoomId = null;
     state.currentRoomName = '';
     state.roomMembers.clear();
+    state.isRoomOwner = false;
+    state.currentRoomLocked = false;
+    state.currentRoomMaxUsers = null;
+    state.pttActive = false;
     state.user.isCameraOn = false;
     state.user.isScreenSharing = false;
     state.focusedTileId = null;
@@ -709,29 +1001,45 @@ document.addEventListener('DOMContentLoaded', () => {
   const BACKGROUND_MAX_WIDTH = 1280;
   const BACKGROUND_MAX_HEIGHT = 720;
 
-  function loadCameraEffect() {
-    const type = localStorage.getItem('triscord_camera_effect');
-    if (type === 'blur-light' || type === 'blur-strong') return { type };
-    if (type === 'image') {
-      const image = localStorage.getItem('triscord_camera_background');
-      if (image) return { type, image };
-    }
-    return { type: 'none' };
-  }
-
   function renderEffectOptions() {
     const supported = window.CameraEffectsProcessor.isSupported();
-    const image = localStorage.getItem('triscord_camera_background');
+    const customImage = localStorage.getItem('triscord_camera_background');
 
-    el.effectCustomImage.classList.toggle('hidden', !image);
-    el.effectCustomImage.style.backgroundImage = image ? `url("${image}")` : '';
+    el.effectCustomImage.classList.toggle('hidden', !customImage);
+    el.effectCustomImage.style.backgroundImage = customImage ? `url("${customImage}")` : '';
 
     el.effectOptions.forEach(btn => {
-      btn.classList.toggle('selected', btn.dataset.effect === state.cameraEffect.type);
+      let selected;
+      if (btn.dataset.preset) {
+        selected = state.cameraEffect.type === 'image' && state.cameraEffect.source === btn.dataset.preset;
+      } else if (btn.id === 'effectCustomImage') {
+        selected = state.cameraEffect.type === 'image' && state.cameraEffect.source === 'custom';
+      } else {
+        selected = btn.dataset.effect === state.cameraEffect.type;
+      }
+      btn.classList.toggle('selected', selected);
       if (btn.dataset.effect !== 'none') btn.disabled = !supported;
     });
     el.btnUploadBackground.disabled = !supported;
     el.effectsUnsupported.classList.toggle('hidden', supported);
+  }
+
+  // Built-in gradient presets share the effects grid with blur/upload, but are
+  // wired up separately from the generic data-effect click handler below
+  function initPresetBackgroundButtons() {
+    document.querySelectorAll('.effect-option[data-preset]').forEach(btn => {
+      const colors = PRESET_BACKGROUNDS[btn.dataset.preset];
+      if (colors) btn.style.backgroundImage = `linear-gradient(135deg, ${colors[0]}, ${colors[1]})`;
+      btn.addEventListener('click', () => selectPresetBackground(btn.dataset.preset));
+    });
+  }
+
+  function selectPresetBackground(id) {
+    const image = getPresetDataUrl(id);
+    if (!image) return;
+    localStorage.setItem('triscord_camera_effect', 'image');
+    localStorage.setItem('triscord_camera_background_source', id);
+    selectCameraEffect({ type: 'image', image, source: id });
   }
 
   function setEffectsStatus(text) {
@@ -864,7 +1172,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const image = canvas.toDataURL('image/jpeg', 0.85);
       localStorage.setItem('triscord_camera_background', image);
-      await selectCameraEffect({ type: 'image', image });
+      localStorage.setItem('triscord_camera_background_source', 'custom');
+      await selectCameraEffect({ type: 'image', image, source: 'custom' });
     } catch (err) {
       alert('Não foi possível usar essa imagem: ' + err.message);
     }
@@ -923,14 +1232,14 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="tile-content">
         <video id="video-local" autoplay playsinline muted class="${hasVideo ? '' : 'hidden'}"></video>
         <div class="avatar-view ${hasVideo ? 'hidden' : ''}">
-          <div class="tile-avatar" style="background-color: ${state.user.avatarColor}">
-            ${state.user.username.charAt(0).toUpperCase()}
+          <div class="tile-avatar" style="background-color: ${safeColor(state.user.avatarColor)}">
+            ${escapeHtml(state.user.username).charAt(0).toUpperCase()}
           </div>
         </div>
       </div>
       <div class="tile-overlay">
         <div class="tile-username">
-          <span>${state.user.username} (Você)</span>
+          <span>${escapeHtml(state.user.username)} (Você)</span>
           ${state.user.isMuted ? '<span class="status-badge-mini red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
           ${state.user.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
         </div>
@@ -958,14 +1267,14 @@ document.addEventListener('DOMContentLoaded', () => {
         <video id="video-${socketId}" autoplay playsinline muted class="${hasVideo ? '' : 'hidden'}"></video>
         <audio id="audio-${socketId}" autoplay></audio>
         <div class="avatar-view ${hasVideo ? 'hidden' : ''}">
-          <div class="tile-avatar" style="background-color: ${member.avatar || '#5865F2'}">
-            ${member.username.charAt(0).toUpperCase()}
+          <div class="tile-avatar" style="background-color: ${safeColor(member.avatar)}">
+            ${escapeHtml(member.username).charAt(0).toUpperCase()}
           </div>
         </div>
       </div>
       <div class="tile-overlay">
         <div class="tile-username">
-          <span>${member.username}</span>
+          <span>${escapeHtml(member.username)}</span>
           ${member.isMuted ? '<span class="status-badge-mini red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
           ${member.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
         </div>
@@ -983,6 +1292,9 @@ document.addEventListener('DOMContentLoaded', () => {
       // Attach speaking detector to remote stream
       setupRemoteSpeakingDetector(socketId, stream);
     }
+
+    const existingQuality = state.connectionQuality.get(socketId);
+    if (existingQuality) updateConnectionQualityIndicator(socketId, existingQuality);
 
     return tile;
   }
@@ -1050,7 +1362,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const usernameSpan = tile.querySelector('.tile-username');
     if (usernameSpan) {
       usernameSpan.innerHTML = `
-        <span>${member.username}</span>
+        <span>${escapeHtml(member.username)}</span>
         ${member.isMuted ? '<span class="status-badge-mini red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
         ${member.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
       `;
@@ -1111,15 +1423,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // ---- Push-to-talk ----
+  // In VAD mode the mic track is always live (mute aside) and the amplitude
+  // detector above decides when to show "speaking". In PTT mode the track
+  // itself is only enabled while the key is held, so the same detector keeps
+  // working unmodified — a disabled track just delivers silence to it.
+  function applyMicEnabledState() {
+    const track = state.webrtc && state.webrtc.localMicStream && state.webrtc.localMicStream.getAudioTracks()[0];
+    if (!track) return;
+    track.enabled = !state.user.isMuted && (state.pttMode !== 'ptt' || state.pttActive);
+  }
+
+  function pttKeyDown() {
+    if (state.pttMode !== 'ptt' || state.pttActive || state.user.isMuted || !state.currentRoomId) return;
+    state.pttActive = true;
+    applyMicEnabledState();
+  }
+
+  function pttKeyUp() {
+    if (!state.pttActive) return;
+    state.pttActive = false;
+    applyMicEnabledState();
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (state.pttMode !== 'ptt' || e.repeat || isTypingTarget(e.target)) return;
+    if (e.code !== state.pttKey) return;
+    e.preventDefault();
+    pttKeyDown();
+  });
+
+  document.addEventListener('keyup', (e) => {
+    if (state.pttMode !== 'ptt' || e.code !== state.pttKey) return;
+    pttKeyUp();
+  });
+
+  // Releasing the key outside the window (alt-tab while holding it) would
+  // otherwise leave the mic stuck open
+  window.addEventListener('blur', () => pttKeyUp());
+
   // Toggle Microphone Mute
   function toggleMute() {
     state.user.isMuted = !state.user.isMuted;
-
-    if (state.webrtc.localMicStream) {
-      state.webrtc.localMicStream.getAudioTracks().forEach(track => {
-        track.enabled = !state.user.isMuted;
-      });
-    }
+    applyMicEnabledState();
 
     window.SoundEffects.playMute(state.user.isMuted);
     updateUserProfileUI();
@@ -1249,7 +1595,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateUserProfileUI() {
     el.userUsername.textContent = state.user.username;
-    el.userAvatar.style.backgroundColor = state.user.avatarColor;
+    el.userAvatar.style.backgroundColor = safeColor(state.user.avatarColor);
     el.userAvatar.textContent = state.user.username.charAt(0).toUpperCase();
 
     if (state.user.isDeafened) {
@@ -1259,15 +1605,50 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       el.userStatusTag.textContent = 'Online';
     }
+
+    el.userCustomStatus.textContent = state.user.status || '';
+    el.userCustomStatus.classList.toggle('hidden', !state.user.status);
   }
 
   // Chat Functions
+  const ALLOWED_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🎉'];
+
+  function renderReactionsBar(msg) {
+    const reactions = msg.reactions || {};
+    const mine = state.user.userId;
+    const pills = Object.keys(reactions)
+      .filter(emoji => reactions[emoji] && reactions[emoji].length)
+      .map(emoji => `
+        <button type="button" class="reaction-pill ${reactions[emoji].includes(mine) ? 'mine' : ''}" data-emoji="${emoji}">
+          <span>${emoji}</span><span class="reaction-count">${reactions[emoji].length}</span>
+        </button>
+      `).join('');
+
+    const picker = ALLOWED_REACTIONS.map(emoji => `
+      <button type="button" class="reaction-picker-option" data-emoji="${emoji}">${emoji}</button>
+    `).join('');
+
+    return `
+      <div class="msg-reactions">
+        ${pills}
+        <div class="reaction-add-wrap">
+          <button type="button" class="reaction-add-btn" title="Reagir"><i data-lucide="smile-plus"></i></button>
+          <div class="reaction-picker hidden">${picker}</div>
+        </div>
+      </div>
+    `;
+  }
+
   function addChatMessage(msg) {
     const isSelf = msg.senderSocketId === state.socket?.id;
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const msgEl = document.createElement('div');
     msgEl.className = `chat-message-item ${msg.isSystem ? 'system-msg' : ''}`;
+    if (msg.id) {
+      msgEl.dataset.messageId = msg.id;
+      state.chatMessagesById.set(msg.id, msg);
+    }
 
     if (msg.isSystem) {
       msgEl.innerHTML = `
@@ -1275,18 +1656,27 @@ document.addEventListener('DOMContentLoaded', () => {
         <span class="msg-timestamp">${time}</span>
       `;
     } else {
+      const attachmentHtml = msg.attachment && msg.attachment.dataUrl
+        ? `<img class="msg-attachment-img" src="${msg.attachment.dataUrl}" alt="${escapeHtml(msg.attachment.name || 'imagem')}" />`
+        : '';
+
       msgEl.innerHTML = `
-        <div class="msg-avatar" style="background-color: ${msg.senderAvatar || '#5865F2'}">
-          ${msg.senderName.charAt(0).toUpperCase()}
+        <div class="msg-avatar" style="background-color: ${safeColor(msg.senderAvatar)}">
+          ${escapeHtml(msg.senderName || '?').charAt(0).toUpperCase()}
         </div>
         <div class="msg-body">
           <div class="msg-header">
-            <span class="msg-sender ${isSelf ? 'self' : ''}">${msg.senderName}</span>
+            <span class="msg-sender ${isSelf ? 'self' : ''}">${escapeHtml(msg.senderName)}</span>
             <span class="msg-timestamp">${time}</span>
           </div>
-          <div class="msg-text">${escapeHtml(msg.text)}</div>
+          ${msg.text ? `<div class="msg-text">${escapeHtml(msg.text)}</div>` : ''}
+          ${attachmentHtml}
+          ${msg.id ? renderReactionsBar(msg) : ''}
         </div>
       `;
+
+      const img = msgEl.querySelector('.msg-attachment-img');
+      if (img) img.addEventListener('click', () => window.open(img.src, '_blank'));
     }
 
     el.chatMessages.appendChild(msgEl);
@@ -1294,27 +1684,91 @@ document.addEventListener('DOMContentLoaded', () => {
     el.chatMessages.scrollTop = el.chatMessages.scrollHeight;
   }
 
+  function updateMessageReactionsUI(messageId, reactions) {
+    const msg = state.chatMessagesById.get(messageId);
+    if (!msg) return;
+    msg.reactions = reactions;
+
+    const msgEl = el.chatMessages.querySelector(`.chat-message-item[data-message-id="${CSS.escape(messageId)}"]`);
+    if (!msgEl) return;
+    const oldBar = msgEl.querySelector('.msg-reactions');
+    if (!oldBar) return;
+    oldBar.outerHTML = renderReactionsBar(msg);
+    window.renderIcons(msgEl);
+  }
+
+  // Delegated so it keeps working across every message the chat ever renders
+  el.chatMessages.addEventListener('click', (e) => {
+    const addBtn = e.target.closest('.reaction-add-btn');
+    if (addBtn) {
+      const picker = addBtn.parentElement.querySelector('.reaction-picker');
+      document.querySelectorAll('.reaction-picker').forEach(p => { if (p !== picker) p.classList.add('hidden'); });
+      picker.classList.toggle('hidden');
+      return;
+    }
+
+    const pickerOption = e.target.closest('.reaction-picker-option');
+    if (pickerOption) {
+      const messageId = pickerOption.closest('.chat-message-item').dataset.messageId;
+      pickerOption.closest('.reaction-picker').classList.add('hidden');
+      if (messageId && state.socket) state.socket.emit('add-reaction', { messageId, emoji: pickerOption.dataset.emoji });
+      return;
+    }
+
+    const pill = e.target.closest('.reaction-pill');
+    if (pill) {
+      const messageId = pill.closest('.chat-message-item').dataset.messageId;
+      if (messageId && state.socket) state.socket.emit('add-reaction', { messageId, emoji: pill.dataset.emoji });
+    }
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (e.target.closest('.reaction-add-wrap')) return;
+    document.querySelectorAll('.reaction-picker').forEach(p => p.classList.add('hidden'));
+  });
+
+  function clearChat() {
+    el.chatMessages.innerHTML = '';
+    state.chatMessagesById.clear();
+  }
+
+  const ATTACHMENT_MAX_DIMENSION = 1600;
+
+  async function fileToAttachment(file) {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, ATTACHMENT_MAX_DIMENSION / bitmap.width, ATTACHMENT_MAX_DIMENSION / bitmap.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    return { type: 'image', dataUrl: canvas.toDataURL('image/jpeg', 0.8), name: file.name };
+  }
+
+  function setPendingAttachment(attachment) {
+    state.pendingAttachment = attachment;
+    el.chatAttachmentPreview.classList.toggle('hidden', !attachment);
+    el.chatAttachmentThumb.src = attachment ? attachment.dataUrl : '';
+  }
+
   function sendChatMessage() {
     const text = el.chatInput.value.trim();
-    if (!text || !state.currentRoomId || !state.socket) return;
+    if ((!text && !state.pendingAttachment) || !state.currentRoomId || !state.socket) return;
 
     state.socket.emit('send-chat-message', {
       message: text,
-      roomId: state.currentRoomId
+      roomId: state.currentRoomId,
+      attachment: state.pendingAttachment
     });
 
     el.chatInput.value = '';
-  }
-
-  function escapeHtml(string) {
-    const div = document.createElement('div');
-    div.innerText = string;
-    return div.innerHTML;
+    setPendingAttachment(null);
   }
 
   // Initialize Settings UI & Audio Device Enumeration
   async function initSettingsUI() {
     el.inputSettingsUsername.value = state.user.username;
+    el.inputSettingsStatus.value = state.user.status;
     el.inputSettingsServerUrl.value = state.serverUrl;
     el.noiseSuppression.checked = state.noiseSuppression;
     el.sliderSensitivity.value = state.micSensitivity;
@@ -1329,6 +1783,44 @@ document.addEventListener('DOMContentLoaded', () => {
         state.localSpeakingDetector.setThreshold(val);
       }
     });
+
+    // Appearance
+    el.settingsLightTheme.checked = state.theme === 'light';
+
+    // Push-to-talk
+    el.settingsModeVAD.checked = state.pttMode !== 'ptt';
+    el.settingsModePTT.checked = state.pttMode === 'ptt';
+    el.pttKeyRow.style.display = state.pttMode === 'ptt' ? 'flex' : 'none';
+    el.btnCapturePttKey.textContent = describeKeyCode(state.pttKey);
+
+    [el.settingsModeVAD, el.settingsModePTT].forEach(radio => {
+      radio.addEventListener('change', () => {
+        el.pttKeyRow.style.display = el.settingsModePTT.checked ? 'flex' : 'none';
+      });
+    });
+
+    el.btnCapturePttKey.addEventListener('click', () => {
+      el.btnCapturePttKey.textContent = 'Pressione uma tecla...';
+      const capture = (e) => {
+        e.preventDefault();
+        document.removeEventListener('keydown', capture, true);
+        state.pttKey = e.code;
+        localStorage.setItem('triscord_ptt_key', e.code);
+        el.btnCapturePttKey.textContent = describeKeyCode(e.code);
+      };
+      document.addEventListener('keydown', capture, true);
+    });
+
+    // TURN server
+    el.settingsTurnUrl.value = state.turnServer.url;
+    el.settingsTurnUsername.value = state.turnServer.username;
+    el.settingsTurnCredential.value = state.turnServer.credential;
+
+    // Global mute shortcut (Electron only)
+    if (window.electronAPI && window.electronAPI.isElectron) {
+      el.globalShortcutSection.classList.remove('hidden');
+      el.settingsGlobalShortcut.value = localStorage.getItem('triscord_global_shortcut') || 'CommandOrControl+Shift+M';
+    }
 
     // Populate Audio/Video Device Selectors
     try {
@@ -1436,11 +1928,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   el.effectOptions.forEach(btn => {
+    if (btn.dataset.preset) return; // wired separately by initPresetBackgroundButtons()
     btn.addEventListener('click', () => {
       const type = btn.dataset.effect;
       if (type === 'image') {
         const image = localStorage.getItem('triscord_camera_background');
-        if (image) selectCameraEffect({ type, image });
+        if (image) selectCameraEffect({ type, image, source: 'custom' });
         return;
       }
       selectCameraEffect({ type });
@@ -1532,11 +2025,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const newUsername = el.inputSettingsUsername.value.trim();
     const newServerUrl = el.inputSettingsServerUrl.value.trim();
     const previousNoiseSuppression = state.noiseSuppression;
+    const previousTurn = { ...state.turnServer };
 
     if (newUsername) {
       state.user.username = newUsername;
       localStorage.setItem('triscord_username', newUsername);
     }
+
+    state.user.status = el.inputSettingsStatus.value.trim().slice(0, 64);
+    localStorage.setItem('triscord_status', state.user.status);
 
     state.selectedAudioInput = el.selectAudioInput.value;
     state.selectedAudioOutput = el.selectAudioOutput.value;
@@ -1549,6 +2046,41 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('triscord_noise_suppression', state.noiseSuppression);
     localStorage.setItem('triscord_avatar_color', state.user.avatarColor);
 
+    // Appearance
+    state.theme = el.settingsLightTheme.checked ? 'light' : 'dark';
+    localStorage.setItem('triscord_theme', state.theme);
+    applyTheme(state.theme);
+
+    // Push-to-talk
+    state.pttMode = el.settingsModePTT.checked ? 'ptt' : 'vad';
+    localStorage.setItem('triscord_voice_mode', state.pttMode);
+    state.pttActive = false;
+    applyMicEnabledState();
+
+    // TURN server
+    state.turnServer = {
+      url: el.settingsTurnUrl.value.trim(),
+      username: el.settingsTurnUsername.value.trim(),
+      credential: el.settingsTurnCredential.value.trim()
+    };
+    localStorage.setItem('triscord_turn_url', state.turnServer.url);
+    localStorage.setItem('triscord_turn_username', state.turnServer.username);
+    localStorage.setItem('triscord_turn_credential', state.turnServer.credential);
+    const turnChanged = JSON.stringify(previousTurn) !== JSON.stringify(state.turnServer);
+    if (turnChanged) {
+      showToast('Servidor TURN atualizado — será usado na próxima conexão.');
+    }
+
+    // Global mute shortcut (Electron only)
+    if (window.electronAPI && window.electronAPI.isElectron && window.electronAPI.setGlobalMuteShortcut) {
+      const accelerator = el.settingsGlobalShortcut.value.trim() || 'CommandOrControl+Shift+M';
+      localStorage.setItem('triscord_global_shortcut', accelerator);
+      const result = await window.electronAPI.setGlobalMuteShortcut(accelerator);
+      if (result && !result.ok) {
+        showToast('Não foi possível registrar esse atalho global.', 'error');
+      }
+    }
+
     updateUserProfileUI();
 
     if (newServerUrl && newServerUrl !== state.serverUrl) {
@@ -1558,7 +2090,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (state.socket && state.currentRoomId) {
       state.socket.emit('user-state-change', {
         username: state.user.username,
-        avatar: state.user.avatarColor
+        avatar: state.user.avatarColor,
+        status: state.user.status
       });
 
       if (previousNoiseSuppression !== state.noiseSuppression && state.webrtc.localMicStream) {
@@ -1567,10 +2100,8 @@ document.addEventListener('DOMContentLoaded', () => {
             state.selectedAudioInput,
             state.noiseSuppression
           );
-          micStream.getAudioTracks().forEach(track => {
-            track.enabled = !state.user.isMuted;
-          });
           setupLocalSpeakingDetector(micStream);
+          applyMicEnabledState();
         } catch (err) {
           console.warn('Could not restart microphone after changing noise suppression:', err);
         }
@@ -1579,4 +2110,161 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.settingsModal.classList.add('hidden');
   });
+
+  // ---- Global mute shortcut (main process -> renderer) ----
+  if (window.electronAPI && window.electronAPI.onGlobalMuteToggle) {
+    window.electronAPI.onGlobalMuteToggle(() => toggleMute());
+    const savedAccelerator = localStorage.getItem('triscord_global_shortcut');
+    if (savedAccelerator && window.electronAPI.setGlobalMuteShortcut) {
+      window.electronAPI.setGlobalMuteShortcut(savedAccelerator).catch(() => {});
+    }
+  }
+
+  // ---- Auto-update ----
+  if (window.electronAPI && window.electronAPI.onUpdateDownloaded) {
+    window.electronAPI.onUpdateDownloaded(() => {
+      const toast = document.createElement('div');
+      toast.className = 'app-toast info visible';
+      toast.innerHTML = `Uma atualização foi baixada. <button type="button" id="btnRestartUpdate" style="margin-left:8px; text-decoration:underline; background:none; border:none; color:inherit; cursor:pointer;">Reiniciar agora</button>`;
+      el.toastContainer.appendChild(toast);
+      toast.querySelector('#btnRestartUpdate').addEventListener('click', () => window.electronAPI.restartToUpdate());
+    });
+  }
+
+  // ---- Call recording (composited grid video + mixed audio -> .webm) ----
+
+  function isRecordingSupported() {
+    return typeof MediaRecorder !== 'undefined' && typeof HTMLCanvasElement.prototype.captureStream === 'function';
+  }
+
+  function startRecording() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280;
+    canvas.height = 720;
+    const ctx = canvas.getContext('2d');
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioCtx();
+    const dest = audioCtx.createMediaStreamDestination();
+    const connectedTrackIds = new Set();
+
+    function connectAudioSources() {
+      const trackSources = [];
+      document.querySelectorAll('#videoGrid audio, #videoGrid video').forEach(mediaEl => {
+        if (mediaEl.srcObject) trackSources.push(...mediaEl.srcObject.getAudioTracks());
+      });
+      if (state.webrtc.localMicStream) trackSources.push(...state.webrtc.localMicStream.getAudioTracks());
+
+      trackSources.forEach(track => {
+        if (connectedTrackIds.has(track.id)) return;
+        connectedTrackIds.add(track.id);
+        try {
+          audioCtx.createMediaStreamSource(new MediaStream([track])).connect(dest);
+        } catch (err) { /* a track can briefly be in a bad state right after (re)negotiation */ }
+      });
+    }
+    connectAudioSources();
+    const rescanTimer = setInterval(connectAudioSources, 2000);
+
+    let drawing = true;
+    function drawFrame() {
+      if (!drawing) return;
+      const videos = Array.from(document.querySelectorAll('#videoGrid video'))
+        .filter(v => v.srcObject && !v.classList.contains('hidden'));
+
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const n = videos.length || 1;
+      const cols = Math.ceil(Math.sqrt(n));
+      const rows = Math.ceil(n / cols);
+      const cellW = canvas.width / cols;
+      const cellH = canvas.height / rows;
+
+      videos.forEach((v, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        try {
+          const vw = v.videoWidth || 16;
+          const vh = v.videoHeight || 9;
+          const scale = Math.min(cellW / vw, cellH / vh);
+          const dw = vw * scale;
+          const dh = vh * scale;
+          ctx.drawImage(v, col * cellW + (cellW - dw) / 2, row * cellH + (cellH - dh) / 2, dw, dh);
+        } catch (err) { /* a track that just ended can throw mid-draw */ }
+      });
+
+      requestAnimationFrame(drawFrame);
+    }
+    drawFrame();
+
+    const canvasStream = canvas.captureStream(30);
+    const combined = new MediaStream([...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+
+    const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+      .find(m => MediaRecorder.isTypeSupported(m)) || '';
+    const recorder = new MediaRecorder(combined, mimeType ? { mimeType } : undefined);
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    recorder.onstop = () => {
+      drawing = false;
+      clearInterval(rescanTimer);
+      audioCtx.close().catch(() => {});
+
+      const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Triscord-Gravacao-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      showToast('Gravação salva no seu computador.');
+    };
+
+    recorder.start(1000);
+    state.recording = { recorder, stop: () => { drawing = false; } };
+    el.btnToggleRecording.classList.add('recording');
+    showToast('Gravação iniciada.');
+  }
+
+  function stopRecording() {
+    if (!state.recording) return;
+    state.recording.stop();
+    state.recording.recorder.stop();
+    state.recording = null;
+    el.btnToggleRecording.classList.remove('recording');
+  }
+
+  el.btnToggleRecording.addEventListener('click', () => {
+    if (!state.currentRoomId) {
+      alert('Entre em um canal de voz para gravar a chamada.');
+      return;
+    }
+    if (state.recording) {
+      stopRecording();
+      return;
+    }
+    if (!isRecordingSupported()) {
+      alert('A gravação não é suportada neste navegador/versão.');
+      return;
+    }
+    startRecording();
+  });
+
+  // ---- Chat image attachments ----
+
+  el.btnAttachImage.addEventListener('click', () => el.chatAttachmentInput.click());
+  el.chatAttachmentInput.addEventListener('change', async () => {
+    const file = el.chatAttachmentInput.files[0];
+    el.chatAttachmentInput.value = '';
+    if (!file) return;
+    try {
+      setPendingAttachment(await fileToAttachment(file));
+    } catch (err) {
+      showToast('Não foi possível usar essa imagem.', 'error');
+    }
+  });
+  el.btnRemoveAttachment.addEventListener('click', () => setPendingAttachment(null));
 });

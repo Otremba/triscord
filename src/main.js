@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, Menu, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -143,6 +143,38 @@ app.on('will-quit', () => {
   systemAudioCaptures.clear();
 });
 
+// Global "toggle mute" shortcut — works even while Triscord is in the
+// background, since it's registered with the OS rather than the page
+let currentMuteAccelerator = null;
+
+ipcMain.handle('set-global-mute-shortcut', (event, accelerator) => {
+  if (typeof accelerator !== 'string' || !accelerator.trim()) {
+    return { ok: false, error: 'invalid accelerator' };
+  }
+
+  if (currentMuteAccelerator) {
+    globalShortcut.unregister(currentMuteAccelerator);
+    currentMuteAccelerator = null;
+  }
+
+  try {
+    const registered = globalShortcut.register(accelerator, () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('global-mute-toggle');
+      }
+    });
+    if (!registered) return { ok: false, error: 'accelerator already in use' };
+    currentMuteAccelerator = accelerator;
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+});
+
 // IPC: Window controls
 ipcMain.on('window-minimize', () => {
   if (mainWindow) mainWindow.minimize();
@@ -164,12 +196,40 @@ ipcMain.on('window-close', () => {
 
 app.whenReady().then(() => {
   createWindow();
+  checkForUpdates();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
+});
+
+// Auto-update from GitHub Releases in packaged builds. Requires the app to be
+// signed/published via `npm run build:win` + a GitHub release carrying the
+// generated latest.yml; harmless no-op in dev or if the dependency is absent.
+let autoUpdaterRef = null;
+
+function checkForUpdates() {
+  if (!app.isPackaged) return;
+  try {
+    const { autoUpdater } = require('electron-updater');
+    autoUpdaterRef = autoUpdater;
+    autoUpdater.autoDownload = true;
+    autoUpdater.on('update-downloaded', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-downloaded');
+      }
+    });
+    autoUpdater.on('error', (err) => console.warn('[AutoUpdater] Error:', err.message));
+    autoUpdater.checkForUpdatesAndNotify().catch(err => console.warn('[AutoUpdater] Check failed:', err.message));
+  } catch (err) {
+    console.warn('[AutoUpdater] electron-updater not available:', err.message);
+  }
+}
+
+ipcMain.on('restart-to-update', () => {
+  if (autoUpdaterRef) autoUpdaterRef.quitAndInstall();
 });
 
 app.on('window-all-closed', () => {

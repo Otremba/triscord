@@ -1933,3 +1933,248 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ==========================================================================
+   Light theme — same structure, lighter surfaces. Everything above is built
+   on the CSS variables redefined here, so this is the only place a light
+   palette needs to live.
+   ========================================================================== */
+:root[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f2f3f5;
+  --bg-tertiary: #e3e5e8;
+  --bg-floating: #ffffff;
+  --bg-modals: #ffffff;
+
+  --channel-hover: rgba(0, 0, 0, 0.05);
+  --channel-active: rgba(0, 0, 0, 0.08);
+
+  --text-normal: #313338;
+  --text-muted: #5c5e66;
+  --text-header: #060607;
+  --text-interactive-hover: #060607;
+}
+
+/* ==========================================================================
+   Custom status (below the username in the bottom user panel)
+   ========================================================================== */
+.user-custom-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+/* ==========================================================================
+   Settings: checkboxes/radios, push-to-talk key row
+   ========================================================================== */
+.setting-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.ptt-key-row {
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* ==========================================================================
+   Owner controls: room lock/limit + per-user kick/force-mute icons
+   ========================================================================== */
+.status-mini-icon.yellow { color: var(--accent-yellow); }
+
+.lock-toggle,
+.owner-action {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.lock-toggle:hover { color: var(--text-interactive-hover); }
+.owner-action { color: var(--text-muted); }
+.owner-action:hover { color: var(--accent-red); }
+
+/* ==========================================================================
+   Connection quality dot on remote tiles
+   ========================================================================== */
+.quality-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.quality-dot.quality-good { background-color: var(--accent-green); }
+.quality-dot.quality-ok { background-color: var(--accent-yellow); }
+.quality-dot.quality-bad { background-color: var(--accent-red); }
+.quality-dot.quality-unknown { background-color: var(--text-muted); }
+
+/* ==========================================================================
+   Recording toggle (pulses red while active)
+   ========================================================================== */
+.btn-voice-control.recording {
+  background-color: var(--accent-red);
+  border-color: var(--accent-red);
+  color: #fff;
+  animation: recordingPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes recordingPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(242, 63, 67, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(242, 63, 67, 0); }
+}
+
+/* ==========================================================================
+   Chat: image attachments + reactions
+   ========================================================================== */
+.chat-attachment-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.chat-attachment-preview img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+
+.chat-attachment-preview button {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.msg-attachment-img {
+  display: block;
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: var(--radius-md);
+  margin-top: 6px;
+  cursor: pointer;
+  object-fit: cover;
+}
+
+.msg-reactions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  position: relative;
+}
+
+.reaction-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.reaction-pill:hover { border-color: var(--accent-blurple); }
+.reaction-pill.mine {
+  background-color: rgba(88, 101, 242, 0.18);
+  border-color: var(--accent-blurple);
+}
+
+.reaction-count { font-size: 11px; color: var(--text-muted); }
+
+.reaction-add-wrap { position: relative; }
+
+.reaction-add-btn {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+}
+
+.reaction-add-btn:hover { color: var(--accent-blurple); }
+.reaction-add-btn .lucide { width: 15px; height: 15px; }
+
+.reaction-picker {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  gap: 2px;
+  background-color: var(--bg-floating);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  box-shadow: var(--shadow-high);
+  z-index: 20;
+}
+
+.reaction-picker.hidden { display: none; }
+
+.reaction-picker-option {
+  background: none;
+  border: none;
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.reaction-picker-option:hover { background-color: var(--channel-hover); }
+
+/* ==========================================================================
+   Toast notifications
+   ========================================================================== */
+.app-toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+}
+
+.app-toast {
+  background-color: var(--bg-floating);
+  color: var(--text-normal);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-high);
+  font-size: 13px;
+  max-width: 320px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+  border-left: 3px solid var(--accent-blurple);
+}
+
+.app-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.app-toast.error { border-left-color: var(--accent-red); }
