@@ -368,6 +368,15 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Switching channels — or rejoining after a reconnect — leaves the peer
+    // connections of the previous room behind, and connectToPeer() skips a
+    // socketId it already has, so someone we meet again would stay silent.
+    if (state.webrtc) {
+      state.webrtc.resetPeers();
+      state.remoteSpeakingDetectors.forEach(d => d.destroy());
+      state.remoteSpeakingDetectors.clear();
+    }
+
     state.currentRoomId = roomId;
     state.currentRoomName = roomName;
 

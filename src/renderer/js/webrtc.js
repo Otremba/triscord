@@ -12,9 +12,22 @@
  * created by addTransceiver, so pre-creating them on the answering side just
  * leaves orphans and the answer ends up recvonly. The answering side therefore
  * adopts the transceivers that setRemoteDescription creates for it.
+ *
+ * Signalling follows the "perfect negotiation" pattern: the side that opens the
+ * connection is impolite, the side that receives the first offer is polite, so
+ * either one can re-offer to restart ICE without the two colliding. ICE
+ * candidates that arrive before the matching description is set are queued
+ * instead of thrown away — dropping them is what used to leave one pair of a
+ * three-way call silently half-connected.
  */
 
 const CHANNEL_ORDER = ['mic', 'cam', 'screen', 'screenAudio'];
+
+// A connection that never reaches 'connected', or falls out of it, is retried
+// with a backoff instead of being torn down: 'disconnected' is often transient.
+const CONNECT_TIMEOUT_MS = 12000;
+const DISCONNECT_GRACE_MS = 6000;
+const MAX_RESTART_ATTEMPTS = 10;
 
 class WebRTCManager {
   constructor(socket, currentUserId) {
@@ -25,6 +38,10 @@ class WebRTCManager {
     this.peers = new Map();
     // Map: socketId -> { mic, cam, screen, screenAudio } RTCRtpTransceivers
     this.peerChannels = new Map();
+    // Map: socketId -> negotiation bookkeeping (see createPeerConnection)
+    this.peerState = new Map();
+    // Map: socketId -> ICE candidates that arrived before the remote description
+    this.pendingCandidates = new Map();
     // Map: socketId -> remote MediaStream (mic + camera)
     this.remoteStreams = new Map();
     // Map: socketId -> remote MediaStream (screen video + screen audio)
@@ -65,25 +82,24 @@ class WebRTCManager {
     // Handle incoming WebRTC Offer
     this.socket.on('webrtc-offer', async ({ senderSocketId, offer, type }) => {
       console.log(`[WebRTC] Received offer from ${senderSocketId} (${type})`);
-      const pc = this.peers.get(senderSocketId) || this.createPeerConnection(senderSocketId);
+      // Whoever receives the first offer is the polite side of this pair
+      const pc = this.peers.get(senderSocketId) ||
+        this.createPeerConnection(senderSocketId, { polite: true });
+      const negotiation = this.peerState.get(senderSocketId);
+      if (!negotiation) return;
+
+      // Perfect negotiation: on a collision only the polite side gives way
+      const collision = negotiation.makingOffer || pc.signalingState !== 'stable';
+      if (collision && !negotiation.polite) {
+        console.warn(`[WebRTC] Ignoring colliding offer from ${senderSocketId}`);
+        return;
+      }
 
       try {
+        // Implicit rollback when we had an offer of our own in flight
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
-
-        // Adopt the transceivers setRemoteDescription just created, in m-line order
-        if (!this.peerChannels.has(senderSocketId)) {
-          const transceivers = pc.getTransceivers();
-          const channels = {};
-          CHANNEL_ORDER.forEach((name, index) => {
-            const transceiver = transceivers[index];
-            if (!transceiver) return;
-            // They arrive recvonly; we have to answer sendrecv to be able to send
-            transceiver.direction = 'sendrecv';
-            channels[name] = transceiver;
-          });
-          this.peerChannels.set(senderSocketId, channels);
-          this.attachLocalTracks(senderSocketId);
-        }
+        this.adoptChannels(senderSocketId, pc);
+        await this.flushPendingCandidates(senderSocketId);
 
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -93,8 +109,11 @@ class WebRTCManager {
           answer: pc.localDescription,
           type: type || 'mesh'
         });
+
+        this.armConnectTimeout(senderSocketId);
       } catch (err) {
         console.error('[WebRTC] Error handling offer:', err);
+        this.scheduleRestart(senderSocketId);
       }
     });
 
@@ -102,26 +121,83 @@ class WebRTCManager {
     this.socket.on('webrtc-answer', async ({ senderSocketId, answer }) => {
       console.log(`[WebRTC] Received answer from ${senderSocketId}`);
       const pc = this.peers.get(senderSocketId);
-      if (pc) {
-        try {
-          await pc.setRemoteDescription(new RTCSessionDescription(answer));
-        } catch (err) {
-          console.error('[WebRTC] Error setting remote description for answer:', err);
-        }
+      if (!pc) return;
+
+      // A late answer to an offer we already rolled back would throw
+      if (pc.signalingState !== 'have-local-offer') {
+        console.warn(`[WebRTC] Dropping answer from ${senderSocketId} in state ${pc.signalingState}`);
+        return;
+      }
+
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        await this.flushPendingCandidates(senderSocketId);
+      } catch (err) {
+        console.error('[WebRTC] Error setting remote description for answer:', err);
+        this.scheduleRestart(senderSocketId);
       }
     });
 
-    // Handle incoming ICE candidate
+    // Handle incoming ICE candidate. Candidates routinely arrive before the
+    // description they belong to; queue those instead of dropping them.
     this.socket.on('webrtc-ice-candidate', async ({ senderSocketId, candidate }) => {
+      if (!candidate) return;
+
       const pc = this.peers.get(senderSocketId);
-      if (pc && candidate) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (err) {
-          console.error('[WebRTC] Error adding ICE candidate:', err);
-        }
+      if (!pc || !pc.remoteDescription) {
+        const queue = this.pendingCandidates.get(senderSocketId) || [];
+        queue.push(candidate);
+        this.pendingCandidates.set(senderSocketId, queue);
+        return;
+      }
+
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.error('[WebRTC] Error adding ICE candidate:', err);
       }
     });
+  }
+
+  /**
+   * Adopt the transceivers setRemoteDescription created for us, in m-line
+   * order. Only needed once per peer: later offers reuse the same m-lines.
+   */
+  adoptChannels(socketId, pc) {
+    if (this.peerChannels.has(socketId)) return;
+
+    const transceivers = pc.getTransceivers();
+    const channels = {};
+    CHANNEL_ORDER.forEach((name, index) => {
+      const transceiver = transceivers[index];
+      if (!transceiver) return;
+      // They arrive recvonly; we have to answer sendrecv to be able to send
+      transceiver.direction = 'sendrecv';
+      channels[name] = transceiver;
+    });
+
+    this.peerChannels.set(socketId, channels);
+    this.attachLocalTracks(socketId);
+  }
+
+  /**
+   * Drain the candidates that arrived before the remote description was set.
+   */
+  async flushPendingCandidates(socketId) {
+    const queue = this.pendingCandidates.get(socketId);
+    if (!queue || !queue.length) return;
+
+    const pc = this.peers.get(socketId);
+    this.pendingCandidates.delete(socketId);
+    if (!pc) return;
+
+    for (const candidate of queue) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.error('[WebRTC] Error adding queued ICE candidate:', err);
+      }
+    }
   }
 
   /**
@@ -303,9 +379,17 @@ class WebRTCManager {
     }
   }
 
-  createPeerConnection(socketId) {
+  createPeerConnection(socketId, { polite = false } = {}) {
     const pc = new RTCPeerConnection({
       iceServers: this.iceServers
+    });
+
+    this.peerState.set(socketId, {
+      polite,
+      makingOffer: false,
+      restartAttempts: 0,
+      restartTimer: null,
+      graceTimer: null
     });
 
     // Send ICE candidates to target peer
@@ -343,15 +427,136 @@ class WebRTCManager {
       }
     };
 
+    // A peer is only dropped when it actually leaves the room; a connection
+    // that breaks is retried, because nothing else would ever bring it back.
     pc.onconnectionstatechange = () => {
+      const negotiation = this.peerState.get(socketId);
       console.log(`[WebRTC] Connection state with ${socketId}: ${pc.connectionState}`);
-      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        this.removePeer(socketId);
+      if (!negotiation) return;
+
+      if (pc.connectionState === 'connected') {
+        this.clearRecoveryTimers(socketId);
+        negotiation.restartAttempts = 0;
+        return;
+      }
+
+      if (pc.connectionState === 'failed') {
+        this.scheduleRestart(socketId);
+        return;
+      }
+
+      // 'disconnected' usually heals by itself within a few seconds
+      if (pc.connectionState === 'disconnected' && !negotiation.graceTimer) {
+        negotiation.graceTimer = setTimeout(() => {
+          negotiation.graceTimer = null;
+          const current = this.peers.get(socketId);
+          if (current && current.connectionState !== 'connected') {
+            this.scheduleRestart(socketId);
+          }
+        }, DISCONNECT_GRACE_MS);
       }
     };
 
     this.peers.set(socketId, pc);
     return pc;
+  }
+
+  /**
+   * Send an offer to a peer, optionally restarting ICE. Safe to call from
+   * either side: a collision is resolved by the perfect-negotiation rules.
+   */
+  async sendOffer(socketId, { iceRestart = false } = {}) {
+    const pc = this.peers.get(socketId);
+    const negotiation = this.peerState.get(socketId);
+    if (!pc || !negotiation) return;
+
+    // A negotiation is already in flight; come back to it if it does not settle
+    if (pc.signalingState !== 'stable') {
+      console.warn(`[WebRTC] Skipping offer to ${socketId}, state ${pc.signalingState}`);
+      this.scheduleRestart(socketId);
+      return;
+    }
+
+    try {
+      negotiation.makingOffer = true;
+      if (iceRestart) pc.restartIce();
+
+      const offer = await pc.createOffer();
+      if (pc.signalingState !== 'stable') {
+        // An incoming offer won the race; that handshake takes over from here
+        this.armConnectTimeout(socketId);
+        return;
+      }
+      await pc.setLocalDescription(offer);
+
+      this.socket.emit('webrtc-offer', {
+        targetSocketId: socketId,
+        offer: pc.localDescription,
+        type: 'mesh'
+      });
+
+      this.armConnectTimeout(socketId);
+    } catch (err) {
+      console.error(`[WebRTC] Error offering to peer ${socketId}:`, err);
+      this.scheduleRestart(socketId);
+    } finally {
+      negotiation.makingOffer = false;
+    }
+  }
+
+  /**
+   * If the handshake never produces a connected peer — a lost candidate, an
+   * answer that never came — retry rather than sit there mute.
+   */
+  armConnectTimeout(socketId) {
+    const negotiation = this.peerState.get(socketId);
+    if (!negotiation || negotiation.restartTimer) return;
+
+    negotiation.restartTimer = setTimeout(() => {
+      negotiation.restartTimer = null;
+      const pc = this.peers.get(socketId);
+      if (pc && pc.connectionState !== 'connected') {
+        console.warn(`[WebRTC] ${socketId} still ${pc.connectionState} after handshake, restarting`);
+        this.restartConnection(socketId);
+      }
+    }, CONNECT_TIMEOUT_MS);
+  }
+
+  scheduleRestart(socketId) {
+    const negotiation = this.peerState.get(socketId);
+    if (!negotiation || negotiation.restartTimer) return;
+
+    if (negotiation.restartAttempts >= MAX_RESTART_ATTEMPTS) {
+      console.error(`[WebRTC] Giving up on ${socketId} after ${negotiation.restartAttempts} attempts`);
+      return;
+    }
+
+    const delay = Math.min(1000 * Math.pow(2, negotiation.restartAttempts), 15000);
+    negotiation.restartTimer = setTimeout(() => {
+      negotiation.restartTimer = null;
+      this.restartConnection(socketId);
+    }, delay);
+  }
+
+  restartConnection(socketId) {
+    const pc = this.peers.get(socketId);
+    const negotiation = this.peerState.get(socketId);
+    if (!pc || !negotiation) return;
+    if (pc.connectionState === 'connected') return;
+
+    negotiation.restartAttempts++;
+    console.warn(`[WebRTC] Restarting ICE with ${socketId} (attempt ${negotiation.restartAttempts})`);
+    this.sendOffer(socketId, { iceRestart: true });
+  }
+
+  clearRecoveryTimers(socketId) {
+    const negotiation = this.peerState.get(socketId);
+    if (!negotiation) return;
+
+    clearTimeout(negotiation.restartTimer);
+    clearTimeout(negotiation.graceTimer);
+    negotiation.restartTimer = null;
+    negotiation.graceTimer = null;
   }
 
   /**
@@ -380,7 +585,8 @@ class WebRTCManager {
     if (this.peers.has(socketId)) return;
 
     console.log(`[WebRTC] Initiating connection to peer ${socketId}`);
-    const pc = this.createPeerConnection(socketId);
+    // We opened this connection, so we are the impolite side of the pair
+    const pc = this.createPeerConnection(socketId, { polite: false });
 
     // Fixed m-line layout. Only the offering side declares it; the answering
     // side adopts the same order from the offer.
@@ -392,28 +598,24 @@ class WebRTCManager {
     });
     this.attachLocalTracks(socketId);
 
-    try {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      this.socket.emit('webrtc-offer', {
-        targetSocketId: socketId,
-        offer: pc.localDescription,
-        type: 'mesh'
-      });
-    } catch (err) {
-      console.error(`[WebRTC] Error connecting to peer ${socketId}:`, err);
-    }
+    await this.sendOffer(socketId);
   }
 
   removePeer(socketId) {
+    this.clearRecoveryTimers(socketId);
+
     if (this.peers.has(socketId)) {
       const pc = this.peers.get(socketId);
+      pc.onconnectionstatechange = null;
+      pc.onicecandidate = null;
+      pc.ontrack = null;
       pc.close();
       this.peers.delete(socketId);
     }
 
     this.peerChannels.delete(socketId);
+    this.peerState.delete(socketId);
+    this.pendingCandidates.delete(socketId);
 
     [this.remoteStreams, this.remoteScreenStreams].forEach(streamMap => {
       const stream = streamMap.get(socketId);
@@ -428,17 +630,23 @@ class WebRTCManager {
     }
   }
 
-  cleanupAll() {
-    this.peers.forEach((pc) => pc.close());
+  /**
+   * Tear down every peer connection but keep the local mic/camera/screen
+   * running — what switching channels needs. Leaving stale connections behind
+   * makes connectToPeer() skip a peer we meet again in the next channel.
+   */
+  resetPeers() {
+    Array.from(this.peers.keys()).forEach(socketId => this.removePeer(socketId));
     this.peers.clear();
     this.peerChannels.clear();
+    this.peerState.clear();
+    this.pendingCandidates.clear();
+    this.remoteStreams.clear();
+    this.remoteScreenStreams.clear();
+  }
 
-    [this.remoteStreams, this.remoteScreenStreams].forEach(streamMap => {
-      streamMap.forEach(stream => {
-        stream.getTracks().forEach(t => t.stop());
-      });
-      streamMap.clear();
-    });
+  cleanupAll() {
+    this.resetPeers();
 
     this.stopMicrophone();
     this.stopCamera();
