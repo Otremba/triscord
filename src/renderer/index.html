@@ -17,26 +17,21 @@
       </div>
       <div class="guild-separator"></div>
       <div class="guild-icon" id="btnCreateRoom" title="Criar Canal de Voz">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
+        <i data-lucide="plus"></i>
       </div>
     </aside>
 
     <!-- 2. Channels Sidebar -->
     <aside class="channels-sidebar">
       <div class="server-header">
-        <span>Triscord 🎙️</span>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M7 10l5 5 5-5z"/>
-        </svg>
+        <span class="server-name"><i data-lucide="audio-lines"></i>Triscord</span>
+        <i data-lucide="chevron-down"></i>
       </div>
 
       <div class="channels-scrollable">
         <div class="channel-category">
           <span>Canais de Voz</span>
-          <button class="btn-icon-small" id="btnRefreshRooms" title="Atualizar">🔄</button>
+          <button class="btn-icon-small" id="btnRefreshRooms" title="Atualizar"><i data-lucide="refresh-cw"></i></button>
         </div>
         <div class="channels-list" id="channelsList">
           <!-- Populated dynamically via JS -->
@@ -58,19 +53,13 @@
 
         <div class="user-controls">
           <button class="icon-button" id="btnToggleMute" title="Mutar Microfone">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-            </svg>
+            <i data-lucide="mic"></i>
           </button>
           <button class="icon-button" id="btnToggleDeafen" title="Ensurdecer">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-            </svg>
+            <i data-lucide="headphones"></i>
           </button>
           <button class="icon-button" id="btnOpenSettings" title="Configurações">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-            </svg>
+            <i data-lucide="settings"></i>
           </button>
         </div>
       </div>
@@ -93,9 +82,7 @@
           </div>
 
           <button class="btn-stage-action" id="btnToggleChat" title="Chat de Texto">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
-            </svg>
+            <i data-lucide="message-square"></i>
             <span>Chat</span>
           </button>
         </div>
@@ -115,15 +102,15 @@
             
             <div class="welcome-features">
               <div class="feat-item">
-                <span>🎙️</span>
+                <i data-lucide="mic"></i>
                 <span>Áudio de alta fidelidade com WebRTC e cancelamento de ruído</span>
               </div>
               <div class="feat-item">
-                <span>🖥️</span>
+                <i data-lucide="monitor-up"></i>
                 <span>Compartilhe telas e janelas de jogos ou programas em 60 FPS</span>
               </div>
               <div class="feat-item">
-                <span>📹</span>
+                <i data-lucide="video"></i>
                 <span>Câmera e chat de texto integrados na mesma sala</span>
               </div>
             </div>
@@ -146,30 +133,22 @@
           <!-- Bottom Voice Action Controls -->
           <div class="voice-action-bar">
             <button class="btn-voice-control" id="btnToggleCamera">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
-              </svg>
+              <i data-lucide="video"></i>
               <span class="btn-label">Câmera</span>
             </button>
 
             <button class="btn-voice-control" id="btnCameraEffects" title="Efeitos de câmera">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/>
-              </svg>
+              <i data-lucide="sparkles"></i>
               <span class="btn-label">Efeitos</span>
             </button>
 
             <button class="btn-voice-control" id="btnToggleScreenShare">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/>
-              </svg>
+              <i data-lucide="screen-share"></i>
               <span class="btn-label">Compartilhar</span>
             </button>
 
             <button class="btn-voice-control btn-disconnect" id="btnDisconnectVoice">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4 11H8c-.55 0-1-.45-1-1s.45-1 1-1h8c.55 0 1 .45 1 1s-.45 1-1 1z"/>
-              </svg>
+              <i data-lucide="phone-off"></i>
               <span>Desconectar</span>
             </button>
           </div>
@@ -179,7 +158,7 @@
         <aside class="chat-drawer hidden" id="chatDrawer">
           <div class="chat-drawer-header">
             <span>Chat do Canal</span>
-            <button class="btn-icon-small" id="btnCloseChat">✖</button>
+            <button class="btn-icon-small" id="btnCloseChat" aria-label="Fechar"><i data-lucide="x"></i></button>
           </div>
 
           <div class="chat-messages-container" id="chatMessages">
@@ -192,9 +171,7 @@
             <div class="chat-input-box">
               <input type="text" id="chatInput" placeholder="Conversar no canal..." />
               <button id="btnSendChat" title="Enviar Mensagem">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                </svg>
+                <i data-lucide="send-horizontal"></i>
               </button>
             </div>
           </div>
@@ -251,7 +228,7 @@
     <div class="modal-dialog effects-dialog">
       <div class="modal-header">
         <h2>Efeitos de Câmera</h2>
-        <button class="btn-icon-small" id="btnCloseEffects" aria-label="Fechar">✖</button>
+        <button class="btn-icon-small" id="btnCloseEffects" aria-label="Fechar"><i data-lucide="x"></i></button>
       </div>
 
       <div class="modal-body effects-body">
@@ -264,28 +241,17 @@
           <div class="effects-section-title">Desfoque e fundos pessoais</div>
           <div class="effects-grid">
             <button class="effect-option" data-effect="none" title="Sem efeito" aria-label="Sem efeito">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/>
-              </svg>
+              <i data-lucide="ban"></i>
             </button>
             <button class="effect-option" data-effect="blur-light" title="Desfoque leve" aria-label="Desfoque leve">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="12" cy="8.5" r="3"/><path d="M6.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5z"/>
-                <circle cx="3.5" cy="6" r="1"/><circle cx="20.5" cy="6" r="1"/><circle cx="3.5" cy="14" r="1"/><circle cx="20.5" cy="14" r="1"/>
-              </svg>
+              <i data-lucide="droplet"></i>
             </button>
             <button class="effect-option" data-effect="blur-strong" title="Desfoque forte" aria-label="Desfoque forte">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="12" cy="8.5" r="3"/><path d="M6.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5z"/>
-                <circle cx="3" cy="4" r="1.2"/><circle cx="21" cy="4" r="1.2"/><circle cx="3" cy="10" r="1.2"/><circle cx="21" cy="10" r="1.2"/>
-                <circle cx="3" cy="16" r="1.2"/><circle cx="21" cy="16" r="1.2"/><circle cx="6" cy="2" r="0.9"/><circle cx="18" cy="2" r="0.9"/>
-              </svg>
+              <i data-lucide="droplets"></i>
             </button>
             <button class="effect-option effect-image hidden" data-effect="image" id="effectCustomImage" title="Seu fundo" aria-label="Seu fundo"></button>
             <button class="effect-option effect-upload" id="btnUploadBackground" title="Enviar imagem de fundo" aria-label="Enviar imagem de fundo">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/>
-              </svg>
+              <i data-lucide="image-plus"></i>
             </button>
             <input type="file" id="backgroundFileInput" accept="image/*" hidden />
           </div>
@@ -302,7 +268,7 @@
     <div class="modal-dialog">
       <div class="modal-header">
         <h2>Configurações do Usuário e Conexão</h2>
-        <button class="btn-icon-small" id="btnCloseSettings">✖</button>
+        <button class="btn-icon-small" id="btnCloseSettings" aria-label="Fechar"><i data-lucide="x"></i></button>
       </div>
 
       <div class="modal-body">
@@ -398,6 +364,8 @@
     </div>
   </div>
 
+  <script src="js/vendor/lucide/lucide.min.js"></script>
+  <script src="js/icons.js"></script>
   <script src="js/socket.io.min.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/noise-suppression.js"></script>

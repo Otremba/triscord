@@ -249,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateStageView();
         addChatMessage({
           senderName: 'Sistema',
-          text: `👋 **${userData.username}** entrou no canal de voz.`,
+          text: `<i data-lucide="log-in"></i><strong>${escapeHtml(userData.username)}</strong> entrou no canal de voz.`,
           timestamp: Date.now(),
           isSystem: true
         });
@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateStageView();
         addChatMessage({
           senderName: 'Sistema',
-          text: `🚪 **${username}** saiu do canal de voz.`,
+          text: `<i data-lucide="log-out"></i><strong>${escapeHtml(username)}</strong> saiu do canal de voz.`,
           timestamp: Date.now(),
           isSystem: true
         });
@@ -319,11 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return `
         <div class="channel-item ${isCurrent ? 'active' : ''}" data-room-id="${room.id}" data-room-name="${room.name}">
           <div class="channel-main">
-            <div class="channel-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 3C10.34 3 9 4.34 9 6V12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12V6C15 4.34 13.66 3 12 3ZM19 11C19 14.53 16.39 17.44 13 17.93V21H11V17.93C7.61 17.44 5 14.53 5 11H7C7 13.76 9.24 16 12 16C14.76 16 17 13.76 17 11H19Z"/>
-              </svg>
-            </div>
+            <div class="channel-icon"><i data-lucide="mic"></i></div>
             <span class="channel-name">${room.name}</span>
             ${userCount > 0 ? `<span class="channel-badge">${userCount}</span>` : ''}
           </div>
@@ -336,10 +332,10 @@ document.addEventListener('DOMContentLoaded', () => {
                   </div>
                   <span class="channel-user-name">${u.username}</span>
                   <div class="channel-user-icons">
-                    ${u.isMuted ? '<span class="status-mini-icon red" title="Mutado">🔇</span>' : ''}
-                    ${u.isDeafened ? '<span class="status-mini-icon red" title="Ensurdecido">🔕</span>' : ''}
-                    ${u.isCameraOn ? '<span class="status-mini-icon green" title="Câmera Ativa">📹</span>' : ''}
-                    ${u.isScreenSharing ? '<span class="status-mini-icon blurple" title="Compartilhando Tela">🖥️</span>' : ''}
+                    ${u.isMuted ? '<span class="status-mini-icon red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
+                    ${u.isDeafened ? '<span class="status-mini-icon red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
+                    ${u.isCameraOn ? '<span class="status-mini-icon green" title="Câmera Ativa"><i data-lucide="video"></i></span>' : ''}
+                    ${u.isScreenSharing ? '<span class="status-mini-icon blurple" title="Compartilhando Tela"><i data-lucide="screen-share"></i></span>' : ''}
                   </div>
                 </div>
               `).join('')}
@@ -348,6 +344,8 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
     }).join('');
+
+    window.renderIcons(el.channelsList);
 
     // Channel click listeners
     el.channelsList.querySelectorAll('.channel-item').forEach(item => {
@@ -520,7 +518,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const content = node.querySelector('.tile-content');
       const hint = document.createElement('div');
       hint.className = 'tile-focus-hint';
-      hint.textContent = state.focusedTileId === key ? '⤡' : '⤢';
+      hint.innerHTML = `<i data-lucide="${state.focusedTileId === key ? 'minimize-2' : 'maximize-2'}"></i>`;
       hint.title = state.focusedTileId === key ? 'Sair do foco (Esc)' : 'Colocar em foco';
       content.appendChild(hint);
 
@@ -549,11 +547,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       el.videoGrid.appendChild(main);
       if (strip.children.length) el.videoGrid.appendChild(strip);
+      window.renderIcons(el.videoGrid);
       return;
     }
 
     tiles.forEach(({ node }) => el.videoGrid.appendChild(node));
     adjustGridColumns();
+    window.renderIcons(el.videoGrid);
   }
 
   // Spotlight a stream: clicking it again returns to the grid
@@ -644,7 +644,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const pct = Math.round(pref.volume * 100);
     const silenced = pref.muted || pct === 0;
 
-    btn.textContent = silenced ? '🔇' : pct < 100 ? '🔉' : '🔊';
+    const icon = silenced ? 'volume-x' : pct < 100 ? 'volume-1' : 'volume-2';
+    btn.innerHTML = `<i data-lucide="${icon}"></i>`;
+    window.renderIcons(btn);
     btn.classList.toggle('adjusted', silenced || pct < 100);
     btn.title = pref.muted ? 'Silenciado por você' : `Volume: ${pct}%`;
     btn.setAttribute('aria-label', btn.title);
@@ -882,7 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
       <div class="tile-overlay">
         <div class="tile-username">
-          <span>🖥️ Tela de ${escapeHtml(label)}</span>
+          <span><i data-lucide="monitor"></i>Tela de ${escapeHtml(label)}</span>
         </div>
       </div>
     `;
@@ -929,8 +931,8 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="tile-overlay">
         <div class="tile-username">
           <span>${state.user.username} (Você)</span>
-          ${state.user.isMuted ? '<span class="status-badge-mini red">🔇</span>' : ''}
-          ${state.user.isDeafened ? '<span class="status-badge-mini red">🔕</span>' : ''}
+          ${state.user.isMuted ? '<span class="status-badge-mini red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
+          ${state.user.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
         </div>
       </div>
     `;
@@ -964,8 +966,8 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="tile-overlay">
         <div class="tile-username">
           <span>${member.username}</span>
-          ${member.isMuted ? '<span class="status-badge-mini red">🔇</span>' : ''}
-          ${member.isDeafened ? '<span class="status-badge-mini red">🔕</span>' : ''}
+          ${member.isMuted ? '<span class="status-badge-mini red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
+          ${member.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
         </div>
       </div>
     `;
@@ -1049,9 +1051,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (usernameSpan) {
       usernameSpan.innerHTML = `
         <span>${member.username}</span>
-        ${member.isMuted ? '<span class="status-badge-mini red">🔇</span>' : ''}
-        ${member.isDeafened ? '<span class="status-badge-mini red">🔕</span>' : ''}
+        ${member.isMuted ? '<span class="status-badge-mini red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
+        ${member.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
       `;
+      window.renderIcons(usernameSpan);
     }
   }
 
@@ -1225,35 +1228,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateActionButtonsState() {
     // Camera button
-    if (state.user.isCameraOn) {
-      el.btnCamera.classList.add('active');
-      el.btnCamera.querySelector('.btn-label').textContent = 'Desligar Câmera';
-    } else {
-      el.btnCamera.classList.remove('active');
-      el.btnCamera.querySelector('.btn-label').textContent = 'Câmera';
-    }
+    el.btnCamera.classList.toggle('active', state.user.isCameraOn);
+    el.btnCamera.querySelector('.btn-label').textContent =
+      state.user.isCameraOn ? 'Desligar Câmera' : 'Câmera';
+    window.setIcon(el.btnCamera, state.user.isCameraOn ? 'video-off' : 'video');
 
     // Screen button
-    if (state.user.isScreenSharing) {
-      el.btnScreenShare.classList.add('active');
-      el.btnScreenShare.querySelector('.btn-label').textContent = 'Parar Tela';
-    } else {
-      el.btnScreenShare.classList.remove('active');
-      el.btnScreenShare.querySelector('.btn-label').textContent = 'Compartilhar';
-    }
+    el.btnScreenShare.classList.toggle('active', state.user.isScreenSharing);
+    el.btnScreenShare.querySelector('.btn-label').textContent =
+      state.user.isScreenSharing ? 'Parar Tela' : 'Compartilhar';
+    window.setIcon(el.btnScreenShare, state.user.isScreenSharing ? 'screen-share-off' : 'screen-share');
 
     // Bottom user panel Mute/Deafen buttons
-    if (state.user.isMuted) {
-      el.btnMute.classList.add('muted');
-    } else {
-      el.btnMute.classList.remove('muted');
-    }
+    el.btnMute.classList.toggle('muted', state.user.isMuted);
+    window.setIcon(el.btnMute, state.user.isMuted ? 'mic-off' : 'mic');
 
-    if (state.user.isDeafened) {
-      el.btnDeafen.classList.add('deafened');
-    } else {
-      el.btnDeafen.classList.remove('deafened');
-    }
+    el.btnDeafen.classList.toggle('deafened', state.user.isDeafened);
+    window.setIcon(el.btnDeafen, state.user.isDeafened ? 'headphone-off' : 'headphones');
   }
 
   function updateUserProfileUI() {
@@ -1299,6 +1290,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     el.chatMessages.appendChild(msgEl);
+    window.renderIcons(msgEl);
     el.chatMessages.scrollTop = el.chatMessages.scrollHeight;
   }
 

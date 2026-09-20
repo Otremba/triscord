@@ -33,7 +33,8 @@
   "devDependencies": {
     "concurrently": "^9.1.2",
     "electron": "^33.2.1",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "lucide": "^1.47.0"
   },
   "build": {
     "appId": "com.triscord.app",

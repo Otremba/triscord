@@ -33,6 +33,15 @@
 
   --shadow-low: 0 1px 3px rgba(0, 0, 0, 0.24);
   --shadow-high: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  /* Motion. One easing for things entering, one for things moving in place,
+     so the whole app decelerates the same way. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 280ms;
 }
 
 * {
@@ -1065,6 +1074,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 14px 20px;
   background-color: var(--bg-secondary);
@@ -1273,12 +1283,16 @@ body {
   box-shadow: var(--shadow-high);
   border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
-  animation: modalPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Bound to :not(.hidden) so the animation replays on each open */
+.modal-overlay:not(.hidden) .modal-dialog {
+  animation: modalPop var(--dur-slow) var(--ease-pop);
 }
 
 @keyframes modalPop {
-  0% { transform: scale(0.95); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+  0% { transform: scale(0.94) translateY(12px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
 }
 
 .modal-header {
@@ -1561,4 +1575,361 @@ body {
 
 .hidden {
   display: none !important;
+}
+
+/* =====================================================================
+   Icons
+   Every glyph is a Lucide SVG (js/icons.js). Size and colour are set
+   here rather than on the markup, so an icon matches whatever it sits in.
+   ===================================================================== */
+
+.lucide {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  stroke-width: 2;
+  vertical-align: middle;
+}
+
+.guild-icon .lucide {
+  width: 26px;
+  height: 26px;
+}
+
+.server-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.server-header .lucide {
+  width: 17px;
+  height: 17px;
+  color: var(--text-muted);
+}
+
+.server-name .lucide {
+  color: var(--accent-blurple);
+}
+
+.btn-icon-small .lucide {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.channel-user-icons .lucide {
+  width: 13px;
+  height: 13px;
+}
+
+.status-mini-icon,
+.status-badge-mini {
+  display: inline-flex;
+  align-items: center;
+}
+
+.status-badge-mini .lucide {
+  width: 14px;
+  height: 14px;
+}
+
+.status-mini-icon.red { color: var(--accent-red); }
+.status-mini-icon.green { color: var(--accent-green); }
+.status-mini-icon.blurple { color: var(--accent-blurple); }
+.status-badge-mini.red { color: var(--accent-red); }
+
+.feat-item .lucide {
+  width: 20px;
+  height: 20px;
+  color: var(--accent-blurple);
+}
+
+.effect-option .lucide {
+  width: 26px;
+  height: 26px;
+}
+
+.tile-username .lucide {
+  width: 14px;
+  height: 14px;
+}
+
+.tile-focus-hint .lucide,
+.tile-volume-btn .lucide {
+  width: 16px;
+  height: 16px;
+}
+
+.focus-strip .tile-volume-btn .lucide {
+  width: 13px;
+  height: 13px;
+}
+
+.tile-volume-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Join and leave notices in the chat. The icon flows with the sentence, so
+   the text wraps as one paragraph instead of breaking at every element. */
+.system-msg-content .lucide {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  color: var(--text-muted);
+  vertical-align: -2px;
+}
+
+/* =====================================================================
+   Motion
+   Anything that appears, moves or changes colour does it over time.
+   Everything below collapses to nothing under prefers-reduced-motion.
+   ===================================================================== */
+
+/* Interactive surfaces: colour and lift on hover, a press that answers back */
+.guild-icon,
+.icon-button,
+.btn-icon-small,
+.btn-stage-action,
+.btn-voice-control,
+.btn-primary,
+.btn-secondary,
+.effect-option,
+.screen-tab-btn,
+.source-card,
+.avatar-color-option,
+.volume-popover-reset,
+.chat-input-box button {
+  transition:
+    background-color var(--dur-fast) var(--ease-in-out),
+    border-color var(--dur-fast) var(--ease-in-out),
+    color var(--dur-fast) var(--ease-in-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+.icon-button:active,
+.btn-icon-small:active,
+.btn-stage-action:active,
+.btn-voice-control:active,
+.btn-primary:active,
+.btn-secondary:active,
+.effect-option:active,
+.chat-input-box button:active {
+  transform: scale(0.94);
+  transition-duration: var(--dur-fast);
+}
+
+.btn-voice-control:hover,
+.btn-stage-action:hover {
+  transform: translateY(-2px);
+}
+
+.btn-primary:disabled,
+.btn-primary:disabled:active,
+.effect-option:disabled,
+.effect-option:disabled:active {
+  transform: none;
+}
+
+.source-card:hover {
+  transform: translateY(-3px);
+}
+
+.avatar-color-option:hover {
+  transform: scale(1.12);
+}
+
+/* The mic and headphone icons swap when muted, so fade the swap in */
+.icon-button .lucide,
+.btn-voice-control .lucide {
+  animation: iconIn var(--dur-base) var(--ease-out);
+}
+
+@keyframes iconIn {
+  0% { opacity: 0; transform: scale(0.7); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Channel list */
+.channel-main {
+  transition:
+    background-color var(--dur-fast) var(--ease-in-out),
+    color var(--dur-fast) var(--ease-in-out);
+}
+
+.channel-user-item {
+  transition: background-color var(--dur-fast) var(--ease-in-out);
+}
+
+.channel-badge {
+  transition:
+    background-color var(--dur-base) var(--ease-in-out),
+    color var(--dur-base) var(--ease-in-out);
+}
+
+/* Connection badge: the dot breathes while we are still connecting */
+.connection-status-badge {
+  transition:
+    background-color var(--dur-slow) var(--ease-in-out),
+    color var(--dur-slow) var(--ease-in-out);
+}
+
+.connection-status-badge.connecting .status-dot {
+  animation: statusPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+
+/* Stage: whichever half is showing slides up into place */
+.welcome-stage:not(.hidden),
+.voice-stage:not(.hidden) {
+  animation: stageIn var(--dur-slow) var(--ease-out);
+}
+
+@keyframes stageIn {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Video tiles: a short rise as the grid is rebuilt */
+.video-tile {
+  animation: tileIn var(--dur-slow) var(--ease-out);
+}
+
+@keyframes tileIn {
+  0% { opacity: 0; transform: translateY(8px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.tile-focus-hint,
+.tile-volume-btn {
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-in-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+.tile-focus-hint:hover,
+.tile-volume-btn:hover {
+  transform: scale(1.08);
+}
+
+.live-tag {
+  animation: iconIn var(--dur-slow) var(--ease-pop);
+}
+
+/* Modals: the backdrop fades, the dialog pops (see .modal-dialog above).
+   .hidden is display:none, which nothing can animate, so these components
+   keep their box and become invisible instead. */
+.modal-overlay {
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    visibility var(--dur-base) linear,
+    backdrop-filter var(--dur-base) var(--ease-out);
+}
+
+.modal-overlay.hidden {
+  display: flex !important;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  backdrop-filter: blur(0);
+}
+
+/* The stage is a flex item, and a flex item refuses to shrink past its own
+   content unless told to — without this the drawer pushes the grid off the
+   right edge on a narrow window instead of squeezing it. */
+.welcome-stage,
+.voice-stage {
+  min-width: 0;
+}
+
+/* Chat drawer: slides the stage over rather than snapping shut */
+.chat-drawer {
+  transition:
+    width var(--dur-slow) var(--ease-out),
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-slow) var(--ease-out);
+  overflow: hidden;
+}
+
+.chat-drawer.hidden {
+  display: flex !important;
+  width: 0;
+  min-width: 0;
+  opacity: 0;
+  transform: translateX(24px);
+  border-left-width: 0;
+  pointer-events: none;
+}
+
+/* Keeps the panel's contents from reflowing while the drawer width animates */
+.chat-drawer-header,
+.chat-messages-container,
+.chat-input-area {
+  min-width: 340px;
+}
+
+/* Each message arrives from below */
+.chat-message-item {
+  animation: messageIn var(--dur-base) var(--ease-out);
+}
+
+@keyframes messageIn {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.btn-stage-action.has-unread::after {
+  animation: iconIn var(--dur-base) var(--ease-pop);
+}
+
+/* Volume popover */
+.volume-popover {
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    visibility var(--dur-fast) linear,
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.volume-popover.hidden {
+  display: block !important;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(0.96) translateY(-4px);
+}
+
+/* Settings, sliders and meters */
+.setting-input,
+.setting-select,
+.chat-input-box input {
+  transition:
+    border-color var(--dur-fast) var(--ease-in-out),
+    background-color var(--dur-fast) var(--ease-in-out),
+    box-shadow var(--dur-base) var(--ease-out);
+}
+
+.modal-body,
+.channels-scrollable,
+.chat-messages-container {
+  scroll-behavior: smooth;
+}
+
+/* Someone who never wants motion gets none of it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
