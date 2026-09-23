@@ -723,26 +723,295 @@ body {
   padding: 2px 5px;
 }
 
-.tile-focus-hint {
+/* Tile Action Bar (Zoom, Fullscreen, Focus) */
+.tile-actions-bar {
   position: absolute;
   top: 10px;
   right: 10px;
-  width: 30px;
-  height: 30px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
   border-radius: var(--radius-md);
-  background-color: rgba(0, 0, 0, 0.6);
-  color: #fff;
+  background-color: rgba(18, 19, 22, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.2s cubic-bezier(0.2, 0, 0, 1), transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.video-tile:hover .tile-actions-bar,
+.tile-actions-bar:focus-within,
+.video-tile.is-zoomed .tile-actions-bar,
+.video-tile:fullscreen .tile-actions-bar,
+.video-tile.is-fullscreen .tile-actions-bar {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.tile-action-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tile-action-divider {
+  width: 1px;
+  height: 16px;
+  background-color: rgba(255, 255, 255, 0.15);
+  margin: 0 2px;
+}
+
+.tile-action-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-normal);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
 }
 
-.video-tile:hover .tile-focus-hint {
+.tile-action-btn svg {
+  width: 15px;
+  height: 15px;
+  pointer-events: none;
+}
+
+.tile-action-btn:hover {
+  background-color: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  transform: scale(1.06);
+}
+
+.tile-action-btn:active {
+  transform: scale(0.94);
+}
+
+.tile-zoom-badge {
+  min-width: 44px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--text-normal);
+  font-family: 'JetBrains Mono', Consolas, monospace, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tile-zoom-badge:hover {
+  background-color: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+
+.tile-zoom-badge.zoomed {
+  background-color: rgba(88, 101, 242, 0.25);
+  border-color: rgba(88, 101, 242, 0.6);
+  color: #8da0f7;
+  font-weight: 700;
+}
+
+.tile-zoom-badge.zoomed:hover {
+  background-color: var(--accent-blue);
+  color: #fff;
+}
+
+/* Floating Zoom Indicator on video */
+.tile-zoom-pill {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-10px);
+  z-index: 12;
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.tile-zoom-pill.visible {
   opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tile-zoom-pill .pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--accent-blue);
+}
+
+/* Compact controls in strip */
+.focus-strip .tile-actions-bar {
+  top: 6px;
+  right: 6px;
+  padding: 2px 4px;
+}
+
+.focus-strip .tile-action-btn {
+  width: 22px;
+  height: 22px;
+}
+
+.focus-strip .tile-action-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.focus-strip .tile-action-group.zoom-controls {
+  display: none;
+}
+
+.focus-strip .tile-action-divider {
+  display: none;
+}
+
+/* Cursor states for Zoom and Pan */
+.tile-content.is-zoomed {
+  cursor: grab;
+}
+
+.tile-content.is-dragging {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.tile-content video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: #000;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+.tile-content video.transition-smooth {
+  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Native Fullscreen & Simulated Fullscreen */
+.video-tile:fullscreen,
+.video-tile:-webkit-full-screen,
+.video-tile.is-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: #000 !important;
+  z-index: 99999 !important;
+  box-shadow: none !important;
+}
+
+.video-tile:fullscreen .tile-content,
+.video-tile:-webkit-full-screen .tile-content,
+.video-tile.is-fullscreen .tile-content {
+  width: 100vw;
+  height: 100vh;
+}
+
+.video-tile:fullscreen .tile-actions-bar,
+.video-tile:-webkit-full-screen .tile-actions-bar,
+.video-tile.is-fullscreen .tile-actions-bar {
+  top: 18px;
+  right: 20px;
+  padding: 6px 10px;
+  background-color: rgba(18, 19, 22, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.video-tile:fullscreen .tile-action-btn,
+.video-tile:-webkit-full-screen .tile-action-btn,
+.video-tile.is-fullscreen .tile-action-btn {
+  width: 32px;
+  height: 32px;
+}
+
+.video-tile:fullscreen .tile-action-btn svg,
+.video-tile:-webkit-full-screen .tile-action-btn svg,
+.video-tile.is-fullscreen .tile-action-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.video-tile:fullscreen .tile-zoom-badge,
+.video-tile:-webkit-full-screen .tile-zoom-badge,
+.video-tile.is-fullscreen .tile-zoom-badge {
+  height: 28px;
+  font-size: 12px;
+  padding: 0 9px;
+}
+
+.video-tile:fullscreen .tile-overlay,
+.video-tile:-webkit-full-screen .tile-overlay,
+.video-tile.is-fullscreen .tile-overlay {
+  padding: 18px 24px;
+  font-size: 15px;
+}
+
+.video-tile:fullscreen .live-tag,
+.video-tile:-webkit-full-screen .live-tag,
+.video-tile.is-fullscreen .live-tag {
+  top: 20px;
+  left: 20px;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+/* Inactivity in Fullscreen: auto-hide overlay & controls */
+.video-tile.fullscreen-idle {
+  cursor: none !important;
+}
+
+.video-tile.fullscreen-idle .tile-actions-bar,
+.video-tile.fullscreen-idle .tile-overlay,
+.video-tile.fullscreen-idle .live-tag,
+.video-tile.fullscreen-idle .tile-volume-btn {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-8px);
+}
+
+/* Backward compatibility fallback */
+.tile-focus-hint {
+  display: none;
 }
 
 /* Camera effects modal */

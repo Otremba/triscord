@@ -159,7 +159,10 @@ document.addEventListener('DOMContentLoaded', () => {
     connectionQuality: new Map(), // socketId -> { level, rttMs, lossPct }
     chatMessagesById: new Map(), // messageId -> message (for re-rendering reactions)
     pendingAttachment: null, // image attachment staged for the next chat message
-    recording: null // { recorder, stop } while a call recording is in progress
+    recording: null, // { recorder, stop } while a call recording is in progress
+    tileZoom: new Map(), // tileKey -> { scale: 1.0, panX: 0, panY: 0 }
+    fullscreenTileKey: null, // tileKey da transmissão em tela cheia (ou null)
+    suppressTileClickUntil: 0 // timestamp para suprimir clique após arrastar
   };
 
   applyTheme(state.theme);
@@ -729,6 +732,15 @@ document.addEventListener('DOMContentLoaded', () => {
     state.user.isCameraOn = false;
     state.user.isScreenSharing = false;
     state.focusedTileId = null;
+
+    if (state.fullscreenTileKey || document.fullscreenElement) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      state.fullscreenTileKey = null;
+    }
+    state.tileZoom.clear();
+
     closeVolumePopover();
     closeEffectsModal();
 
@@ -756,6 +768,396 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAllVideoTiles();
   }
 
+  // ---- Stream Zoom, Pan & Fullscreen Engine ----
+
+  function getTileZoom(tileKey) {
+    if (!state.tileZoom.has(tileKey)) {
+      state.tileZoom.set(tileKey, { scale: 1.0, panX: 0, panY: 0 });
+    }
+    return state.tileZoom.get(tileKey);
+  }
+
+  function applyTileTransform(tileKey, smooth = false) {
+    const tile = document.querySelector(`.video-tile[data-tile-key="${CSS.escape(tileKey)}"]`);
+    if (!tile) return;
+
+    const zoom = getTileZoom(tileKey);
+    const content = tile.querySelector('.tile-content');
+    const video = tile.querySelector('.tile-content video');
+    const badge = tile.querySelector(`#zoom-badge-${CSS.escape(tileKey)}`);
+
+    if (badge) {
+      badge.textContent = `${Math.round(zoom.scale * 100)}%`;
+      badge.classList.toggle('zoomed', zoom.scale > 1.05);
+    }
+
+    if (content) {
+      content.classList.toggle('is-zoomed', zoom.scale > 1.05);
+    }
+
+    tile.classList.toggle('is-zoomed', zoom.scale > 1.05);
+
+    if (video) {
+      if (smooth) {
+        video.classList.add('transition-smooth');
+        setTimeout(() => video.classList.remove('transition-smooth'), 220);
+      }
+      if (zoom.scale <= 1.01) {
+        video.style.transform = '';
+      } else {
+        video.style.transform = `translate3d(${zoom.panX}px, ${zoom.panY}px, 0px) scale(${zoom.scale})`;
+      }
+    }
+  }
+
+  function showZoomPill(tile, scaleText) {
+    let pill = tile.querySelector('.tile-zoom-pill');
+    if (!pill) {
+      pill = document.createElement('div');
+      pill.className = 'tile-zoom-pill';
+      tile.appendChild(pill);
+    }
+    pill.innerHTML = `<span class="pill-dot"></span><span>${escapeHtml(scaleText)}</span>`;
+    pill.classList.add('visible');
+    clearTimeout(pill._timer);
+    pill._timer = setTimeout(() => {
+      pill.classList.remove('visible');
+    }, 1300);
+  }
+
+  function setTileZoom(tileKey, newScale, focalX = null, focalY = null, smooth = false) {
+    const tile = document.querySelector(`.video-tile[data-tile-key="${CSS.escape(tileKey)}"]`);
+    const zoom = getTileZoom(tileKey);
+    const oldScale = zoom.scale;
+    const clampedScale = Math.min(5.0, Math.max(1.0, newScale));
+
+    if (clampedScale <= 1.01) {
+      zoom.scale = 1.0;
+      zoom.panX = 0;
+      zoom.panY = 0;
+      applyTileTransform(tileKey, smooth);
+      if (tile && oldScale > 1.05) {
+        showZoomPill(tile, '100% (Ajustado)');
+      }
+      return;
+    }
+
+    const content = tile ? tile.querySelector('.tile-content') : null;
+    const cw = content ? content.clientWidth : 800;
+    const ch = content ? content.clientHeight : 450;
+
+    if (focalX !== null && focalY !== null) {
+      // Zoom centered at mouse position
+      const cx = focalX - cw / 2;
+      const cy = focalY - ch / 2;
+      const ratio = clampedScale / oldScale;
+      zoom.panX = cx - (cx - zoom.panX) * ratio;
+      zoom.panY = cy - (cy - zoom.panY) * ratio;
+    }
+
+    // Clamp pan bounds so video doesn't drift away
+    const maxPanX = Math.max(0, (cw * clampedScale - cw) / 2);
+    const maxPanY = Math.max(0, (ch * clampedScale - ch) / 2);
+    zoom.panX = Math.max(-maxPanX, Math.min(maxPanX, zoom.panX));
+    zoom.panY = Math.max(-maxPanY, Math.min(maxPanY, zoom.panY));
+    zoom.scale = clampedScale;
+
+    applyTileTransform(tileKey, smooth);
+    if (tile) {
+      showZoomPill(tile, `${Math.round(clampedScale * 100)}% • Arraste para mover`);
+    }
+  }
+
+  function zoomTileByStep(tileKey, stepDelta) {
+    const zoom = getTileZoom(tileKey);
+    const nextScale = Math.round((zoom.scale + stepDelta) * 4) / 4;
+    setTileZoom(tileKey, nextScale, null, null, true);
+  }
+
+  function resetTileZoom(tileKey) {
+    setTileZoom(tileKey, 1.0, null, null, true);
+  }
+
+  function createTileActionsBar(tileKey, isVideoTile) {
+    const bar = document.createElement('div');
+    bar.className = 'tile-actions-bar';
+
+    // 1. Zoom controls (only for video / stream tiles)
+    if (isVideoTile) {
+      const zoomGroup = document.createElement('div');
+      zoomGroup.className = 'tile-action-group zoom-controls';
+
+      const btnZoomOut = document.createElement('button');
+      btnZoomOut.type = 'button';
+      btnZoomOut.className = 'tile-action-btn';
+      btnZoomOut.dataset.action = 'zoom-out';
+      btnZoomOut.title = 'Diminuir zoom (Scroll para baixo)';
+      btnZoomOut.innerHTML = '<i data-lucide="minus"></i>';
+      btnZoomOut.addEventListener('click', (e) => {
+        e.stopPropagation();
+        zoomTileByStep(tileKey, -0.25);
+      });
+
+      const zoomBadge = document.createElement('button');
+      zoomBadge.type = 'button';
+      zoomBadge.className = 'tile-zoom-badge';
+      zoomBadge.id = `zoom-badge-${tileKey}`;
+      zoomBadge.dataset.action = 'zoom-reset';
+      zoomBadge.title = 'Redefinir zoom (100%)';
+      const currentZoom = getTileZoom(tileKey);
+      zoomBadge.textContent = `${Math.round(currentZoom.scale * 100)}%`;
+      if (currentZoom.scale > 1.05) zoomBadge.classList.add('zoomed');
+      zoomBadge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        resetTileZoom(tileKey);
+      });
+
+      const btnZoomIn = document.createElement('button');
+      btnZoomIn.type = 'button';
+      btnZoomIn.className = 'tile-action-btn';
+      btnZoomIn.dataset.action = 'zoom-in';
+      btnZoomIn.title = 'Aumentar zoom (Scroll para cima)';
+      btnZoomIn.innerHTML = '<i data-lucide="plus"></i>';
+      btnZoomIn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        zoomTileByStep(tileKey, 0.25);
+      });
+
+      zoomGroup.appendChild(btnZoomOut);
+      zoomGroup.appendChild(zoomBadge);
+      zoomGroup.appendChild(btnZoomIn);
+      bar.appendChild(zoomGroup);
+
+      const divider = document.createElement('div');
+      divider.className = 'tile-action-divider';
+      bar.appendChild(divider);
+    }
+
+    // 2. Fullscreen Button (for video / stream tiles)
+    if (isVideoTile) {
+      const isCurrentFs = state.fullscreenTileKey === tileKey;
+      const btnFs = document.createElement('button');
+      btnFs.type = 'button';
+      btnFs.className = 'tile-action-btn tile-fullscreen-btn';
+      btnFs.id = `btn-fs-${tileKey}`;
+      btnFs.title = isCurrentFs ? 'Sair da tela cheia (Esc ou F)' : 'Tela cheia (F)';
+      btnFs.innerHTML = `<i data-lucide="${isCurrentFs ? 'minimize' : 'maximize'}"></i>`;
+      btnFs.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleTileFullscreen(tileKey);
+      });
+      bar.appendChild(btnFs);
+    }
+
+    // 3. Spotlight / Focus Button
+    const isFocused = state.focusedTileId === tileKey;
+    const btnFocus = document.createElement('button');
+    btnFocus.type = 'button';
+    btnFocus.className = 'tile-action-btn tile-focus-btn';
+    btnFocus.title = isFocused ? 'Sair do foco (Esc)' : 'Colocar em foco';
+    btnFocus.innerHTML = `<i data-lucide="${isFocused ? 'minimize-2' : 'maximize-2'}"></i>`;
+    btnFocus.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleTileFocus(tileKey);
+    });
+    bar.appendChild(btnFocus);
+
+    return bar;
+  }
+
+  function setupTileZoomAndPan(tile, tileKey, videoEl) {
+    const content = tile.querySelector('.tile-content');
+    if (!content || !videoEl) return;
+
+    // Apply any existing zoom state on load
+    applyTileTransform(tileKey, false);
+
+    // 1. Mouse Wheel Zoom (centered at mouse cursor)
+    content.addEventListener('wheel', (e) => {
+      // Prevent page/grid scrolling
+      e.preventDefault();
+      e.stopPropagation();
+
+      const rect = content.getBoundingClientRect();
+      const focalX = e.clientX - rect.left;
+      const focalY = e.clientY - rect.top;
+
+      const zoom = getTileZoom(tileKey);
+      const delta = -Math.sign(e.deltaY) * 0.25;
+      const nextScale = zoom.scale + delta;
+
+      setTileZoom(tileKey, nextScale, focalX, focalY, false);
+    }, { passive: false });
+
+    // 2. Drag to Pan (when zoomed in)
+    let isMouseDown = false;
+    let hasDragged = false;
+    let startClientX = 0;
+    let startClientY = 0;
+    let startPanX = 0;
+    let startPanY = 0;
+
+    const onPointerDown = (e) => {
+      if (e.button !== 0) return; // left click only
+      const zoom = getTileZoom(tileKey);
+      if (zoom.scale <= 1.01) return;
+
+      // Don't drag if clicking buttons
+      if (e.target.closest('.tile-actions-bar') || e.target.closest('.tile-volume-btn') || e.target.closest('.live-tag')) {
+        return;
+      }
+
+      isMouseDown = true;
+      hasDragged = false;
+      startClientX = e.clientX;
+      startClientY = e.clientY;
+      startPanX = zoom.panX;
+      startPanY = zoom.panY;
+      content.classList.add('is-dragging');
+
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
+    };
+
+    const onPointerMove = (e) => {
+      if (!isMouseDown) return;
+      const dx = e.clientX - startClientX;
+      const dy = e.clientY - startClientY;
+
+      if (!hasDragged && Math.hypot(dx, dy) > 4) {
+        hasDragged = true;
+      }
+
+      if (hasDragged) {
+        const zoom = getTileZoom(tileKey);
+        const cw = content.clientWidth;
+        const ch = content.clientHeight;
+        const maxPanX = Math.max(0, (cw * zoom.scale - cw) / 2);
+        const maxPanY = Math.max(0, (ch * zoom.scale - ch) / 2);
+
+        zoom.panX = Math.max(-maxPanX, Math.min(maxPanX, startPanX + dx));
+        zoom.panY = Math.max(-maxPanY, Math.min(maxPanY, startPanY + dy));
+        applyTileTransform(tileKey, false);
+      }
+    };
+
+    const onPointerUp = () => {
+      if (isMouseDown) {
+        isMouseDown = false;
+        content.classList.remove('is-dragging');
+        if (hasDragged) {
+          state.suppressTileClickUntil = Date.now() + 250;
+        }
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+      }
+    };
+
+    content.addEventListener('pointerdown', onPointerDown);
+
+    // 3. Double-click:
+    // If zoomed > 100%: reset zoom to 100%
+    // If zoom === 100%: toggle fullscreen!
+    content.addEventListener('dblclick', (e) => {
+      if (e.target.closest('.tile-actions-bar') || e.target.closest('.tile-volume-btn')) return;
+      e.stopPropagation();
+      const zoom = getTileZoom(tileKey);
+      if (zoom.scale > 1.05) {
+        resetTileZoom(tileKey);
+      } else {
+        toggleTileFullscreen(tileKey);
+      }
+    });
+  }
+
+  async function toggleTileFullscreen(tileKey) {
+    const tile = document.querySelector(`.video-tile[data-tile-key="${CSS.escape(tileKey)}"]`);
+    if (!tile) return;
+
+    const isFullscreenCurrently = document.fullscreenElement === tile || tile.classList.contains('is-fullscreen');
+
+    if (isFullscreenCurrently) {
+      if (document.fullscreenElement) {
+        try {
+          await document.exitFullscreen();
+        } catch (err) {
+          console.warn('Exit fullscreen error:', err);
+        }
+      }
+      tile.classList.remove('is-fullscreen', 'fullscreen-idle');
+      state.fullscreenTileKey = null;
+      updateFullscreenButtons();
+    } else {
+      // Exit any existing fullscreen first
+      if (document.fullscreenElement) {
+        try { await document.exitFullscreen(); } catch (e) {}
+      }
+
+      state.fullscreenTileKey = tileKey;
+      tile.classList.add('is-fullscreen');
+
+      if (tile.requestFullscreen) {
+        try {
+          await tile.requestFullscreen();
+        } catch (err) {
+          console.warn('requestFullscreen failed, fallback to CSS fullscreen:', err);
+        }
+      }
+
+      setupFullscreenInactivity(tile);
+      updateFullscreenButtons();
+    }
+  }
+
+  function updateFullscreenButtons() {
+    document.querySelectorAll('.tile-fullscreen-btn').forEach(btn => {
+      const tile = btn.closest('.video-tile');
+      const tileKey = tile ? tile.dataset.tileKey : null;
+      const isFs = state.fullscreenTileKey === tileKey;
+      btn.title = isFs ? 'Sair da tela cheia (Esc ou F)' : 'Tela cheia (F)';
+      btn.innerHTML = `<i data-lucide="${isFs ? 'minimize' : 'maximize'}"></i>`;
+      window.renderIcons(btn);
+    });
+  }
+
+  let fullscreenInactivityTimer = null;
+  function setupFullscreenInactivity(tile) {
+    const resetIdle = () => {
+      tile.classList.remove('fullscreen-idle');
+      clearTimeout(fullscreenInactivityTimer);
+      if (state.fullscreenTileKey && (document.fullscreenElement === tile || tile.classList.contains('is-fullscreen'))) {
+        fullscreenInactivityTimer = setTimeout(() => {
+          tile.classList.add('fullscreen-idle');
+        }, 2500);
+      }
+    };
+
+    tile.removeEventListener('mousemove', tile._resetIdleHandler || (() => {}));
+    tile._resetIdleHandler = resetIdle;
+    tile.addEventListener('mousemove', resetIdle);
+    resetIdle();
+  }
+
+  document.addEventListener('fullscreenchange', () => {
+    const fsEl = document.fullscreenElement;
+    if (!fsEl) {
+      if (state.fullscreenTileKey) {
+        const prevTile = document.querySelector(`.video-tile[data-tile-key="${CSS.escape(state.fullscreenTileKey)}"]`);
+        if (prevTile) prevTile.classList.remove('is-fullscreen', 'fullscreen-idle');
+        state.fullscreenTileKey = null;
+        updateFullscreenButtons();
+      }
+    } else {
+      const tileKey = fsEl.dataset.tileKey;
+      if (tileKey) {
+        state.fullscreenTileKey = tileKey;
+        fsEl.classList.add('is-fullscreen');
+        setupFullscreenInactivity(fsEl);
+        updateFullscreenButtons();
+      }
+    }
+  });
+
   // Render all tiles in the stage grid.
   // Camera and screen share are independent tiles, like a real client: sharing your
   // screen while the webcam is on produces two tiles for the same person.
@@ -765,13 +1167,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const tiles = [];
 
     // 1. Local user tile (avatar or webcam)
-    tiles.push({ key: 'local', node: createLocalUserTile() });
+    tiles.push({
+      key: 'local',
+      node: createLocalUserTile(),
+      isVideo: state.user.isCameraOn
+    });
 
     // 2. Local screen share tile
     if (state.user.isScreenSharing) {
       tiles.push({
         key: 'screen-local',
-        node: createScreenTile('local', `${state.user.username} (Você)`, state.webrtc.localScreenStream, true)
+        node: createScreenTile('local', `${state.user.username} (Você)`, state.webrtc.localScreenStream, true),
+        isVideo: true
       });
     }
 
@@ -780,14 +1187,16 @@ document.addEventListener('DOMContentLoaded', () => {
       tiles.push({
         key: socketId,
         node: createRemoteUserTile(socketId, member, state.webrtc.remoteStreams.get(socketId)),
-        audio: { kind: 'voice', socketId }
+        audio: { kind: 'voice', socketId },
+        isVideo: !!member.isCameraOn
       });
 
       if (member.isScreenSharing) {
         tiles.push({
           key: `screen-${socketId}`,
           node: createScreenTile(socketId, member.username, state.webrtc.remoteScreenStreams.get(socketId), false),
-          audio: { kind: 'stream', socketId }
+          audio: { kind: 'stream', socketId },
+          isVideo: true
         });
       }
     });
@@ -797,26 +1206,51 @@ document.addEventListener('DOMContentLoaded', () => {
       state.focusedTileId = null;
     }
 
+    // Fullscreen tile could have stopped
+    if (state.fullscreenTileKey && !tiles.some(t => t.key === state.fullscreenTileKey)) {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      state.fullscreenTileKey = null;
+    }
+
     // Same for the volume popover's target
     if (state.volumePopover && !tiles.some(t => t.audio &&
         t.audio.kind === state.volumePopover.kind && t.audio.socketId === state.volumePopover.socketId)) {
       closeVolumePopover();
     }
 
-    tiles.forEach(({ key, node, audio }) => {
+    tiles.forEach(({ key, node, audio, isVideo }) => {
       node.dataset.tileKey = key;
-      node.addEventListener('click', () => toggleTileFocus(key));
+      node.addEventListener('click', (e) => {
+        if (e.target.closest('.tile-actions-bar') || e.target.closest('.tile-volume-btn') || e.target.closest('.volume-popover')) {
+          return;
+        }
+        if (Date.now() < state.suppressTileClickUntil) {
+          return;
+        }
+        toggleTileFocus(key);
+      });
 
       const content = node.querySelector('.tile-content');
-      const hint = document.createElement('div');
-      hint.className = 'tile-focus-hint';
-      hint.innerHTML = `<i data-lucide="${state.focusedTileId === key ? 'minimize-2' : 'maximize-2'}"></i>`;
-      hint.title = state.focusedTileId === key ? 'Sair do foco (Esc)' : 'Colocar em foco';
-      content.appendChild(hint);
+      const videoEl = content ? content.querySelector('video') : null;
+      const isActualVideo = !!isVideo;
+
+      // Modern unified action bar (Zoom, Fullscreen, Spotlight)
+      const actionsBar = createTileActionsBar(key, isActualVideo);
+      content.appendChild(actionsBar);
+
+      // Setup Zoom and Pan on video tiles
+      if (isActualVideo && videoEl) {
+        setupTileZoomAndPan(node, key, videoEl);
+      }
 
       if (audio) {
         content.appendChild(createVolumeButton(audio.kind, audio.socketId));
         node.addEventListener('contextmenu', (e) => openVolumeAtPointer(audio.kind, audio.socketId, e));
+      }
+
+      if (state.fullscreenTileKey === key) {
+        node.classList.add('is-fullscreen');
+        setupFullscreenInactivity(node);
       }
     });
 
@@ -1946,16 +2380,80 @@ document.addEventListener('DOMContentLoaded', () => {
     el.backgroundFileInput.value = '';
   });
 
-  // Esc closes the effects modal, then the volume popover, then leaves spotlight mode
+  function getActiveStreamTileKey() {
+    if (state.fullscreenTileKey) return state.fullscreenTileKey;
+    const hoveredTile = document.querySelector('.video-tile:hover');
+    if (hoveredTile && hoveredTile.dataset.tileKey) return hoveredTile.dataset.tileKey;
+    if (state.focusedTileId) return state.focusedTileId;
+    const screenTile = document.querySelector('.video-tile.screen-tile');
+    if (screenTile && screenTile.dataset.tileKey) return screenTile.dataset.tileKey;
+    return null;
+  }
+
+  // Keyboard shortcuts: Esc, F (fullscreen), +, -, 0 (zoom)
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    if (!el.effectsModal.classList.contains('hidden')) {
-      closeEffectsModal();
-    } else if (state.volumePopover) {
-      closeVolumePopover();
-    } else if (state.focusedTileId) {
-      state.focusedTileId = null;
-      renderAllVideoTiles();
+    const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) ||
+      document.activeElement?.isContentEditable;
+
+    if (e.key === 'Escape') {
+      if (state.fullscreenTileKey || document.fullscreenElement) {
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+        if (state.fullscreenTileKey) {
+          const fsTile = document.querySelector(`.video-tile[data-tile-key="${CSS.escape(state.fullscreenTileKey)}"]`);
+          if (fsTile) fsTile.classList.remove('is-fullscreen', 'fullscreen-idle');
+          state.fullscreenTileKey = null;
+          updateFullscreenButtons();
+        }
+      } else if (!el.effectsModal.classList.contains('hidden')) {
+        closeEffectsModal();
+      } else if (state.volumePopover) {
+        closeVolumePopover();
+      } else if (state.focusedTileId) {
+        state.focusedTileId = null;
+        renderAllVideoTiles();
+      }
+      return;
+    }
+
+    if (isTyping) return;
+
+    // F key: Toggle Fullscreen on active stream
+    if (e.key === 'f' || e.key === 'F') {
+      const targetKey = getActiveStreamTileKey();
+      if (targetKey) {
+        e.preventDefault();
+        toggleTileFullscreen(targetKey);
+      }
+      return;
+    }
+
+    // Zoom shortcuts
+    if (e.key === '+' || e.key === '=') {
+      const targetKey = getActiveStreamTileKey();
+      if (targetKey) {
+        e.preventDefault();
+        zoomTileByStep(targetKey, 0.25);
+      }
+      return;
+    }
+
+    if (e.key === '-' || e.key === '_') {
+      const targetKey = getActiveStreamTileKey();
+      if (targetKey) {
+        e.preventDefault();
+        zoomTileByStep(targetKey, -0.25);
+      }
+      return;
+    }
+
+    if (e.key === '0') {
+      const targetKey = getActiveStreamTileKey();
+      if (targetKey) {
+        e.preventDefault();
+        resetTileZoom(targetKey);
+      }
     }
   });
 
