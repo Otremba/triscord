@@ -83,19 +83,37 @@ class WebRTCManager {
     this.onRemoteStreamRemoved = null; // (socketId, isScreen)
     this.onConnectionQualityChanged = null; // (socketId, { level: 'good'|'ok'|'bad', rttMs, lossPct })
 
+    this.userCustomIceServers = Array.isArray(options.iceServers) ? options.iceServers : [];
     this.iceServers = [
+      ...this.userCustomIceServers,
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
       { urls: 'stun:stun3.l.google.com:19302' },
       { urls: 'stun:stun4.l.google.com:19302' },
-      // A user-supplied TURN server (Configurações > Servidor) goes first so it
-      // wins over the shared fallback below when both are reachable
-      ...(Array.isArray(options.iceServers) ? options.iceServers : []),
       ...DEFAULT_TURN_SERVERS
     ];
 
     this.setupSocketListeners();
+  }
+
+  updateIceServers(servers) {
+    if (Array.isArray(servers) && servers.length > 0) {
+      const combined = [
+        ...this.userCustomIceServers,
+        ...servers,
+        { urls: 'stun:stun.l.google.com:19302' },
+        ...DEFAULT_TURN_SERVERS
+      ];
+      const seen = new Set();
+      this.iceServers = combined.filter(s => {
+        const key = JSON.stringify(s);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      console.log('[WebRTC] Updated ICE servers configured:', this.iceServers.length);
+    }
   }
 
   setupSocketListeners() {

@@ -21,6 +21,77 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, '../src/renderer')));
 app.use('/socket.io-client', express.static(path.join(__dirname, '../node_modules/socket.io-client/dist')));
 
+// Metered TURN configuration & dynamic ICE servers resolution
+const METERED_DOMAIN = process.env.METERED_DOMAIN || 'triscord.metered.live';
+const METERED_SECRET_KEY = process.env.METERED_SECRET_KEY || 'lraG_4qQ2N9UDUjHsFeq9EGx5nPA22polekFNeXsgrnQ0npL';
+const METERED_API_KEY = process.env.METERED_API_KEY || '';
+
+let cachedIceServers = null;
+let lastFetchTime = 0;
+const CACHE_TTL_MS = 3600000; // 1 hour
+
+async function getIceServers() {
+  const now = Date.now();
+  if (cachedIceServers && (now - lastFetchTime < CACHE_TTL_MS)) {
+    return cachedIceServers;
+  }
+
+  const domain = METERED_DOMAIN;
+  const secretKey = METERED_SECRET_KEY;
+  const apiKey = METERED_API_KEY;
+
+  try {
+    if (apiKey) {
+      const res = await fetch(`https://${domain}/api/v1/turn/credentials?apiKey=${apiKey}`);
+      if (res.ok) {
+        const servers = await res.json();
+        if (Array.isArray(servers) && servers.length > 0) {
+          cachedIceServers = servers;
+          lastFetchTime = now;
+          return cachedIceServers;
+        }
+      }
+    }
+
+    if (secretKey) {
+      const res = await fetch(`https://${domain}/api/v1/turn/credential?secretKey=${secretKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.apiKey) {
+          const credRes = await fetch(`https://${domain}/api/v1/turn/credentials?apiKey=${data.apiKey}`);
+          if (credRes.ok) {
+            const servers = await credRes.json();
+            if (Array.isArray(servers) && servers.length > 0) {
+              cachedIceServers = servers;
+              lastFetchTime = now;
+              return cachedIceServers;
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[TURN] Failed to fetch Metered credentials:', err.message);
+  }
+
+  // Fallback defaults
+  return [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+  ];
+}
+
+app.get('/api/ice-servers', async (req, res) => {
+  const iceServers = await getIceServers();
+  res.json(iceServers);
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -112,6 +183,11 @@ io.on('connection', (socket) => {
 
   // Send current room list and user state on connect
   socket.emit('rooms-update', getRoomsSummary());
+
+  // Provide TURN/STUN ICE servers to connected client
+  getIceServers().then(iceServers => {
+    socket.emit('ice-servers', iceServers);
+  }).catch(() => {});
 
   let currentRoomId = null;
   let currentUserData = null;

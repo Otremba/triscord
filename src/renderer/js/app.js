@@ -452,8 +452,11 @@ document.addEventListener('DOMContentLoaded', () => {
         setConnectionStatus('connecting', 'Aguardando servidor...');
       });
 
-      state.socket.on('disconnect', () => {
-        setConnectionStatus('disconnected', 'Desconectado');
+      // Dynamic ICE / TURN servers provided by server
+      state.socket.on('ice-servers', (iceServers) => {
+        if (state.webrtc && Array.isArray(iceServers) && iceServers.length > 0) {
+          state.webrtc.updateIceServers(iceServers);
+        }
       });
 
       // Rooms update broadcast
