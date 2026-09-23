@@ -1,6 +1,6 @@
 {
   "name": "triscord",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Triscord: aplicativo de voz, vídeo e compartilhamento de tela com Electron e WebRTC",
   "main": "src/main.js",
   "scripts": {
