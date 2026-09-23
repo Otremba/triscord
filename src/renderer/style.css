@@ -2447,3 +2447,403 @@ body {
 }
 
 .app-toast.error { border-left-color: var(--accent-red); }
+
+/* ==========================================================================
+   Persistent Remote Audio Container & Mobile Audio Unlock Banner
+   ========================================================================== */
+.hidden-audio-container {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.audio-unlock-banner {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: linear-gradient(135deg, var(--accent-blurple), #4752c4);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--dur-base) var(--ease-out);
+  animation: bannerSlideDown 0.35s var(--ease-pop);
+}
+
+.audio-unlock-banner.hidden {
+  display: none !important;
+}
+
+.audio-unlock-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.audio-unlock-content .lucide {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.btn-unlock-audio {
+  background-color: #ffffff;
+  color: var(--accent-blurple);
+  border: none;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.btn-unlock-audio:hover {
+  transform: scale(1.05);
+}
+
+@keyframes bannerSlideDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.mobile-only {
+  display: none !important;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+/* ==========================================================================
+   Mobile Responsive Overhaul (iOS Safari, Android Chrome, Tablets)
+   ========================================================================== */
+@media (max-width: 768px) {
+  html, body {
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-only {
+    display: inline-flex !important;
+  }
+
+  .app-container {
+    height: 100dvh;
+    width: 100vw;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Backdrop */
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 120;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s var(--ease-out);
+  }
+
+  .sidebar-backdrop.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Sidebar Drawer on Mobile */
+  .guilds-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 140;
+    transform: translateX(-100%);
+    transition: transform 0.28s var(--ease-out);
+    box-shadow: var(--shadow-high);
+  }
+
+  .guilds-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .channels-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 135;
+    width: calc(100vw - 60px);
+    max-width: 320px;
+    transform: translateX(-100%);
+    transition: transform 0.28s var(--ease-out);
+    box-shadow: var(--shadow-high);
+  }
+
+  .channels-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .channels-scrollable {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Main Stage Area */
+  .main-stage-area {
+    width: 100vw;
+    height: 100dvh;
+    flex: 1;
+  }
+
+  /* Top Bar */
+  .stage-top-bar {
+    height: 52px;
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .stage-title-info {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .stage-title-info .channel-title {
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stage-title-info .channel-divider,
+  .stage-title-info .channel-topic {
+    display: none !important;
+  }
+
+  .stage-top-actions {
+    gap: 6px;
+  }
+
+  .connection-status-badge {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  .connection-status-badge .status-text {
+    max-width: 80px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .btn-stage-action {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-height: 36px;
+  }
+
+  /* Voice Action Bar */
+  .voice-action-bar {
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)) 8px;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    background-color: var(--bg-secondary);
+    border-top: 1px solid rgba(0, 0, 0, 0.2);
+  }
+
+  .btn-voice-control {
+    min-height: 44px;
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: var(--radius-full);
+    flex: 1 1 auto;
+    min-width: 60px;
+    justify-content: center;
+  }
+
+  .btn-voice-control.btn-disconnect {
+    flex-grow: 1.2;
+    min-width: 110px;
+  }
+
+  .btn-voice-control .btn-label {
+    display: inline;
+  }
+
+  /* Video Grid on Mobile */
+  .video-grid-container {
+    padding: 6px;
+  }
+
+  .video-grid {
+    gap: 6px;
+  }
+
+  .video-grid.grid-1 {
+    grid-template-columns: 1fr;
+  }
+
+  .video-grid.grid-2 {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+
+  .video-grid.grid-4,
+  .video-grid.grid-6,
+  .video-grid.grid-many {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .video-tile {
+    min-height: 140px;
+    border-radius: var(--radius-md);
+  }
+
+  .tile-avatar {
+    width: 64px;
+    height: 64px;
+    font-size: 24px;
+  }
+
+  .tile-username {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  /* Chat Drawer Mobile (Full Screen Overlay) */
+  .chat-drawer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    z-index: 200;
+    border-left: none;
+    box-shadow: none;
+  }
+
+  .chat-drawer-header {
+    height: 52px;
+    padding: 0 16px;
+    font-size: 15px;
+  }
+
+  .chat-input-area {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) 12px;
+  }
+
+  .chat-input-box {
+    min-height: 44px;
+  }
+
+  .chat-input-box input {
+    font-size: 15px; /* prevents iOS Safari auto-zoom on input focus */
+  }
+
+  /* Modals Mobile */
+  .modal-overlay {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .modal-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: 90dvh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 16px;
+    animation: modalSlideUp 0.3s var(--ease-out);
+  }
+
+  @keyframes modalSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .modal-body {
+    max-height: calc(90dvh - 120px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Welcome Screen on Mobile */
+  .welcome-hero-card {
+    padding: 24px 16px;
+    max-width: 94%;
+  }
+
+  .welcome-hero-card h2 {
+    font-size: 20px;
+  }
+
+  .welcome-features {
+    gap: 12px;
+  }
+
+  .feat-item {
+    font-size: 12px;
+  }
+
+  /* Toasts */
+  .app-toast-container {
+    bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+    right: 12px;
+    left: 12px;
+  }
+
+  .app-toast {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .btn-voice-control .btn-label {
+    display: none;
+  }
+
+  .btn-voice-control {
+    min-width: 44px;
+    padding: 8px;
+  }
+
+  .btn-voice-control.btn-disconnect {
+    min-width: 44px;
+  }
+
+  .btn-voice-control.btn-disconnect span {
+    display: none;
+  }
+
+  .video-tile {
+    min-height: 120px;
+  }
+}
+

@@ -2,16 +2,33 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1e1f22">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Triscord</title>
   <link rel="icon" href="assets/icon.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Persistent Audio Container (never destroyed by DOM tile re-renders) -->
+  <div id="remoteAudioContainer" class="hidden-audio-container" aria-hidden="true"></div>
+
+  <!-- Audio Unlock Banner for Mobile Browsers -->
+  <div class="audio-unlock-banner hidden" id="audioUnlockBanner">
+    <div class="audio-unlock-content">
+      <i data-lucide="volume-2"></i>
+      <span>Áudio em espera. <strong>Toque para ouvir a chamada</strong></span>
+    </div>
+    <button type="button" id="btnUnlockAudioConfirm" class="btn-unlock-audio">Ouvir</button>
+  </div>
+
   <div class="app-container">
+    <!-- Backdrop for mobile drawer -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     
     <!-- 1. Guilds / Servers Left Sidebar -->
-    <aside class="guilds-sidebar">
+    <aside class="guilds-sidebar" id="guildsSidebar">
       <div class="guild-icon active" id="brandIcon" title="Triscord">
         <img src="assets/icon.png" alt="Triscord" />
       </div>
@@ -22,10 +39,10 @@
     </aside>
 
     <!-- 2. Channels Sidebar -->
-    <aside class="channels-sidebar">
+    <aside class="channels-sidebar" id="channelsSidebar">
       <div class="server-header">
         <span class="server-name"><i data-lucide="audio-lines"></i>Triscord</span>
-        <i data-lucide="chevron-down"></i>
+        <button class="btn-icon-small mobile-only" id="btnCloseSidebar" title="Fechar menu"><i data-lucide="x"></i></button>
       </div>
 
       <div class="channels-scrollable">
@@ -70,10 +87,15 @@
     <main class="main-stage-area">
       <!-- Stage Top Bar -->
       <header class="stage-top-bar">
+        <button class="btn-stage-action mobile-only" id="btnToggleSidebar" title="Ver Canais">
+          <i data-lucide="menu"></i>
+          <span>Canais</span>
+        </button>
+
         <div class="stage-title-info">
           <span class="channel-title" id="currentChannelHeader">Nenhum canal selecionado</span>
           <div class="channel-divider"></div>
-          <span class="channel-topic" id="channelTopicHeader">Clique em um canal de voz à esquerda para entrar</span>
+          <span class="channel-topic" id="channelTopicHeader">Clique em um canal de voz para entrar</span>
         </div>
 
         <div class="stage-top-actions">

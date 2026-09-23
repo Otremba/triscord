@@ -240,11 +240,15 @@ class WebRTCManager {
    */
   async startMicrophone(audioDeviceId = null, noiseSuppression = true) {
     try {
-      const mic = await window.captureMicrophone({
+      const constraints = {
         echoCancellation: true,
-        autoGainControl: true,
-        ...(audioDeviceId ? { deviceId: { exact: audioDeviceId } } : {})
-      }, noiseSuppression);
+        autoGainControl: true
+      };
+      if (audioDeviceId && audioDeviceId !== 'default' && audioDeviceId !== 'communications') {
+        constraints.deviceId = { exact: audioDeviceId };
+      }
+
+      const mic = await window.captureMicrophone(constraints, noiseSuppression);
 
       this.stopMicrophone();
       this.micCapture = mic;
@@ -256,7 +260,19 @@ class WebRTCManager {
       return this.localMicStream;
     } catch (err) {
       console.error('[WebRTC] Error accessing microphone:', err);
-      throw err;
+      // Final mobile fallback: pure audio
+      try {
+        console.warn('[WebRTC] Retrying microphone with pure audio: true');
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        this.stopMicrophone();
+        this.localMicStream = fallbackStream;
+        this.noiseSuppressionMode = 'off';
+        this.applyTrackToPeers('mic', this.localMicStream.getAudioTracks()[0] || null);
+        return this.localMicStream;
+      } catch (fallbackErr) {
+        console.error('[WebRTC] Ultimate microphone fallback failed:', fallbackErr);
+        throw err;
+      }
     }
   }
 
@@ -279,17 +295,30 @@ class WebRTCManager {
    */
   async startCamera(videoDeviceId = null) {
     try {
-      const constraints = {
-        audio: false,
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 },
-          ...(videoDeviceId ? { deviceId: { exact: videoDeviceId } } : {})
-        }
+      const videoConstraints = {
+        width: { ideal: 1280, max: 1920 },
+        height: { ideal: 720, max: 1080 },
+        frameRate: { ideal: 30 }
       };
 
-      this.rawCamStream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (videoDeviceId && videoDeviceId !== 'default') {
+        videoConstraints.deviceId = { exact: videoDeviceId };
+      } else {
+        videoConstraints.facingMode = 'user';
+      }
+
+      const constraints = {
+        audio: false,
+        video: videoConstraints
+      };
+
+      try {
+        this.rawCamStream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (camErr) {
+        console.warn('[WebRTC] Constrained camera failed, falling back to basic video:', camErr);
+        this.rawCamStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+      }
+
       this.useCameraStream(this.rawCamStream);
 
       // The camera shows up immediately; the effect takes over when the model has loaded
@@ -441,6 +470,13 @@ class WebRTCManager {
       if (!remoteStream.getTracks().includes(event.track)) {
         remoteStream.addTrack(event.track);
       }
+
+      event.track.onunmute = () => {
+        console.log(`[WebRTC] Remote track unmuted: ${event.track.kind} from ${socketId}`);
+        if (this.onRemoteStreamAdded) {
+          this.onRemoteStreamAdded(socketId, remoteStream, isScreen);
+        }
+      };
 
       if (this.onRemoteStreamAdded) {
         this.onRemoteStreamAdded(socketId, remoteStream, isScreen);

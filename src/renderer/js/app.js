@@ -262,10 +262,113 @@ document.addEventListener('DOMContentLoaded', () => {
     volumePopoverValue: document.getElementById('volumePopoverValue'),
     volumePopoverMute: document.getElementById('volumePopoverMute'),
     volumePopoverReset: document.getElementById('volumePopoverReset'),
-    btnTestMic: document.getElementById('btnTestMic'),
+    // Mobile elements & Remote Audio Container
+    remoteAudioContainer: document.getElementById('remoteAudioContainer'),
+    audioUnlockBanner: document.getElementById('audioUnlockBanner'),
+    btnUnlockAudioConfirm: document.getElementById('btnUnlockAudioConfirm'),
+    btnToggleSidebar: document.getElementById('btnToggleSidebar'),
+    btnCloseSidebar: document.getElementById('btnCloseSidebar'),
+    sidebarBackdrop: document.getElementById('sidebarBackdrop'),
+    guildsSidebar: document.getElementById('guildsSidebar'),
+    channelsSidebar: document.getElementById('channelsSidebar'),
+
     avatarColorPicker: document.querySelectorAll('.avatar-color-option'),
     toastContainer: document.getElementById('toastContainer')
   };
+
+  // ---- Mobile Persistent Audio & Autoplay Unblocker ----
+
+  function getOrCreateRemoteAudio(socketId, kind, stream) {
+    if (!socketId) return null;
+    const audioId = `remote-audio-${kind}-${socketId}`;
+    let audioEl = document.getElementById(audioId);
+    if (!audioEl) {
+      audioEl = document.createElement('audio');
+      audioEl.id = audioId;
+      audioEl.autoplay = true;
+      audioEl.playsInline = true;
+      audioEl.setAttribute('playsinline', '');
+      audioEl.setAttribute('webkit-playsinline', '');
+      if (el.remoteAudioContainer) {
+        el.remoteAudioContainer.appendChild(audioEl);
+      }
+    }
+
+    if (stream && audioEl.srcObject !== stream) {
+      audioEl.srcObject = stream;
+    }
+
+    applyAudioPref(audioEl, kind, socketId);
+    playAudioSafely(audioEl);
+    return audioEl;
+  }
+
+  function playAudioSafely(audioEl) {
+    if (!audioEl) return;
+    try {
+      const playPromise = audioEl.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          hideAudioUnlockBanner();
+        }).catch(err => {
+          console.warn(`[AudioPlayback] Play rejected for ${audioEl.id}:`, err);
+          if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
+            showAudioUnlockBanner();
+          }
+        });
+      }
+    } catch (e) {
+      showAudioUnlockBanner();
+    }
+  }
+
+  function showAudioUnlockBanner() {
+    if (el.audioUnlockBanner) {
+      el.audioUnlockBanner.classList.remove('hidden');
+      window.renderIcons(el.audioUnlockBanner);
+    }
+  }
+
+  function hideAudioUnlockBanner() {
+    if (el.audioUnlockBanner) {
+      el.audioUnlockBanner.classList.add('hidden');
+    }
+  }
+
+  function removeRemoteAudio(socketId) {
+    ['voice', 'stream'].forEach(kind => {
+      const audioEl = document.getElementById(`remote-audio-${kind}-${socketId}`);
+      if (audioEl) {
+        audioEl.srcObject = null;
+        audioEl.remove();
+      }
+    });
+  }
+
+  function removeAllRemoteAudio() {
+    if (el.remoteAudioContainer) {
+      el.remoteAudioContainer.innerHTML = '';
+    }
+  }
+
+  // Mobile drawer management
+  function openMobileSidebar() {
+    if (el.channelsSidebar) el.channelsSidebar.classList.add('mobile-open');
+    if (el.guildsSidebar) el.guildsSidebar.classList.add('mobile-open');
+    if (el.sidebarBackdrop) el.sidebarBackdrop.classList.add('visible');
+  }
+
+  function closeMobileSidebar() {
+    if (el.channelsSidebar) el.channelsSidebar.classList.remove('mobile-open');
+    if (el.guildsSidebar) el.guildsSidebar.classList.remove('mobile-open');
+    if (el.sidebarBackdrop) el.sidebarBackdrop.classList.remove('visible');
+  }
+
+  function toggleMobileSidebar() {
+    const isOpen = el.channelsSidebar && el.channelsSidebar.classList.contains('mobile-open');
+    if (isOpen) closeMobileSidebar();
+    else openMobileSidebar();
+  }
 
   // Initialize UI
   updateUserProfileUI();
@@ -322,12 +425,14 @@ document.addEventListener('DOMContentLoaded', () => {
       // Handle Remote Stream Added
       state.webrtc.onRemoteStreamAdded = (socketId, stream, isScreen) => {
         console.log(`[App] Remote stream received from ${socketId} (${isScreen ? 'screen' : 'main'})`);
+        getOrCreateRemoteAudio(socketId, isScreen ? 'stream' : 'voice', stream);
         renderUserTile(socketId, stream, isScreen);
       };
 
       // Handle Remote Stream Removed
       state.webrtc.onRemoteStreamRemoved = (socketId) => {
         console.log(`[App] Remote stream removed from ${socketId}`);
+        removeRemoteAudio(socketId);
         renderAllVideoTiles();
       };
 
@@ -447,6 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // User left room
       state.socket.on('user-left', ({ socketId, username }) => {
         state.webrtc.removePeer(socketId);
+        removeRemoteAudio(socketId);
         state.roomMembers.delete(socketId);
         removeRemoteSpeakingDetector(socketId);
         window.SoundEffects.playLeave();
@@ -653,6 +759,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    if (window.unlockAudioSession) {
+      window.unlockAudioSession().catch(() => {});
+    }
+
+    if (window.innerWidth <= 768) {
+      closeMobileSidebar();
+    }
+
     // Switching channels — or rejoining after a reconnect — leaves the peer
     // connections of the previous room behind, and connectToPeer() skips a
     // socketId it already has, so someone we meet again would stay silent.
@@ -660,6 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.webrtc.resetPeers();
       state.remoteSpeakingDetectors.forEach(d => d.destroy());
       state.remoteSpeakingDetectors.clear();
+      removeAllRemoteAudio();
     }
 
     state.currentRoomId = roomId;
@@ -714,6 +829,9 @@ document.addEventListener('DOMContentLoaded', () => {
       state.webrtc.cleanupAll();
     }
 
+    removeAllRemoteAudio();
+    hideAudioUnlockBanner();
+
     if (state.localSpeakingDetector) {
       state.localSpeakingDetector.destroy();
       state.localSpeakingDetector = null;
@@ -747,7 +865,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateActionButtonsState();
     updateStageView();
     el.channelNameHeader.textContent = 'Nenhum canal selecionado';
-    el.channelTopicHeader.textContent = 'Clique em um canal de voz à esquerda para entrar';
+    el.channelTopicHeader.textContent = 'Clique em um canal de voz para entrar';
   }
 
   // Update Main Stage View (Welcome state vs Active Voice Grid)
@@ -1337,8 +1455,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const voiceEl = document.getElementById(`audio-${socketId}`);
     if (voiceEl) applyAudioPref(voiceEl, 'voice', socketId);
 
+    const persistentVoice = document.getElementById(`remote-audio-voice-${socketId}`);
+    if (persistentVoice) applyAudioPref(persistentVoice, 'voice', socketId);
+
     const streamEl = document.getElementById(`audio-screen-${socketId}`);
     if (streamEl) applyAudioPref(streamEl, 'stream', socketId);
+
+    const persistentStream = document.getElementById(`remote-audio-stream-${socketId}`);
+    if (persistentStream) applyAudioPref(persistentStream, 'stream', socketId);
   }
 
   function applyAllPeerAudio() {
@@ -2750,6 +2874,45 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     startRecording();
   });
+
+  // ---- Mobile Navigation & Audio Unblock Handlers ----
+  if (el.btnToggleSidebar) el.btnToggleSidebar.addEventListener('click', toggleMobileSidebar);
+  if (el.btnCloseSidebar) el.btnCloseSidebar.addEventListener('click', closeMobileSidebar);
+  if (el.sidebarBackdrop) el.sidebarBackdrop.addEventListener('click', closeMobileSidebar);
+
+  if (el.btnUnlockAudioConfirm) {
+    el.btnUnlockAudioConfirm.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (window.unlockAudioSession) {
+        window.unlockAudioSession();
+      }
+      if (el.remoteAudioContainer) {
+        el.remoteAudioContainer.querySelectorAll('audio').forEach(playAudioSafely);
+      }
+      hideAudioUnlockBanner();
+    });
+  }
+
+  if (el.audioUnlockBanner) {
+    el.audioUnlockBanner.addEventListener('click', () => {
+      if (window.unlockAudioSession) {
+        window.unlockAudioSession();
+      }
+      if (el.remoteAudioContainer) {
+        el.remoteAudioContainer.querySelectorAll('audio').forEach(playAudioSafely);
+      }
+      hideAudioUnlockBanner();
+    });
+  }
+
+  if (window.onAudioUnlockedHandlers) {
+    window.onAudioUnlockedHandlers.add(() => {
+      if (el.remoteAudioContainer) {
+        el.remoteAudioContainer.querySelectorAll('audio').forEach(playAudioSafely);
+      }
+      hideAudioUnlockBanner();
+    });
+  }
 
   // ---- Chat image attachments ----
 

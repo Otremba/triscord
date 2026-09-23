@@ -96,18 +96,40 @@ function waitForProcessorReady(node) {
   });
 }
 
+function sanitizeAudioConstraints(constraints = {}) {
+  const clean = { ...constraints };
+  if (clean.deviceId) {
+    const devId = typeof clean.deviceId === 'object' ? clean.deviceId.exact : clean.deviceId;
+    if (!devId || devId === 'default' || devId === 'communications') {
+      delete clean.deviceId;
+    } else {
+      clean.deviceId = { exact: devId };
+    }
+  }
+  return clean;
+}
+
 /**
  * Capture a microphone with noise suppression, preferring RNNoise and falling
  * back to the browser's built-in suppressor if RNNoise cannot start.
  * Resolves to { stream, mode, release } — mode is 'rnnoise', 'native' or 'off'.
  */
-async function captureMicrophone(audioConstraints, noiseSuppression) {
+async function captureMicrophone(audioConstraints = {}, noiseSuppression = true) {
+  const cleanConstraints = sanitizeAudioConstraints(audioConstraints);
   const useRnnoise = noiseSuppression && RNNoiseSuppressor.isSupported();
 
-  const raw = await navigator.mediaDevices.getUserMedia({
-    audio: { ...audioConstraints, noiseSuppression: noiseSuppression && !useRnnoise },
-    video: false
-  });
+  let raw;
+  try {
+    raw = await navigator.mediaDevices.getUserMedia({
+      audio: { ...cleanConstraints, noiseSuppression: noiseSuppression && !useRnnoise },
+      video: false
+    });
+  } catch (err) {
+    // If constrained capture failed on mobile, retry with pure audio: true
+    console.warn('[Microphone] Initial capture failed, retrying with standard constraints:', err);
+    raw = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  }
+
   const stopRaw = () => raw.getTracks().forEach(t => t.stop());
 
   if (!useRnnoise) {
@@ -126,20 +148,29 @@ async function captureMicrophone(audioConstraints, noiseSuppression) {
     };
   } catch (err) {
     console.warn('[RNNoise] Unavailable, falling back to native noise suppression:', err);
-    // Chromium fixes audio processing at capture time and ignores
-    // applyConstraints for it, so the fallback needs a fresh capture
     stopRaw();
-    const native = await navigator.mediaDevices.getUserMedia({
-      audio: { ...audioConstraints, noiseSuppression: true },
-      video: false
-    });
-    return {
-      stream: native,
-      mode: 'native',
-      release: () => native.getTracks().forEach(t => t.stop())
-    };
+    try {
+      const native = await navigator.mediaDevices.getUserMedia({
+        audio: { ...cleanConstraints, noiseSuppression: true },
+        video: false
+      });
+      return {
+        stream: native,
+        mode: 'native',
+        release: () => native.getTracks().forEach(t => t.stop())
+      };
+    } catch (e2) {
+      const basic = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      return {
+        stream: basic,
+        mode: 'native',
+        release: () => basic.getTracks().forEach(t => t.stop())
+      };
+    }
   }
 }
 
 window.RNNoiseSuppressor = RNNoiseSuppressor;
 window.captureMicrophone = captureMicrophone;
+window.sanitizeAudioConstraints = sanitizeAudioConstraints;
+
