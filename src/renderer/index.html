@@ -42,6 +42,7 @@
     <aside class="channels-sidebar" id="channelsSidebar">
       <div class="server-header">
         <span class="server-name"><i data-lucide="audio-lines"></i>Triscord</span>
+        <button class="btn-icon-small desktop-only" id="btnCollapseSidebar" title="Ocultar canais (Ctrl+B)" aria-label="Ocultar canais"><i data-lucide="panel-left-close"></i></button>
         <button class="btn-icon-small mobile-only" id="btnCloseSidebar" title="Fechar menu"><i data-lucide="x"></i></button>
       </div>
 
@@ -81,12 +82,21 @@
           </button>
         </div>
       </div>
+
+      <!-- Drag to resize the column; double-click restores the default width -->
+      <div class="sidebar-resizer desktop-only" id="sidebarResizer" role="separator" tabindex="0"
+        aria-orientation="vertical" aria-label="Redimensionar lista de canais"
+        aria-valuemin="180" aria-valuemax="420" aria-valuenow="240"
+        title="Arraste para redimensionar · clique duplo para o tamanho padrão"></div>
     </aside>
 
     <!-- 3. Main Stage / Voice Area -->
     <main class="main-stage-area">
       <!-- Stage Top Bar -->
       <header class="stage-top-bar">
+        <button class="btn-stage-action desktop-only" id="btnExpandSidebar" title="Mostrar canais (Ctrl+B)" aria-label="Mostrar canais">
+          <i data-lucide="panel-left-open"></i>
+        </button>
         <button class="btn-stage-action mobile-only" id="btnToggleSidebar" title="Ver Canais">
           <i data-lucide="menu"></i>
           <span>Canais</span>

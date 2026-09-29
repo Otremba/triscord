@@ -140,7 +140,9 @@ body {
 
 /* 2. Channels Sidebar */
 .channels-sidebar {
-  width: 240px;
+  /* --channels-width is set by initSidebarLayout() when the column is resized */
+  width: var(--channels-width, 240px);
+  position: relative;
   background-color: var(--bg-secondary);
   display: flex;
   flex-direction: column;
@@ -2791,6 +2793,86 @@ input[type="radio"]:disabled {
   display: none !important;
 }
 
+/* ==========================================================================
+   Channel list column: resizable and collapsible on desktop. On mobile the
+   column is a drawer instead, and none of this applies.
+   ========================================================================== */
+@media (min-width: 769px) {
+  .channels-sidebar {
+    overflow: hidden;
+    transition:
+      width var(--dur-slow) var(--ease-out),
+      border-right-width var(--dur-slow) var(--ease-out);
+  }
+
+  /* The contents keep their width while the column animates shut, so they
+     slide out of view instead of squashing */
+  .channels-sidebar > .server-header,
+  .channels-sidebar > .channels-scrollable,
+  .channels-sidebar > .user-panel {
+    min-width: 180px;
+  }
+
+  .app-container.sidebar-collapsed .channels-sidebar {
+    width: 0;
+    border-right-width: 0;
+  }
+
+  /* While dragging the width follows the pointer, with no easing behind it */
+  .app-container.sidebar-resizing .channels-sidebar {
+    transition: none;
+  }
+
+  .app-container.sidebar-resizing,
+  .app-container.sidebar-resizing * {
+    cursor: col-resize !important;
+    user-select: none;
+  }
+
+  .app-container:not(.sidebar-collapsed) #btnExpandSidebar {
+    display: none;
+  }
+
+  .app-container.sidebar-collapsed .stage-title-info {
+    margin-left: 12px;
+    margin-right: auto;
+  }
+}
+
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 20;
+  touch-action: none;
+}
+
+/* A thin accent line shows where to grab */
+.sidebar-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 2px;
+  background-color: var(--accent-blurple);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-in-out);
+}
+
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after,
+.app-container.sidebar-resizing .sidebar-resizer::after {
+  opacity: 1;
+}
+
+.sidebar-resizer:focus-visible {
+  outline: none;
+}
+
 .sidebar-backdrop {
   display: none;
 }
@@ -2809,6 +2891,10 @@ input[type="radio"]:disabled {
 
   .mobile-only {
     display: inline-flex !important;
+  }
+
+  .desktop-only {
+    display: none !important;
   }
 
   .app-container {
@@ -2853,15 +2939,17 @@ input[type="radio"]:disabled {
     transform: translateX(0);
   }
 
+  /* Opens beside the 72px icon bar rather than underneath it (which hid the
+     first 72px of the list), still leaving a strip of backdrop to tap-close */
   .channels-sidebar {
     position: fixed;
     top: 0;
     bottom: 0;
-    left: 0;
+    left: 72px;
     z-index: 135;
-    width: calc(100vw - 60px);
+    width: calc(100vw - 72px - 48px);
     max-width: 320px;
-    transform: translateX(-100%);
+    transform: translateX(calc(-100% - 72px));
     transition: transform 0.28s var(--ease-out);
     box-shadow: var(--shadow-high);
   }

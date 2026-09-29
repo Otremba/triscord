@@ -319,6 +319,9 @@ document.addEventListener('DOMContentLoaded', () => {
     sidebarBackdrop: document.getElementById('sidebarBackdrop'),
     guildsSidebar: document.getElementById('guildsSidebar'),
     channelsSidebar: document.getElementById('channelsSidebar'),
+    sidebarResizer: document.getElementById('sidebarResizer'),
+    btnCollapseSidebar: document.getElementById('btnCollapseSidebar'),
+    btnExpandSidebar: document.getElementById('btnExpandSidebar'),
 
     avatarColorPicker: document.querySelectorAll('.avatar-color-option'),
     toastContainer: document.getElementById('toastContainer')
@@ -443,11 +446,136 @@ document.addEventListener('DOMContentLoaded', () => {
     else openMobileSidebar();
   }
 
+  // ---- Channel list column: resizable and collapsible on desktop ----
+  // (on mobile the same column is a drawer, see openMobileSidebar)
+
+  const SIDEBAR_DEFAULT_WIDTH = 240;
+  const SIDEBAR_MIN_WIDTH = 180;
+  const SIDEBAR_MAX_WIDTH = 420;
+  // Dragging the edge further left than this hides the column
+  const SIDEBAR_COLLAPSE_BELOW = 120;
+  const desktopLayout = window.matchMedia('(min-width: 769px)');
+  const appContainer = document.querySelector('.app-container');
+
+  function clampSidebarWidth(width) {
+    if (!Number.isFinite(width)) return SIDEBAR_DEFAULT_WIDTH;
+    return Math.round(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, width)));
+  }
+
+  function applySidebarWidth(width) {
+    appContainer.style.setProperty('--channels-width', `${width}px`);
+    el.sidebarResizer.setAttribute('aria-valuenow', String(width));
+  }
+
+  function isSidebarCollapsed() {
+    return appContainer.classList.contains('sidebar-collapsed');
+  }
+
+  // A hidden column stays out of the tab order too; only on desktop, where
+  // the class actually hides it
+  function syncSidebarInert() {
+    el.channelsSidebar.inert = desktopLayout.matches && isSidebarCollapsed();
+  }
+
+  function setSidebarCollapsed(collapsed) {
+    appContainer.classList.toggle('sidebar-collapsed', collapsed);
+    syncSidebarInert();
+    localStorage.setItem('triscord_sidebar_collapsed', collapsed ? '1' : '0');
+  }
+
+  function saveSidebarWidth() {
+    const width = clampSidebarWidth(parseFloat(appContainer.style.getPropertyValue('--channels-width')));
+    localStorage.setItem('triscord_sidebar_width', String(width));
+  }
+
+  function toggleSidebarCollapsed() {
+    const collapse = !isSidebarCollapsed();
+    // Only move focus when the focused control is about to disappear, so
+    // Ctrl+B does not pull the cursor out of the chat box
+    const focused = document.activeElement;
+    const focusWillVanish = collapse
+      ? el.channelsSidebar.contains(focused)
+      : focused === el.btnExpandSidebar;
+
+    setSidebarCollapsed(collapse);
+    if (focusWillVanish) {
+      (collapse ? el.btnExpandSidebar : el.btnCollapseSidebar).focus({ preventScroll: true });
+    }
+  }
+
+  function initSidebarLayout() {
+    applySidebarWidth(clampSidebarWidth(parseInt(localStorage.getItem('triscord_sidebar_width'), 10)));
+    setSidebarCollapsed(localStorage.getItem('triscord_sidebar_collapsed') === '1');
+    desktopLayout.addEventListener('change', syncSidebarInert);
+
+    el.btnCollapseSidebar.addEventListener('click', toggleSidebarCollapsed);
+    el.btnExpandSidebar.addEventListener('click', toggleSidebarCollapsed);
+
+    el.sidebarResizer.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+
+      const resizer = el.sidebarResizer;
+      const startX = e.clientX;
+      const startWidth = el.channelsSidebar.getBoundingClientRect().width;
+      resizer.setPointerCapture(e.pointerId);
+      appContainer.classList.add('sidebar-resizing');
+
+      const onMove = (ev) => {
+        const next = startWidth + ev.clientX - startX;
+        // Only the class while dragging: making the column inert now would
+        // take the pointer capture away from the handle
+        appContainer.classList.toggle('sidebar-collapsed', next < SIDEBAR_COLLAPSE_BELOW);
+        if (next >= SIDEBAR_COLLAPSE_BELOW) applySidebarWidth(clampSidebarWidth(next));
+      };
+
+      const onEnd = () => {
+        resizer.removeEventListener('pointermove', onMove);
+        resizer.removeEventListener('pointerup', onEnd);
+        resizer.removeEventListener('pointercancel', onEnd);
+        appContainer.classList.remove('sidebar-resizing');
+        // Dragged shut: reopening should bring back the width it had before
+        if (isSidebarCollapsed()) applySidebarWidth(clampSidebarWidth(startWidth));
+        setSidebarCollapsed(isSidebarCollapsed());
+        saveSidebarWidth();
+      };
+
+      resizer.addEventListener('pointermove', onMove);
+      resizer.addEventListener('pointerup', onEnd);
+      resizer.addEventListener('pointercancel', onEnd);
+    });
+
+    el.sidebarResizer.addEventListener('dblclick', () => {
+      applySidebarWidth(SIDEBAR_DEFAULT_WIDTH);
+      saveSidebarWidth();
+    });
+
+    el.sidebarResizer.addEventListener('keydown', (e) => {
+      const current = clampSidebarWidth(parseFloat(appContainer.style.getPropertyValue('--channels-width')));
+      const step = e.shiftKey ? 48 : 16;
+      let next = null;
+      if (e.key === 'ArrowLeft') next = current - step;
+      else if (e.key === 'ArrowRight') next = current + step;
+      else if (e.key === 'Home') next = SIDEBAR_MIN_WIDTH;
+      else if (e.key === 'End') next = SIDEBAR_MAX_WIDTH;
+      else if (e.key === 'Enter') {
+        e.preventDefault();
+        toggleSidebarCollapsed();
+        return;
+      }
+      if (next === null) return;
+      e.preventDefault();
+      applySidebarWidth(clampSidebarWidth(next));
+      saveSidebarWidth();
+    });
+  }
+
   // Initialize UI
   updateUserProfileUI();
   initSettingsUI();
   initPresetBackgroundButtons();
   initNameGate();
+  initSidebarLayout();
 
   // Initialize Screen Share Picker
   state.screenPicker = new window.ScreenSharePicker();
@@ -2854,6 +2982,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', (e) => {
     const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) ||
       document.activeElement?.isContentEditable;
+
+    // Ctrl+B: hide/show the channel list (desktop layout only)
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b' && desktopLayout.matches) {
+      e.preventDefault();
+      toggleSidebarCollapsed();
+      return;
+    }
 
     if (e.key === 'Escape') {
       if (state.fullscreenTileKey || document.fullscreenElement) {
