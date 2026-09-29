@@ -1800,10 +1800,13 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
       <div class="tile-overlay">
-        <div class="tile-username">
-          <span>${escapeHtml(state.user.username)} (Você)</span>
-          ${state.user.isMuted ? '<span class="status-badge-mini red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
-          ${state.user.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
+        <div class="tile-overlay-info">
+          <div class="tile-username">
+            <span>${escapeHtml(state.user.username)} (Você)</span>
+            ${state.user.isMuted ? '<span class="status-badge-mini red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
+            ${state.user.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
+          </div>
+          ${state.user.status ? `<div class="tile-user-status">${escapeHtml(state.user.status)}</div>` : ''}
         </div>
       </div>
     `;
@@ -1835,10 +1838,13 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
       <div class="tile-overlay">
-        <div class="tile-username">
-          <span>${escapeHtml(member.username)}</span>
-          ${member.isMuted ? '<span class="status-badge-mini red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
-          ${member.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
+        <div class="tile-overlay-info">
+          <div class="tile-username">
+            <span>${escapeHtml(member.username)}</span>
+            ${member.isMuted ? '<span class="status-badge-mini red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
+            ${member.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
+          </div>
+          ${member.status ? `<div class="tile-user-status">${escapeHtml(member.status)}</div>` : ''}
         </div>
       </div>
     `;
@@ -1929,6 +1935,19 @@ document.addEventListener('DOMContentLoaded', () => {
         ${member.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
       `;
       window.renderIcons(usernameSpan);
+    }
+
+    const overlayInfo = tile.querySelector('.tile-overlay-info');
+    let statusEl = tile.querySelector('.tile-user-status');
+    if (member.status) {
+      if (!statusEl) {
+        statusEl = document.createElement('div');
+        statusEl.className = 'tile-user-status';
+        overlayInfo?.appendChild(statusEl);
+      }
+      statusEl.textContent = member.status;
+    } else if (statusEl) {
+      statusEl.remove();
     }
   }
 

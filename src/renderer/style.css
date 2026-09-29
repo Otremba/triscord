@@ -1325,6 +1325,13 @@ body {
   justify-content: space-between;
 }
 
+.tile-overlay-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
 .tile-username {
   display: flex;
   align-items: center;
@@ -1332,6 +1339,14 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-header);
+}
+
+.tile-user-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-badge-mini {
