@@ -400,6 +400,13 @@
               <input type="range" id="settingsSensitivity" min="1" max="50" value="15" />
               <span style="font-size: 11px; color: var(--text-muted);">Menos Sensível</span>
             </div>
+            <div class="slider-group">
+              <span style="font-size: 11px; color: var(--text-muted);">Volume do retorno</span>
+              <input type="range" id="settingsMicTestVolume" min="0" max="200" step="5" value="100"
+                aria-label="Volume do retorno do teste de microfone"
+                title="Acima de 100% o som é amplificado. Use fones para não dar microfonia." />
+              <span id="labelMicTestVolume" style="font-size: 11px; color: var(--text-muted); min-width: 34px; text-align: right;">100%</span>
+            </div>
           </div>
         </div>
 

@@ -141,6 +141,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return null;
   }
 
+  function loadMicTestVolume() {
+    const saved = parseInt(localStorage.getItem('triscord_mic_test_volume'), 10);
+    return Number.isFinite(saved) ? Math.min(200, Math.max(0, saved)) : 100;
+  }
+
   // Application State
   const state = {
     serverUrl: localStorage.getItem('triscord_server_url') || defaultServerUrl,
@@ -174,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cameraEffect: loadCameraEffect(), // { type: 'none' | 'blur-light' | 'blur-strong' | 'image', image?, source? }
     effectsPreview: null, // own camera + processor while the effects modal is open with the camera off
     micSensitivity: parseInt(localStorage.getItem('triscord_mic_sens') || '15', 10),
+    micTestVolume: loadMicTestVolume(), // % of the mic test monitor, 0-200
     selectedAudioInput: localStorage.getItem('triscord_mic_device') || 'default',
     selectedAudioOutput: localStorage.getItem('triscord_spk_device') || 'default',
     selectedVideoInput: localStorage.getItem('triscord_cam_device') || 'default',
@@ -269,6 +275,8 @@ document.addEventListener('DOMContentLoaded', () => {
     selectVideoInput: document.getElementById('settingsVideoInput'),
     sliderSensitivity: document.getElementById('settingsSensitivity'),
     labelSensitivity: document.getElementById('labelSensitivity'),
+    sliderMicTestVolume: document.getElementById('settingsMicTestVolume'),
+    labelMicTestVolume: document.getElementById('labelMicTestVolume'),
     noiseSuppression: document.getElementById('settingsNoiseSuppression'),
     settingsLightTheme: document.getElementById('settingsLightTheme'),
     settingsModeVAD: document.getElementById('settingsModeVAD'),
@@ -2603,7 +2611,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let testCapture = null;
   let testDetector = null;
-  let testAudioEl = null;
+  // The monitor goes through a gain node rather than an <audio> element,
+  // whose volume cannot go above 100%
+  let testMonitor = null; // { context, gain }
   let testStarting = false;
 
   function stopMicTest() {
@@ -2611,10 +2621,9 @@ document.addEventListener('DOMContentLoaded', () => {
       testDetector.destroy();
       testDetector = null;
     }
-    if (testAudioEl) {
-      testAudioEl.pause();
-      testAudioEl.srcObject = null;
-      testAudioEl = null;
+    if (testMonitor) {
+      testMonitor.context.close().catch(() => {});
+      testMonitor = null;
     }
     if (testCapture) {
       testCapture.release();
@@ -2637,10 +2646,12 @@ document.addEventListener('DOMContentLoaded', () => {
         ...(el.selectAudioInput.value ? { deviceId: { exact: el.selectAudioInput.value } } : {})
       }, el.noiseSuppression.checked);
 
-      testAudioEl = new Audio();
-      testAudioEl.volume = 0.3;
-      testAudioEl.srcObject = testCapture.stream;
-      await testAudioEl.play();
+      const context = new AudioContext();
+      const gain = context.createGain();
+      gain.gain.value = state.micTestVolume / 100;
+      context.createMediaStreamSource(testCapture.stream).connect(gain).connect(context.destination);
+      testMonitor = { context, gain };
+      await context.resume();
 
       testDetector = new window.SpeakingDetector(testCapture.stream, (isSpeaking, level) => {
         const pct = Math.min(100, Math.round((level / 60) * 100));
@@ -2664,6 +2675,20 @@ document.addEventListener('DOMContentLoaded', () => {
     el.noiseSuppression.checked = state.noiseSuppression;
     el.sliderSensitivity.value = state.micSensitivity;
     el.labelSensitivity.textContent = `${state.micSensitivity}%`;
+
+    el.sliderMicTestVolume.value = state.micTestVolume;
+    el.labelMicTestVolume.textContent = `${state.micTestVolume}%`;
+
+    el.sliderMicTestVolume.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      state.micTestVolume = val;
+      el.labelMicTestVolume.textContent = `${val}%`;
+      localStorage.setItem('triscord_mic_test_volume', val);
+      if (testMonitor) {
+        // A short ramp instead of a jump, so dragging the slider does not click
+        testMonitor.gain.gain.setTargetAtTime(val / 100, testMonitor.context.currentTime, 0.02);
+      }
+    });
 
     el.sliderSensitivity.addEventListener('input', (e) => {
       const val = parseInt(e.target.value, 10);
