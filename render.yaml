@@ -9,3 +9,18 @@ services:
     startCommand: node server/server.js
     healthCheckPath: /
     autoDeploy: true
+    envVars:
+      - key: TURN_URLS
+        sync: false
+      - key: TURN_USERNAME
+        sync: false
+      - key: TURN_CREDENTIAL
+        sync: false
+      - key: ICE_TRANSPORT_POLICY
+        sync: false
+      - key: METERED_DOMAIN
+        sync: false
+      - key: METERED_API_KEY
+        sync: false
+      - key: METERED_SECRET_KEY
+        sync: false

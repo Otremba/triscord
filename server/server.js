@@ -26,6 +26,48 @@ const METERED_DOMAIN = process.env.METERED_DOMAIN || 'triscord.metered.live';
 const METERED_SECRET_KEY = process.env.METERED_SECRET_KEY || 'lraG_4qQ2N9UDUjHsFeq9EGx5nPA22polekFNeXsgrnQ0npL';
 const METERED_API_KEY = process.env.METERED_API_KEY || '';
 
+const DEFAULT_TURN_SERVERS = [
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+];
+
+function getConfiguredTurnServers(env = process.env) {
+  const urls = String(env.TURN_URLS || '').split(',').map(url => url.trim()).filter(Boolean);
+  if (!urls.length) return [];
+
+  const server = { urls: urls.length === 1 ? urls[0] : urls };
+  if (env.TURN_USERNAME) server.username = env.TURN_USERNAME;
+  if (env.TURN_CREDENTIAL) server.credential = env.TURN_CREDENTIAL;
+  return [server];
+}
+
+function getIceTransportPolicy(env = process.env) {
+  return env.ICE_TRANSPORT_POLICY === 'relay' ? 'relay' : 'all';
+}
+
+function getBaseIceServers(env = process.env) {
+  return [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    ...getConfiguredTurnServers(env),
+    ...DEFAULT_TURN_SERVERS
+  ];
+}
+
+function mergeIceServers(...groups) {
+  const seen = new Set();
+  return groups.flat().filter(server => {
+    const key = JSON.stringify(server);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 let cachedIceServers = null;
 let lastFetchTime = 0;
 const CACHE_TTL_MS = 3600000; // 1 hour
@@ -36,9 +78,10 @@ async function getIceServers() {
     return cachedIceServers;
   }
 
-  const domain = METERED_DOMAIN;
-  const secretKey = METERED_SECRET_KEY;
-  const apiKey = METERED_API_KEY;
+  const domain = process.env.METERED_DOMAIN || METERED_DOMAIN;
+  const secretKey = process.env.METERED_SECRET_KEY || METERED_SECRET_KEY;
+  const apiKey = process.env.METERED_API_KEY || METERED_API_KEY;
+  const baseIceServers = getBaseIceServers();
 
   try {
     if (apiKey) {
@@ -46,7 +89,7 @@ async function getIceServers() {
       if (res.ok) {
         const servers = await res.json();
         if (Array.isArray(servers) && servers.length > 0) {
-          cachedIceServers = servers;
+          cachedIceServers = mergeIceServers(baseIceServers, servers);
           lastFetchTime = now;
           return cachedIceServers;
         }
@@ -65,7 +108,7 @@ async function getIceServers() {
           if (credRes.ok) {
             const servers = await credRes.json();
             if (Array.isArray(servers) && servers.length > 0) {
-              cachedIceServers = servers;
+              cachedIceServers = mergeIceServers(baseIceServers, servers);
               lastFetchTime = now;
               return cachedIceServers;
             }
@@ -77,14 +120,7 @@ async function getIceServers() {
     console.warn('[TURN] Failed to fetch Metered credentials:', err.message);
   }
 
-  // Fallback defaults
-  return [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-  ];
+  return baseIceServers;
 }
 
 app.get('/api/ice-servers', async (req, res) => {
@@ -186,7 +222,7 @@ io.on('connection', (socket) => {
 
   // Provide TURN/STUN ICE servers to connected client
   getIceServers().then(iceServers => {
-    socket.emit('ice-servers', iceServers);
+    socket.emit('ice-servers', iceServers, getIceTransportPolicy());
   }).catch(() => {});
 
   let currentRoomId = null;
@@ -477,4 +513,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, server, io, rooms, getRoomsSummary };
+module.exports = { app, server, io, rooms, getRoomsSummary, getConfiguredTurnServers, getIceTransportPolicy, getBaseIceServers };

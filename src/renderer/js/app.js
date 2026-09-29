@@ -454,9 +454,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       // Dynamic ICE / TURN servers provided by server
-      state.socket.on('ice-servers', (iceServers) => {
+      state.socket.on('ice-servers', (iceServers, iceTransportPolicy) => {
         if (state.webrtc && Array.isArray(iceServers) && iceServers.length > 0) {
-          state.webrtc.updateIceServers(iceServers);
+          state.webrtc.updateIceServers(iceServers, iceTransportPolicy);
         }
       });
 

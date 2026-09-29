@@ -1,5 +1,5 @@
 const io = require('socket.io-client');
-const { server } = require('./server');
+const { server, getConfiguredTurnServers, getIceTransportPolicy, getBaseIceServers } = require('./server');
 
 let port;
 
@@ -17,6 +17,40 @@ afterAll((done) => {
 function connect() {
   return io(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
 }
+
+describe('TURN configuration', () => {
+  test('parses multiple TURN URLs with shared credentials', () => {
+    expect(getConfiguredTurnServers({
+      TURN_URLS: 'turn:turn.example.com:3478?transport=udp, turns:turn.example.com:5349?transport=tcp',
+      TURN_USERNAME: 'triscord-user',
+      TURN_CREDENTIAL: 'temporary-secret'
+    })).toEqual([{
+      urls: [
+        'turn:turn.example.com:3478?transport=udp',
+        'turns:turn.example.com:5349?transport=tcp'
+      ],
+      username: 'triscord-user',
+      credential: 'temporary-secret'
+    }]);
+  });
+
+  test('returns no TURN server when none is configured', () => {
+    expect(getConfiguredTurnServers({})).toEqual([]);
+  });
+
+  test('uses relay-only policy only when explicitly requested', () => {
+    expect(getIceTransportPolicy({ ICE_TRANSPORT_POLICY: 'relay' })).toBe('relay');
+    expect(getIceTransportPolicy({})).toBe('all');
+  });
+
+  test('keeps the built-in public TURN relay available by default', () => {
+    const servers = getBaseIceServers({});
+    expect(servers).toContainEqual(expect.objectContaining({
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject'
+    }));
+  });
+});
 
 describe('join-room', () => {
   test('sanitizes a hostile username/avatar and rejects a spoofed userId later', (done) => {

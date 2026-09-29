@@ -13,7 +13,9 @@ O **Triscord** é um aplicativo desktop de voz, vídeo e compartilhamento de tel
 - **📹 Câmera (Webcam)**: Ativação/desativação instantânea com grid dinâmico e responsivo, além de efeitos de fundo (desfoque ou imagem, incluindo fundos prontos).
 - **🔕 Controles de Áudio**: Mutar microfone, ensurdecer (*Deafen*), cancelamento de eco e supressão de ruído nativos.
 - **📶 Indicador de Qualidade de Conexão**: um ponto colorido por pessoa mostra ping/perda de pacotes em tempo real.
-- **🌐 Servidor TURN configurável**: além de um relay público de teste incluso por padrão, é possível apontar para seu próprio TURN em Configurações > Servidor para maior confiabilidade atrás de NAT/firewalls restritos.
+- **🌐 Servidor TURN configurável**: usa credenciais Metered e relay público de teste por padrão; também aceita um relay TURN próprio para chamadas atrás de NAT/firewalls restritos.
+
+Para apontar para outro servidor, configure `TURN_URLS`, `TURN_USERNAME` e `TURN_CREDENTIAL` no ambiente. `TURN_URLS` aceita uma ou mais URLs separadas por vírgula, por exemplo `turn:turn.exemplo.com:3478?transport=udp,turns:turn.exemplo.com:5349?transport=tcp`. Também é possível substituir as credenciais Metered com `METERED_DOMAIN`, `METERED_API_KEY` ou `METERED_SECRET_KEY`. Para testar somente pelo relay, defina temporariamente `ICE_TRANSPORT_POLICY=relay`; sem essa opção, o navegador escolhe a rota ICE mais adequada (`all`).
 - **🔊 Efeitos Sonoros**: Sons sintetizados para entrada/saída de canal, mute e mensagens.
 - **💬 Chat de Texto**: Mensagens em tempo real com histórico por sala, reações em emoji e envio de imagens.
 - **🔴 Gravação de Chamada**: grava vídeo (grid composto) + áudio de todos os participantes em um `.webm` salvo localmente.

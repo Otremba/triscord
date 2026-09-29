@@ -29,12 +29,14 @@ const CONNECT_TIMEOUT_MS = 12000;
 const DISCONNECT_GRACE_MS = 6000;
 const MAX_RESTART_ATTEMPTS = 10;
 
-// Public, rate-limited TURN relay (Open Relay Project) used as a fallback so
-// calls still connect behind strict NATs/symmetric firewalls where STUN alone
-// fails. It's a shared testing service, not meant for heavy daily use — add
-// your own TURN server (coturn, or a paid provider) in Configurações >
-// Servidor for reliable long-term use; anything entered there is prepended
-// ahead of this fallback.
+const DEFAULT_STUN_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' }
+];
+
 const DEFAULT_TURN_SERVERS = [
   { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
@@ -84,36 +86,68 @@ class WebRTCManager {
     this.onConnectionQualityChanged = null; // (socketId, { level: 'good'|'ok'|'bad', rttMs, lossPct })
 
     this.userCustomIceServers = Array.isArray(options.iceServers) ? options.iceServers : [];
+    this.iceTransportPolicy = options.iceTransportPolicy === 'relay' ? 'relay' : 'all';
     this.iceServers = [
       ...this.userCustomIceServers,
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:stun3.l.google.com:19302' },
-      { urls: 'stun:stun4.l.google.com:19302' },
+      ...DEFAULT_STUN_SERVERS,
       ...DEFAULT_TURN_SERVERS
     ];
 
     this.setupSocketListeners();
   }
 
-  updateIceServers(servers) {
+  updateIceServers(servers, iceTransportPolicy = this.iceTransportPolicy) {
     if (Array.isArray(servers) && servers.length > 0) {
       const combined = [
         ...this.userCustomIceServers,
         ...servers,
-        { urls: 'stun:stun.l.google.com:19302' },
+        ...DEFAULT_STUN_SERVERS,
         ...DEFAULT_TURN_SERVERS
       ];
       const seen = new Set();
-      this.iceServers = combined.filter(s => {
+      const iceServers = combined.filter(s => {
         const key = JSON.stringify(s);
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       });
-      console.log('[WebRTC] Updated ICE servers configured:', this.iceServers.length);
+
+      const transportPolicy = iceTransportPolicy === 'relay' ? 'relay' : 'all';
+      const serversChanged = JSON.stringify(iceServers) !== JSON.stringify(this.iceServers);
+      const policyChanged = transportPolicy !== this.iceTransportPolicy;
+      if (!serversChanged && !policyChanged) return;
+
+      this.iceServers = iceServers;
+      this.iceTransportPolicy = transportPolicy;
+      console.log(`[WebRTC] Updated ICE servers (${this.iceServers.length}), transport policy: ${transportPolicy}`);
+
+      this.peers.forEach((pc, socketId) => {
+        try {
+          pc.setConfiguration({
+            ...pc.getConfiguration(),
+            iceServers: this.iceServers,
+            iceTransportPolicy: this.iceTransportPolicy
+          });
+          const negotiation = this.peerState.get(socketId);
+          if (!negotiation) return;
+
+          negotiation.iceRestartPending = true;
+          if (pc.signalingState === 'stable') this.flushIceRestart(socketId);
+        } catch (err) {
+          console.error(`[WebRTC] Failed to update ICE configuration for ${socketId}:`, err);
+        }
+      });
     }
+  }
+
+  flushIceRestart(socketId) {
+    const pc = this.peers.get(socketId);
+    const negotiation = this.peerState.get(socketId);
+    if (!pc || !negotiation || !negotiation.iceRestartPending || pc.signalingState !== 'stable') return;
+
+    negotiation.iceRestartPending = false;
+    console.log(`[WebRTC] Restarting ICE with ${socketId} after ICE server update`);
+    this.sendOffer(socketId, { iceRestart: true });
   }
 
   setupSocketListeners() {
@@ -448,12 +482,14 @@ class WebRTCManager {
 
   createPeerConnection(socketId, { polite = false } = {}) {
     const pc = new RTCPeerConnection({
-      iceServers: this.iceServers
+      iceServers: this.iceServers,
+      iceTransportPolicy: this.iceTransportPolicy
     });
 
     this.peerState.set(socketId, {
       polite,
       makingOffer: false,
+      iceRestartPending: false,
       restartAttempts: 0,
       restartTimer: null,
       graceTimer: null
@@ -467,6 +503,12 @@ class WebRTCManager {
           candidate: event.candidate,
           type: 'mesh'
         });
+      }
+    };
+
+    pc.onsignalingstatechange = () => {
+      if (pc.signalingState === 'stable') {
+        setTimeout(() => this.flushIceRestart(socketId), 0);
       }
     };
 
@@ -733,6 +775,7 @@ class WebRTCManager {
     if (this.peers.has(socketId)) {
       const pc = this.peers.get(socketId);
       pc.onconnectionstatechange = null;
+      pc.onsignalingstatechange = null;
       pc.onicecandidate = null;
       pc.ontrack = null;
       pc.close();
