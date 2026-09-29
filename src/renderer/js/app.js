@@ -136,6 +136,8 @@ document.addEventListener('DOMContentLoaded', () => {
     focusedTileId: null, // spotlighted tile key: 'local', 'screen-local', socketId or 'screen-<socketId>'
     // Per-person playback: { voice: { userId: { volume, muted } }, stream: { ... } }
     audioPrefs: loadAudioPrefs(),
+    // Per-person "stop watching screen share": { userId: false } (absent/true = watching)
+    watchPrefs: loadWatchPrefs(),
     volumePopover: null, // { kind: 'voice' | 'stream', socketId } while the popover is open
     cameraEffect: loadCameraEffect(), // { type: 'none' | 'blur-light' | 'blur-strong' | 'image', image?, source? }
     effectsPreview: null, // own camera + processor while the effects modal is open with the camera off
@@ -1000,7 +1002,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setTileZoom(tileKey, 1.0, null, null, true);
   }
 
-  function createTileActionsBar(tileKey, isVideoTile) {
+  function createTileActionsBar(tileKey, isVideoTile, watchSocketId) {
     const bar = document.createElement('div');
     bar.className = 'tile-actions-bar';
 
@@ -1083,6 +1085,22 @@ document.addEventListener('DOMContentLoaded', () => {
       toggleTileFocus(tileKey);
     });
     bar.appendChild(btnFocus);
+
+    // 4. Watch / Stop watching (remote screen shares only; local-only preference)
+    if (watchSocketId) {
+      const isWatching = isWatchingStream(watchSocketId);
+      const btnWatch = document.createElement('button');
+      btnWatch.type = 'button';
+      btnWatch.className = 'tile-action-btn tile-watch-btn';
+      btnWatch.title = isWatching ? 'Parar de assistir' : 'Assistir transmissão';
+      btnWatch.innerHTML = `<i data-lucide="${isWatching ? 'eye-off' : 'eye'}"></i>`;
+      btnWatch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setWatchingStream(watchSocketId, !isWatchingStream(watchSocketId));
+        renderAllVideoTiles();
+      });
+      bar.appendChild(btnWatch);
+    }
 
     return bar;
   }
@@ -1318,7 +1336,8 @@ document.addEventListener('DOMContentLoaded', () => {
           key: `screen-${socketId}`,
           node: createScreenTile(socketId, member.username, state.webrtc.remoteScreenStreams.get(socketId), false),
           audio: { kind: 'stream', socketId },
-          isVideo: true
+          isVideo: true,
+          watchSocketId: socketId
         });
       }
     });
@@ -1340,7 +1359,7 @@ document.addEventListener('DOMContentLoaded', () => {
       closeVolumePopover();
     }
 
-    tiles.forEach(({ key, node, audio, isVideo }) => {
+    tiles.forEach(({ key, node, audio, isVideo, watchSocketId }) => {
       node.dataset.tileKey = key;
       node.addEventListener('click', (e) => {
         if (e.target.closest('.tile-actions-bar') || e.target.closest('.tile-volume-btn') || e.target.closest('.volume-popover')) {
@@ -1357,7 +1376,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const isActualVideo = !!isVideo;
 
       // Modern unified action bar (Zoom, Fullscreen, Spotlight)
-      const actionsBar = createTileActionsBar(key, isActualVideo);
+      const actionsBar = createTileActionsBar(key, isActualVideo, watchSocketId);
       content.appendChild(actionsBar);
 
       // Setup Zoom and Pan on video tiles
@@ -1447,6 +1466,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     applyPeerAudio(socketId);
     refreshVolumeButtons(socketId);
+  }
+
+  // ---- Per-viewer "stop watching" for screen shares (client-side only, not synced with the broadcaster) ----
+
+  function loadWatchPrefs() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('triscord_watch_prefs'));
+      if (saved && typeof saved === 'object') return saved;
+    } catch (e) {}
+    return {};
+  }
+
+  // false entries mean "not watching"; true/unset (watching) is the default and isn't stored
+  function isWatchingStream(socketId) {
+    const key = audioPrefKey(socketId);
+    return state.watchPrefs[key] !== false;
+  }
+
+  function setWatchingStream(socketId, watching) {
+    // Re-read first: another window may have saved since this one loaded
+    state.watchPrefs = loadWatchPrefs();
+
+    const key = audioPrefKey(socketId);
+    if (watching) delete state.watchPrefs[key];
+    else state.watchPrefs[key] = false;
+    localStorage.setItem('triscord_watch_prefs', JSON.stringify(state.watchPrefs));
+
+    const stream = socketId === 'local'
+      ? state.webrtc.localScreenStream
+      : state.webrtc.remoteScreenStreams.get(socketId);
+    applyScreenTileWatchState(socketId, stream);
   }
 
   function applyAudioPref(audioEl, kind, socketId) {
@@ -1746,12 +1796,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const tile = document.createElement('div');
     tile.className = 'video-tile screen-tile';
     tile.id = `tile-screen-${id}`;
+    tile.dataset.socketId = id;
 
     tile.innerHTML = `
       <div class="tile-content">
         <video id="video-screen-${id}" autoplay playsinline muted></video>
         ${isLocal ? '' : `<audio id="audio-screen-${id}" autoplay></audio>`}
         <div class="live-tag">${isLocal ? 'TRANSMITINDO TELA' : 'AO VIVO'}</div>
+        ${isLocal ? '' : `
+        <div class="watch-paused-view hidden">
+          <i data-lucide="eye-off"></i>
+          <span>Você parou de assistir esta transmissão</span>
+          <button type="button" class="watch-resume-btn">Assistir transmissão</button>
+        </div>`}
       </div>
       <div class="tile-overlay">
         <div class="tile-username">
@@ -1760,17 +1817,57 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
 
-    if (stream) {
-      tile.querySelector('video').srcObject = stream;
-
-      const audioEl = tile.querySelector('audio');
-      if (audioEl) {
-        audioEl.srcObject = stream;
-        applyAudioPref(audioEl, 'stream', id);
+    if (!isLocal) {
+      const resumeBtn = tile.querySelector('.watch-resume-btn');
+      if (resumeBtn) {
+        resumeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setWatchingStream(id, true);
+          renderAllVideoTiles();
+        });
       }
     }
 
+    if (stream) {
+      const audioEl = tile.querySelector('audio');
+      if (audioEl) applyAudioPref(audioEl, 'stream', id);
+    }
+
+    applyScreenTileWatchState(id, stream, tile);
+
     return tile;
+  }
+
+  // Shows/hides the video for a screen share tile based on the viewer's own
+  // "watching" preference. Client-side only: the broadcaster keeps sending regardless.
+  function applyScreenTileWatchState(socketId, stream, tile) {
+    tile = tile || document.getElementById(`tile-screen-${socketId}`);
+    if (!tile) return;
+
+    const videoEl = tile.querySelector('video');
+    const audioEl = tile.querySelector('audio');
+    const pausedView = tile.querySelector('.watch-paused-view');
+    if (!videoEl) return;
+
+    const watching = socketId === 'local' || isWatchingStream(socketId);
+    const videoTrack = stream && stream.getVideoTracks()[0];
+
+    if (watching) {
+      if (videoTrack) videoTrack.enabled = true;
+      if (videoEl.srcObject !== stream) videoEl.srcObject = stream || null;
+      videoEl.classList.remove('hidden');
+      if (audioEl) {
+        if (audioEl.srcObject !== stream) audioEl.srcObject = stream || null;
+        applyAudioPref(audioEl, 'stream', socketId);
+      }
+      if (pausedView) pausedView.classList.add('hidden');
+    } else {
+      if (videoTrack) videoTrack.enabled = false;
+      videoEl.srcObject = null;
+      videoEl.classList.add('hidden');
+      if (audioEl) audioEl.srcObject = null;
+      if (pausedView) pausedView.classList.remove('hidden');
+    }
   }
 
   function adjustGridColumns() {
@@ -1878,13 +1975,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      if (videoEl.srcObject !== stream) videoEl.srcObject = stream;
-
-      const audioEl = document.getElementById(`audio-screen-${socketId}`);
-      if (audioEl && audioEl.srcObject !== stream) {
-        audioEl.srcObject = stream;
-        applyAudioPref(audioEl, 'stream', socketId);
-      }
+      applyScreenTileWatchState(socketId, stream);
       return;
     }
 
