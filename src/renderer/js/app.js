@@ -242,6 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     settingsTurnUsername: document.getElementById('settingsTurnUsername'),
     settingsTurnCredential: document.getElementById('settingsTurnCredential'),
     micVuMeter: document.getElementById('micVuMeterFill'),
+    btnTestMic: document.getElementById('btnTestMic'),
 
     // Camera effects modal
     btnCameraEffects: document.getElementById('btnCameraEffects'),
@@ -2326,6 +2327,61 @@ document.addEventListener('DOMContentLoaded', () => {
     setPendingAttachment(null);
   }
 
+  let testCapture = null;
+  let testDetector = null;
+  let testAudioEl = null;
+  let testStarting = false;
+
+  function stopMicTest() {
+    if (testDetector) {
+      testDetector.destroy();
+      testDetector = null;
+    }
+    if (testAudioEl) {
+      testAudioEl.pause();
+      testAudioEl.srcObject = null;
+      testAudioEl = null;
+    }
+    if (testCapture) {
+      testCapture.release();
+      testCapture = null;
+    }
+    el.btnTestMic.textContent = 'Testar Microfone';
+    el.micVuMeter.style.width = '0%';
+  }
+
+  async function startMicTest() {
+    if (testStarting) return;
+
+    testStarting = true;
+    el.btnTestMic.disabled = true;
+    try {
+      // Uses the checkbox as it is right now, so the filter can be compared before saving
+      testCapture = await window.captureMicrophone({
+        echoCancellation: true,
+        autoGainControl: true,
+        ...(el.selectAudioInput.value ? { deviceId: { exact: el.selectAudioInput.value } } : {})
+      }, el.noiseSuppression.checked);
+
+      testAudioEl = new Audio();
+      testAudioEl.volume = 0.3;
+      testAudioEl.srcObject = testCapture.stream;
+      await testAudioEl.play();
+
+      testDetector = new window.SpeakingDetector(testCapture.stream, (isSpeaking, level) => {
+        const pct = Math.min(100, Math.round((level / 60) * 100));
+        el.micVuMeter.style.width = `${pct}%`;
+      }, { threshold: 0 });
+      el.btnTestMic.textContent = 'Parar Teste';
+    } catch (err) {
+      stopMicTest();
+      alert('Erro ao testar microfone: ' + err.message);
+    } finally {
+      testStarting = false;
+      el.btnTestMic.disabled = false;
+    }
+  }
+
   // Initialize Settings UI & Audio Device Enumeration
   async function initSettingsUI() {
     el.inputSettingsUsername.value = state.user.username;
@@ -2420,34 +2476,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Mic Test Button
-    let testCapture = null;
-    let testDetector = null;
     el.btnTestMic.addEventListener('click', async () => {
       if (testCapture) {
-        testCapture.release();
-        testCapture = null;
-        if (testDetector) testDetector.destroy();
-        el.btnTestMic.textContent = 'Testar Microfone';
-        el.micVuMeter.style.width = '0%';
+        stopMicTest();
         return;
       }
-
-      try {
-        // Uses the checkbox as it is right now, so the filter can be compared before saving
-        testCapture = await window.captureMicrophone({
-          echoCancellation: true,
-          autoGainControl: true,
-          ...(el.selectAudioInput.value ? { deviceId: { exact: el.selectAudioInput.value } } : {})
-        }, el.noiseSuppression.checked);
-        el.btnTestMic.textContent = 'Parar Teste';
-
-        testDetector = new window.SpeakingDetector(testCapture.stream, (isSpeaking, level) => {
-          const pct = Math.min(100, Math.round((level / 60) * 100));
-          el.micVuMeter.style.width = `${pct}%`;
-        }, { threshold: 0 });
-      } catch (err) {
-        alert('Erro ao testar microfone: ' + err.message);
-      }
+      await startMicTest();
     });
   }
 
@@ -2649,8 +2683,18 @@ document.addEventListener('DOMContentLoaded', () => {
   el.btnSaveSettings.addEventListener('click', async () => {
     const newUsername = el.inputSettingsUsername.value.trim();
     const newServerUrl = el.inputSettingsServerUrl.value.trim();
+    const previousAudioInput = state.selectedAudioInput;
     const previousNoiseSuppression = state.noiseSuppression;
+    const nextAudioInput = el.selectAudioInput.value;
+    const nextNoiseSuppression = el.noiseSuppression.checked;
+    const microphoneSettingsChanged = previousAudioInput !== nextAudioInput ||
+      previousNoiseSuppression !== nextNoiseSuppression;
     const previousTurn = { ...state.turnServer };
+
+    if ((testCapture || testStarting) && microphoneSettingsChanged) {
+      showToast('Saia do teste para aplicar.', 'error');
+      return;
+    }
 
     if (newUsername) {
       state.user.username = newUsername;
@@ -2660,10 +2704,10 @@ document.addEventListener('DOMContentLoaded', () => {
     state.user.status = el.inputSettingsStatus.value.trim().slice(0, 64);
     localStorage.setItem('triscord_status', state.user.status);
 
-    state.selectedAudioInput = el.selectAudioInput.value;
+    state.selectedAudioInput = nextAudioInput;
     state.selectedAudioOutput = el.selectAudioOutput.value;
     state.selectedVideoInput = el.selectVideoInput.value;
-    state.noiseSuppression = el.noiseSuppression.checked;
+    state.noiseSuppression = nextNoiseSuppression;
 
     localStorage.setItem('triscord_mic_device', state.selectedAudioInput);
     localStorage.setItem('triscord_spk_device', state.selectedAudioOutput);
@@ -2718,8 +2762,10 @@ document.addEventListener('DOMContentLoaded', () => {
         avatar: state.user.avatarColor,
         status: state.user.status
       });
+    }
 
-      if (previousNoiseSuppression !== state.noiseSuppression && state.webrtc.localMicStream) {
+    if (microphoneSettingsChanged) {
+      if (state.webrtc && state.webrtc.localMicStream) {
         try {
           const micStream = await state.webrtc.startMicrophone(
             state.selectedAudioInput,
@@ -2728,9 +2774,10 @@ document.addEventListener('DOMContentLoaded', () => {
           setupLocalSpeakingDetector(micStream);
           applyMicEnabledState();
         } catch (err) {
-          console.warn('Could not restart microphone after changing noise suppression:', err);
+          console.warn('Could not restart microphone after changing audio settings:', err);
         }
       }
+
     }
 
     el.settingsModal.classList.add('hidden');
