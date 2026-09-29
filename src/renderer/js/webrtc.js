@@ -67,6 +67,33 @@ const DEFAULT_TURN_SERVERS = [
 // How often to sample getStats() for the on-tile connection quality indicator
 const QUALITY_POLL_MS = 3000;
 
+// Screen share encoding. Measured in the Electron app with game-like motion
+// at 1080p, the old setup (contentHint 'detail' and WebRTC's default 2.5 Mbps
+// cap above 960x540) kept the resolution and dropped the frame rate to 6-18
+// fps. 'motion' keeps the frame rate and lets the resolution adapt to the
+// bandwidth instead. Caps are per viewer: in a mesh every viewer is a
+// separate encode and upload, and bandwidth estimation still keeps each one
+// within what the connection can carry.
+const SCREEN_BITRATE_BPS = {
+  720: { 30: 2500000, 60: 4000000 },
+  1080: { 30: 4500000, 60: 8000000 }
+};
+// A little extra buffering on the receiving side of a screen share absorbs
+// network jitter, which shows up as stutter; voice is left untouched
+const SCREEN_JITTER_BUFFER_MS = 100;
+
+function screenEncodingFor({ height = 1080, frameRate = 30, mode = 'motion' } = {}) {
+  const byFps = SCREEN_BITRATE_BPS[height >= 1080 ? 1080 : 720];
+  const fps = frameRate >= 60 ? 60 : 30;
+  const sharp = mode === 'detail';
+  return {
+    contentHint: sharp ? 'detail' : 'motion',
+    degradationPreference: sharp ? 'maintain-resolution' : 'maintain-framerate',
+    maxBitrate: byFps[fps],
+    maxFramerate: fps
+  };
+}
+
 function newSessionId() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
@@ -95,6 +122,7 @@ class WebRTCManager {
     this.localMicStream = null;
     this.localCamStream = null;
     this.localScreenStream = null;
+    this.screenEncoding = null; // see screenEncodingFor()
 
     // Camera background effects (see startCamera / setCameraEffect)
     this.rawCamStream = null;
@@ -580,7 +608,11 @@ class WebRTCManager {
   /**
    * Set local screen share stream
    */
-  setScreenStream(screenStream) {
+  /**
+   * @param profile { height, frameRate, mode } as picked in the share dialog;
+   *   mode 'motion' (games, video) or 'detail' (text, code)
+   */
+  setScreenStream(screenStream, profile = {}) {
     this.localScreenStream = screenStream;
     if (!screenStream) {
       this.applyTrackToPeers('screen', null);
@@ -588,11 +620,42 @@ class WebRTCManager {
       return;
     }
 
+    this.screenEncoding = screenEncodingFor(profile);
     const screenTrack = screenStream.getVideoTracks()[0];
-    if (screenTrack) screenTrack.contentHint = 'detail';
+    if (screenTrack) screenTrack.contentHint = this.screenEncoding.contentHint;
 
     this.applyTrackToPeers('screen', screenTrack || null);
     this.applyTrackToPeers('screenAudio', screenStream.getAudioTracks()[0] || null);
+    this.peerChannels.forEach((_, socketId) => this.applyScreenEncoding(socketId));
+  }
+
+  /**
+   * Put the screen share's bitrate cap, frame rate and degradation preference
+   * on one peer's screen sender. Each viewer has its own encoder in a mesh,
+   * so this runs per peer — again once a peer finishes connecting, because a
+   * sender has no encodings to configure before its first negotiation.
+   */
+  async applyScreenEncoding(socketId) {
+    const channels = this.peerChannels.get(socketId);
+    const sender = channels && channels.screen && channels.screen.sender;
+    if (!sender || !this.localScreenStream || !this.screenEncoding) return;
+
+    const params = sender.getParameters();
+    if (!params.encodings || !params.encodings.length) return;
+
+    const { maxBitrate, maxFramerate, degradationPreference } = this.screenEncoding;
+    const encoding = params.encodings[0];
+    if (encoding.maxBitrate === maxBitrate && encoding.maxFramerate === maxFramerate &&
+        params.degradationPreference === degradationPreference) return;
+
+    encoding.maxBitrate = maxBitrate;
+    encoding.maxFramerate = maxFramerate;
+    params.degradationPreference = degradationPreference;
+    try {
+      await sender.setParameters(params);
+    } catch (err) {
+      console.warn(`[WebRTC] Could not configure screen encoding for ${socketId}:`, err);
+    }
   }
 
   stopScreenShare() {
@@ -652,6 +715,11 @@ class WebRTCManager {
       const isScreen = channel === 'screen' || channel === 'screenAudio';
       console.log(`[WebRTC] Remote ${event.track.kind} track from ${socketId} (${channel || 'unknown'})`);
 
+      // Same target on screen video and screen audio keeps the two in sync
+      if (isScreen && 'jitterBufferTarget' in event.receiver) {
+        event.receiver.jitterBufferTarget = SCREEN_JITTER_BUFFER_MS;
+      }
+
       const streamMap = isScreen ? this.remoteScreenStreams : this.remoteStreams;
       let remoteStream = streamMap.get(socketId);
       if (!remoteStream) {
@@ -685,6 +753,8 @@ class WebRTCManager {
       if (pc.connectionState === 'connected') {
         this.clearRecoveryTimers(socketId);
         negotiation.restartAttempts = 0;
+        // Someone who joins mid-share gets the screen settings once negotiated
+        this.applyScreenEncoding(socketId);
         if (!negotiation.statsInterval) {
           negotiation.statsInterval = setInterval(() => this.pollConnectionQuality(socketId), QUALITY_POLL_MS);
           this.pollConnectionQuality(socketId);
@@ -959,12 +1029,18 @@ class WebRTCManager {
         micDirection: channels.mic ? channels.mic.currentDirection : null,
         path: null,
         audioSent: 0,
-        audioReceived: 0
+        audioReceived: 0,
+        // Screen share: what we send to this peer / what we get from them.
+        // limitedBy 'cpu' means our PC cannot encode fast enough; 'bandwidth'
+        // means the upload (ours) or the connection cannot carry more
+        screenOut: null,
+        screenIn: null
       };
 
       try {
         const stats = await pc.getStats();
         const byId = new Map();
+        const screenMid = channels.screen ? channels.screen.mid : null;
         stats.forEach(r => byId.set(r.id, r));
         stats.forEach(r => {
           if (r.type === 'transport' && r.selectedCandidatePairId) {
@@ -975,6 +1051,16 @@ class WebRTCManager {
           }
           if (r.type === 'outbound-rtp' && r.kind === 'audio') row.audioSent += r.packetsSent || 0;
           if (r.type === 'inbound-rtp' && r.kind === 'audio') row.audioReceived += r.packetsReceived || 0;
+
+          const isScreen = r.kind === 'video' && screenMid !== null && r.mid === screenMid;
+          if (isScreen && r.type === 'outbound-rtp' && r.framesEncoded) {
+            row.screenOut = `${r.framesPerSecond || 0} fps ${r.frameWidth}x${r.frameHeight} ` +
+              `${r.encoderImplementation || ''} limitedBy=${r.qualityLimitationReason}`;
+          }
+          if (isScreen && r.type === 'inbound-rtp' && r.framesDecoded) {
+            row.screenIn = `${r.framesPerSecond || 0} fps ${r.frameWidth}x${r.frameHeight} ` +
+              `dropped=${r.framesDropped || 0} freezes=${r.freezeCount || 0}`;
+          }
         });
       } catch (err) {}
 
@@ -1004,6 +1090,7 @@ class WebRTCManager {
     if (this.localScreenStream) {
       assign('screen', this.localScreenStream.getVideoTracks()[0] || null);
       assign('screenAudio', this.localScreenStream.getAudioTracks()[0] || null);
+      this.applyScreenEncoding(socketId);
     }
   }
 

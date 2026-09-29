@@ -2800,7 +2800,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const stream = await state.screenPicker.open();
       if (!stream) return; // cancelled
 
-      state.webrtc.setScreenStream(stream);
+      state.webrtc.setScreenStream(stream, state.screenPicker.lastProfile || {});
       state.user.isScreenSharing = true;
 
       // Handle user stopping stream from OS prompt
