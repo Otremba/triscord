@@ -37,7 +37,28 @@ jobs:
             throw 'native/bin/loopback-capture.exe was not built'
           }
 
-      - name: Build and Publish Release
+      # electron-builder uploads each file in parallel, and when publishing
+      # straight to a release (not a draft) every upload can create its own
+      # release for the same tag. v1.1.3 ended up split in two, with the tag's
+      # download links pointing at the one without latest.yml, which broke
+      # auto-update. So build here and publish all files in a single call.
+      - name: Build installer
+        run: npx electron-builder --win --publish never
+
+      - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --win --publish always
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $tag = "v$version"
+          $files = @(
+            "release/Triscord-Setup-$version.exe",
+            "release/Triscord-Setup-$version.exe.blockmap",
+            "release/latest.yml"
+          )
+          foreach ($file in $files) {
+            if (-not (Test-Path $file)) { throw "$file was not built" }
+          }
+          gh release create $tag @files --title $tag --generate-notes --target $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "gh release create failed with exit code $LASTEXITCODE" }
