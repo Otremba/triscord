@@ -73,7 +73,8 @@
     "publish": {
       "provider": "github",
       "owner": "Otremba",
-      "repo": "triscord"
+      "repo": "triscord",
+      "releaseType": "release"
     }
   }
 }
