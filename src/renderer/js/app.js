@@ -105,8 +105,40 @@ document.addEventListener('DOMContentLoaded', () => {
     return localStorage.getItem('triscord_theme') === 'light' ? 'light' : 'dark';
   }
 
-  function applyTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+  let themeTransitionTimer = null;
+
+  function applyTheme(theme, { animate = false } = {}) {
+    const root = document.documentElement;
+    const next = theme === 'light' ? 'light' : 'dark';
+    if (animate && root.getAttribute('data-theme') !== next) {
+      // Cross-fade the colours (see .theme-transition in style.css)
+      root.classList.add('theme-transition');
+      clearTimeout(themeTransitionTimer);
+      themeTransitionTimer = setTimeout(() => root.classList.remove('theme-transition'), 400);
+    }
+    root.setAttribute('data-theme', next);
+  }
+
+  // Usernames: 2-32 characters. Older versions saved a random "Amigo_1234"
+  // without asking; that counts as no name chosen yet.
+  const USERNAME_MIN_LENGTH = 2;
+  const USERNAME_MAX_LENGTH = 32;
+  const PLACEHOLDER_USERNAME_RE = /^Amigo_\d{4}$/;
+
+  // Same codepoint filter as the server's stripControlChars, then collapse spaces
+  function normalizeUsername(value) {
+    return Array.from(String(value || ''))
+      .filter(ch => ch.codePointAt(0) >= 32 && ch.codePointAt(0) !== 127)
+      .join('')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function usernameError(name) {
+    if (name.length < USERNAME_MIN_LENGTH) return `Use pelo menos ${USERNAME_MIN_LENGTH} caracteres.`;
+    if (name.length > USERNAME_MAX_LENGTH) return `Use no máximo ${USERNAME_MAX_LENGTH} caracteres.`;
+    if (PLACEHOLDER_USERNAME_RE.test(name)) return 'Escolha um nome seu, não o gerado automaticamente.';
+    return null;
   }
 
   // Application State
@@ -114,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     serverUrl: localStorage.getItem('triscord_server_url') || defaultServerUrl,
     user: {
       userId: localStorage.getItem('triscord_user_id') || `user_${Math.random().toString(36).substr(2, 9)}`,
-      username: localStorage.getItem('triscord_username') || `Amigo_${Math.floor(1000 + Math.random() * 9000)}`,
+      username: localStorage.getItem('triscord_username') || '',
       avatarColor: localStorage.getItem('triscord_avatar_color') || '#5865F2',
       status: localStorage.getItem('triscord_status') || '',
       isMuted: false,
@@ -170,7 +202,6 @@ document.addEventListener('DOMContentLoaded', () => {
   applyTheme(state.theme);
 
   localStorage.setItem('triscord_user_id', state.user.userId);
-  localStorage.setItem('triscord_username', state.user.username);
   localStorage.setItem('triscord_avatar_color', state.user.avatarColor);
   localStorage.setItem('triscord_status', state.user.status);
 
@@ -225,6 +256,12 @@ document.addEventListener('DOMContentLoaded', () => {
     btnCloseSettings: document.getElementById('btnCloseSettings'),
     btnSaveSettings: document.getElementById('btnSaveSettings'),
     inputSettingsUsername: document.getElementById('settingsUsername'),
+    nameModal: document.getElementById('nameModal'),
+    nameForm: document.getElementById('nameForm'),
+    nameInput: document.getElementById('nameInput'),
+    nameHint: document.getElementById('nameHint'),
+    nameAvatarPreview: document.getElementById('nameAvatarPreview'),
+    btnConfirmName: document.getElementById('btnConfirmName'),
     inputSettingsStatus: document.getElementById('settingsStatus'),
     inputSettingsServerUrl: document.getElementById('settingsServerUrl'),
     selectAudioInput: document.getElementById('settingsAudioInput'),
@@ -402,6 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateUserProfileUI();
   initSettingsUI();
   initPresetBackgroundButtons();
+  initNameGate();
 
   // Initialize Screen Share Picker
   state.screenPicker = new window.ScreenSharePicker();
@@ -811,8 +849,66 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // ---- Name gate: nobody enters a call without having picked a name ----
+
+  function hasChosenName() {
+    return !usernameError(normalizeUsername(state.user.username));
+  }
+
+  function initNameGate() {
+    el.nameAvatarPreview.style.backgroundColor = safeColor(state.user.avatarColor);
+
+    el.nameInput.addEventListener('input', () => {
+      const name = normalizeUsername(el.nameInput.value);
+      const error = name ? usernameError(name) : null;
+
+      el.btnConfirmName.disabled = !name || !!error;
+      el.nameHint.textContent = error || `Entre ${USERNAME_MIN_LENGTH} e ${USERNAME_MAX_LENGTH} caracteres.`;
+      el.nameHint.classList.toggle('error', !!error);
+
+      const letter = name ? name.charAt(0).toUpperCase() : '?';
+      if (el.nameAvatarPreview.textContent !== letter) {
+        el.nameAvatarPreview.textContent = letter;
+        // Restart the pop animation for the new letter
+        el.nameAvatarPreview.classList.remove('pop');
+        void el.nameAvatarPreview.offsetWidth;
+        el.nameAvatarPreview.classList.add('pop');
+      }
+    });
+
+    el.nameForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = normalizeUsername(el.nameInput.value);
+      if (usernameError(name)) return;
+
+      state.user.username = name;
+      localStorage.setItem('triscord_username', name);
+      updateUserProfileUI();
+      el.inputSettingsUsername.value = name;
+
+      el.nameModal.classList.add('hidden');
+      showToast(`Bem-vindo, ${name}!`);
+    });
+
+    if (!hasChosenName()) openNameModal();
+  }
+
+  function openNameModal() {
+    const current = normalizeUsername(state.user.username);
+    el.nameInput.value = PLACEHOLDER_USERNAME_RE.test(current) ? '' : current;
+    el.nameInput.dispatchEvent(new Event('input'));
+    el.nameModal.classList.remove('hidden');
+    // Wait for the overlay to become visible, or focus() is ignored
+    setTimeout(() => el.nameInput.focus(), 60);
+  }
+
   // Join a voice channel
   async function joinRoom(roomId, roomName) {
+    if (!hasChosenName()) {
+      openNameModal();
+      return;
+    }
+
     if (!state.socket || !state.socket.connected) {
       alert('Aguarde a conexão com o servidor...');
       return;
@@ -2336,7 +2432,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateUserProfileUI() {
     el.userUsername.textContent = state.user.username;
     el.userAvatar.style.backgroundColor = safeColor(state.user.avatarColor);
-    el.userAvatar.textContent = state.user.username.charAt(0).toUpperCase();
+    el.userAvatar.textContent = (state.user.username.charAt(0) || '?').toUpperCase();
 
     if (state.user.isDeafened) {
       el.userStatusTag.textContent = 'Ensurdecido';
@@ -2859,7 +2955,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   el.btnSaveSettings.addEventListener('click', async () => {
-    const newUsername = el.inputSettingsUsername.value.trim();
+    const newUsername = normalizeUsername(el.inputSettingsUsername.value);
     const newServerUrl = el.inputSettingsServerUrl.value.trim();
     const previousAudioInput = state.selectedAudioInput;
     const previousNoiseSuppression = state.noiseSuppression;
@@ -2874,10 +2970,15 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (newUsername) {
-      state.user.username = newUsername;
-      localStorage.setItem('triscord_username', newUsername);
+    const nameProblem = usernameError(newUsername);
+    if (nameProblem) {
+      showToast(`Nome de usuário: ${nameProblem}`, 'error');
+      el.inputSettingsUsername.focus();
+      return;
     }
+
+    state.user.username = newUsername;
+    localStorage.setItem('triscord_username', newUsername);
 
     state.user.status = el.inputSettingsStatus.value.trim().slice(0, 64);
     localStorage.setItem('triscord_status', state.user.status);
@@ -2896,7 +2997,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Appearance
     state.theme = el.settingsLightTheme.checked ? 'light' : 'dark';
     localStorage.setItem('triscord_theme', state.theme);
-    applyTheme(state.theme);
+    applyTheme(state.theme, { animate: true });
 
     // Push-to-talk
     state.pttMode = el.settingsModePTT.checked ? 'ptt' : 'vad';

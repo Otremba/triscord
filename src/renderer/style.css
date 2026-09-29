@@ -42,6 +42,10 @@
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --dur-slow: 280ms;
+
+  /* Unchecked checkbox/radio outline, and the focus ring around any control */
+  --control-border: rgba(255, 255, 255, 0.28);
+  --focus-ring: 0 0 0 3px rgba(88, 101, 242, 0.35);
 }
 
 * {
@@ -1612,14 +1616,19 @@ body {
   overflow: hidden;
 }
 
-/* Bound to :not(.hidden) so the animation replays on each open */
-.modal-overlay:not(.hidden) .modal-dialog {
-  animation: modalPop var(--dur-slow) var(--ease-pop);
+/* A transition rather than a keyframe, so the dialog animates out on close
+   as well as in on open (the overlay stays rendered while hidden, see Motion) */
+.modal-dialog {
+  transition:
+    transform var(--dur-slow) var(--ease-pop),
+    opacity var(--dur-base) var(--ease-out);
 }
 
-@keyframes modalPop {
-  0% { transform: scale(0.94) translateY(12px); opacity: 0; }
-  100% { transform: scale(1) translateY(0); opacity: 1; }
+.modal-overlay.hidden .modal-dialog {
+  transform: scale(0.94) translateY(12px);
+  opacity: 0;
+  transition-timing-function: var(--ease-in-out), var(--ease-in-out);
+  transition-duration: var(--dur-base), var(--dur-fast);
 }
 
 .modal-header {
@@ -1786,6 +1795,11 @@ body {
 
 .setting-input:focus, .setting-select:focus {
   border-color: var(--accent-blurple);
+  box-shadow: var(--focus-ring);
+}
+
+.setting-input:hover:not(:focus), .setting-select:hover:not(:focus) {
+  border-color: var(--control-border);
 }
 
 .avatar-color-picker {
@@ -2249,6 +2263,34 @@ body {
   scroll-behavior: smooth;
 }
 
+/* Settings sections settle in one after another when a dialog opens */
+.modal-overlay:not(.hidden) .setting-section {
+  animation: sectionIn var(--dur-slow) var(--ease-out) backwards;
+}
+
+.modal-overlay:not(.hidden) .setting-section:nth-child(2) { animation-delay: 25ms; }
+.modal-overlay:not(.hidden) .setting-section:nth-child(3) { animation-delay: 50ms; }
+.modal-overlay:not(.hidden) .setting-section:nth-child(4) { animation-delay: 75ms; }
+.modal-overlay:not(.hidden) .setting-section:nth-child(5) { animation-delay: 100ms; }
+.modal-overlay:not(.hidden) .setting-section:nth-child(n+6) { animation-delay: 125ms; }
+
+@keyframes sectionIn {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Switching theme cross-fades instead of flashing (class set by applyTheme) */
+:root.theme-transition,
+:root.theme-transition *,
+:root.theme-transition *::before,
+:root.theme-transition *::after {
+  transition:
+    background-color var(--dur-slow) var(--ease-in-out),
+    border-color var(--dur-slow) var(--ease-in-out),
+    color var(--dur-slow) var(--ease-in-out),
+    fill var(--dur-slow) var(--ease-in-out) !important;
+}
+
 /* Someone who never wants motion gets none of it */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -2267,6 +2309,7 @@ body {
    palette needs to live.
    ========================================================================== */
 :root[data-theme="light"] {
+  --control-border: rgba(0, 0, 0, 0.3);
   --bg-primary: #ffffff;
   --bg-secondary: #f2f3f5;
   --bg-tertiary: #e3e5e8;
@@ -2300,10 +2343,173 @@ body {
 .setting-checkbox {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 4px 0;
   font-size: 13px;
   color: var(--text-normal);
   cursor: pointer;
+  user-select: none;
+}
+
+/* Checkboxes and radios: the native ones render as bright white boxes on the
+   dark theme, so they are drawn here from the theme's own colours */
+input[type="checkbox"],
+input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  display: inline-grid;
+  place-content: center;
+  background-color: var(--bg-tertiary);
+  border: 2px solid var(--control-border);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-in-out),
+    border-color var(--dur-fast) var(--ease-in-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+input[type="checkbox"] {
+  border-radius: 5px;
+}
+
+input[type="radio"] {
+  border-radius: 50%;
+}
+
+/* The tick: a clipped square that pops in when checked */
+input[type="checkbox"]::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background-color: #fff;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  transform: scale(0);
+  transition: transform var(--dur-base) var(--ease-pop);
+}
+
+input[type="radio"]::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--accent-blurple);
+  transform: scale(0);
+  transition: transform var(--dur-base) var(--ease-pop);
+}
+
+input[type="checkbox"]:checked {
+  background-color: var(--accent-blurple);
+  border-color: var(--accent-blurple);
+}
+
+input[type="radio"]:checked {
+  border-color: var(--accent-blurple);
+}
+
+input[type="checkbox"]:checked::before,
+input[type="radio"]:checked::before {
+  transform: scale(1);
+}
+
+input[type="checkbox"]:hover:not(:disabled),
+input[type="radio"]:hover:not(:disabled),
+.setting-checkbox:hover input:not(:disabled),
+.option-group:hover input:not(:disabled) {
+  border-color: var(--accent-blurple);
+}
+
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+input[type="checkbox"]:active:not(:disabled),
+input[type="radio"]:active:not(:disabled) {
+  transform: scale(0.88);
+}
+
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.option-group label {
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ==========================================================================
+   Name gate: first-run dialog that asks for a username
+   ========================================================================== */
+.name-gate {
+  /* Above every other dialog: nothing else is usable until a name is set */
+  z-index: 1100;
+}
+
+.name-dialog {
+  max-width: 440px;
+}
+
+.name-dialog-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 24px 4px;
+  text-align: center;
+}
+
+.name-dialog-hero h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-header);
+}
+
+.name-dialog-hero p {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.name-avatar-preview {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: 'Outfit', sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: var(--shadow-high);
+}
+
+.name-avatar-preview.pop {
+  animation: iconIn var(--dur-base) var(--ease-pop);
+}
+
+.name-dialog .btn-primary {
+  width: 100%;
+  padding: 11px 20px;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: color var(--dur-fast) var(--ease-in-out);
+}
+
+.field-hint.error {
+  color: var(--accent-red);
 }
 
 .ptt-key-row {
@@ -2832,18 +3038,14 @@ body {
     max-height: 90dvh;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     padding: 16px;
-    animation: modalSlideUp 0.3s var(--ease-out);
+    transition:
+      transform var(--dur-slow) var(--ease-out),
+      opacity var(--dur-base) var(--ease-out);
   }
 
-  @keyframes modalSlideUp {
-    from {
-      opacity: 0;
-      transform: translateY(100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .modal-overlay.hidden .modal-dialog {
+    transform: translateY(100%);
+    opacity: 0;
   }
 
   .modal-body {

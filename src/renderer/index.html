@@ -301,6 +301,27 @@
     </div>
   </div>
 
+  <!-- First run: pick a name before anything else (cannot be dismissed) -->
+  <div class="modal-overlay name-gate hidden" id="nameModal" role="dialog" aria-modal="true" aria-labelledby="nameModalTitle">
+    <form class="modal-dialog name-dialog" id="nameForm" novalidate>
+      <div class="name-dialog-hero">
+        <div class="name-avatar-preview" id="nameAvatarPreview">?</div>
+        <h2 id="nameModalTitle">Como a galera vai te chamar?</h2>
+        <p>Escolha o nome que aparece nas salas e no chat. Dá para mudar depois nas configurações.</p>
+      </div>
+      <div class="modal-body">
+        <div class="setting-section">
+          <label class="setting-label" for="nameInput">Nome de usuário</label>
+          <input type="text" id="nameInput" class="setting-input" maxlength="32" autocomplete="off" spellcheck="false" placeholder="Ex: Lucas_Gamer" />
+          <span class="field-hint" id="nameHint">Entre 2 e 32 caracteres.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn-primary" id="btnConfirmName" disabled>Continuar</button>
+      </div>
+    </form>
+  </div>
+
   <!-- Settings Modal -->
   <div class="modal-overlay hidden" id="settingsModal">
     <div class="modal-dialog">
@@ -313,7 +334,7 @@
         <!-- User Profile Settings -->
         <div class="setting-section">
           <label class="setting-label">Seu Nome de Usuário</label>
-          <input type="text" id="settingsUsername" class="setting-input" placeholder="Ex: Lucas_Gamer" />
+          <input type="text" id="settingsUsername" class="setting-input" maxlength="32" placeholder="Ex: Lucas_Gamer" />
         </div>
 
         <div class="setting-section">
