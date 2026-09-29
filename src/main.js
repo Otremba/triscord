@@ -22,7 +22,11 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: true
+      webSecurity: true,
+      // A minimized call must keep running at full speed: Chromium otherwise
+      // throttles timers in a background window, which delays the timers that
+      // recover a dropped peer connection
+      backgroundThrottling: false
     },
     frame: true,
     ...(fs.existsSync(iconPath) ? { icon: iconPath } : {})

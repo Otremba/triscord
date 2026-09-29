@@ -306,6 +306,31 @@ document.addEventListener('DOMContentLoaded', () => {
     return audioEl;
   }
 
+  // A remote voice that is connected but not playing — its element was removed
+  // by a re-render, or play() was interrupted — is silent with no visible error
+  function ensureRemoteVoicePlaying(socketId) {
+    const stream = state.webrtc && state.webrtc.remoteStreams.get(socketId);
+    if (!stream || !stream.getAudioTracks().length) return;
+
+    const audioEl = document.getElementById(`remote-audio-voice-${socketId}`);
+    if (!audioEl || audioEl.srcObject !== stream || audioEl.paused) {
+      console.warn(`[AudioPlayback] Voice of ${socketId} was not playing, restoring`);
+      getOrCreateRemoteAudio(socketId, 'voice', stream);
+    }
+  }
+
+  // Console helper for debugging a call: triscordDebug()
+  window.triscordDebug = async () => {
+    if (!state.webrtc) return [];
+    const rows = await state.webrtc.getDiagnostics();
+    rows.forEach(row => {
+      const member = state.roomMembers.get(row.socketId);
+      row.user = member ? member.username : '?';
+    });
+    console.table(rows);
+    return rows;
+  };
+
   function playAudioSafely(audioEl) {
     if (!audioEl) return;
     try {
@@ -388,6 +413,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.socket) {
       state.socket.disconnect();
     }
+    // The old manager's peer connections and mic belong to the old socket
+    if (state.webrtc) {
+      state.webrtc.cleanupAll();
+    }
 
     setConnectionStatus('connecting', 'Conectando ao servidor...');
 
@@ -414,6 +443,9 @@ document.addEventListener('DOMContentLoaded', () => {
       state.webrtc.cameraEffect = state.cameraEffect;
       state.webrtc.onConnectionQualityChanged = (socketId, quality) => {
         updateConnectionQualityIndicator(socketId, quality);
+        // Polled every few seconds while connected: a good moment to make sure
+        // this peer's voice is actually playing
+        ensureRemoteVoicePlaying(socketId);
       };
 
       // The call's camera switched between raw and effect-processed video
@@ -447,6 +479,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // If we were previously in a room, rejoin it
         if (state.currentRoomId) {
           joinRoom(state.currentRoomId, state.currentRoomName);
+        }
+      });
+
+      // The server only closes a socket itself when this session was replaced;
+      // socket.io does not reconnect after that on its own
+      state.socket.on('disconnect', (reason) => {
+        setConnectionStatus('connecting', 'Reconectando...');
+        if (reason === 'io server disconnect') {
+          setTimeout(() => state.socket && state.socket.connect(), 1000);
         }
       });
 
@@ -496,6 +537,12 @@ document.addEventListener('DOMContentLoaded', () => {
       state.socket.on('room-join-denied', ({ reason }) => {
         state.currentRoomId = null;
         state.currentRoomName = '';
+        // The mic was opened for this call; do not leave it running
+        if (state.webrtc) state.webrtc.stopMicrophone();
+        if (state.localSpeakingDetector) {
+          state.localSpeakingDetector.destroy();
+          state.localSpeakingDetector = null;
+        }
         updateStageView();
         showToast(reason === 'locked' ? 'Esta sala está trancada pelo dono.' : 'Esta sala está cheia.', 'error');
       });
@@ -512,6 +559,12 @@ document.addEventListener('DOMContentLoaded', () => {
           isSystem: true
         });
         notify('Triscord', `${userData.username} entrou no canal #${state.currentRoomName}`);
+      });
+
+      // The same user joined the room from another window or device
+      state.socket.on('session-replaced', () => {
+        showToast('Você entrou nesta sala em outra janela.', 'error');
+        leaveCurrentRoom();
       });
 
       // A room owner kicked us out
@@ -786,19 +839,11 @@ document.addEventListener('DOMContentLoaded', () => {
     state.currentRoomId = roomId;
     state.currentRoomName = roomName;
 
-    // Start local microphone if not started
-    try {
-      if (!state.webrtc.localMicStream) {
-        const micStream = await state.webrtc.startMicrophone(
-          state.selectedAudioInput,
-          state.noiseSuppression
-        );
-        setupLocalSpeakingDetector(micStream);
-        applyMicEnabledState();
-      }
-    } catch (err) {
-      console.warn('Microphone permission denied or not found:', err);
-    }
+    // Joining does not wait for the microphone: starting RNNoise takes a
+    // second or more, and every peer connection would sit idle until then.
+    // The mic's m-line is negotiated either way, so the track is attached to
+    // every peer with replaceTrack as soon as it is ready.
+    startCallMicrophone();
 
     // Emit join to server
     state.socket.emit('join-room', {
@@ -817,6 +862,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.channelNameHeader.textContent = `# ${roomName}`;
     el.channelTopicHeader.textContent = `Canal de Voz Ativo • Baixa Latência WebRTC`;
+  }
+
+  function startCallMicrophone() {
+    if (!state.webrtc || state.webrtc.localMicStream || state.micStarting) return;
+
+    const webrtc = state.webrtc;
+    state.micStarting = webrtc.startMicrophone(state.selectedAudioInput, state.noiseSuppression)
+      .then((micStream) => {
+        // Left the call (or the server was switched) while the mic was starting
+        if (!state.currentRoomId || state.webrtc !== webrtc) {
+          webrtc.stopMicrophone();
+          return;
+        }
+        applyMicEnabledState();
+        setupLocalSpeakingDetector(micStream);
+      })
+      .catch((err) => {
+        console.warn('Microphone permission denied or not found:', err);
+        showToast('Não foi possível acessar o microfone.', 'error');
+      })
+      .finally(() => {
+        state.micStarting = null;
+      });
   }
 
   // Leave room

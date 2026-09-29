@@ -19,22 +19,43 @@
  * candidates that arrive before the matching description is set are queued
  * instead of thrown away — dropping them is what used to leave one pair of a
  * three-way call silently half-connected.
+ *
+ * Every RTCPeerConnection also gets a random session id that travels with all
+ * of its signalling (session = the sender's, targetSession = the receiver's as
+ * far as the sender knows). Without it an offer from a brand-new connection
+ * (the peer rejoined, or rebuilt a connection that would not heal) looked like
+ * a renegotiation of the old one: it was applied to a peer connection with the
+ * wrong DTLS/ICE state, which can leave one pair of a call with audio flowing
+ * in one direction only, or in none. Messages for a connection that no longer
+ * exists are dropped. Peers or servers that do not send session ids fall back
+ * to the plain perfect-negotiation behaviour.
  */
 
 const CHANNEL_ORDER = ['mic', 'cam', 'screen', 'screenAudio'];
 
 // A connection that never reaches 'connected', or falls out of it, is retried
 // with a backoff instead of being torn down: 'disconnected' is often transient.
-const CONNECT_TIMEOUT_MS = 12000;
-const DISCONNECT_GRACE_MS = 6000;
-const MAX_RESTART_ATTEMPTS = 10;
+// Recovery is driven by the impolite side (the one that opened the connection);
+// the polite side waits POLITE_BACKOFF_FACTOR times longer before stepping in,
+// so the two rarely restart at the same moment.
+const CONNECT_TIMEOUT_MS = 10000;
+// An answer normally arrives well within a second; one that has not after this
+// long was lost, and waiting for the full connect timeout only prolongs silence
+const ANSWER_TIMEOUT_MS = 5000;
+const DISCONNECT_GRACE_MS = 5000;
+const MAX_RESTART_ATTEMPTS = 12;
+const POLITE_BACKOFF_FACTOR = 3;
+// Every third attempt throws the peer connection away and opens a new one
+// instead of restarting ICE on it: some broken states (a half-applied offer, a
+// DTLS mismatch) are not something an ICE restart can get out of.
+const ICE_RESTARTS_BEFORE_REBUILD = 2;
+const MAX_PENDING_CANDIDATES = 200;
 
+// More STUN servers only yield duplicate server-reflexive candidates and slow
+// gathering down; two are plenty.
 const DEFAULT_STUN_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun3.l.google.com:19302' },
-  { urls: 'stun:stun4.l.google.com:19302' }
+  { urls: 'stun:stun1.l.google.com:19302' }
 ];
 
 const DEFAULT_TURN_SERVERS = [
@@ -45,6 +66,10 @@ const DEFAULT_TURN_SERVERS = [
 
 // How often to sample getStats() for the on-tile connection quality indicator
 const QUALITY_POLL_MS = 3000;
+
+function newSessionId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
 
 class WebRTCManager {
   constructor(socket, currentUserId, options = {}) {
@@ -59,6 +84,8 @@ class WebRTCManager {
     this.peerState = new Map();
     // Map: socketId -> ICE candidates that arrived before the remote description
     this.pendingCandidates = new Map();
+    // Whether the server relays session ids and peers send them (see signal())
+    this.sessionsSeen = false;
     // Map: socketId -> remote MediaStream (mic + camera)
     this.remoteStreams = new Map();
     // Map: socketId -> remote MediaStream (screen video + screen audio)
@@ -128,8 +155,10 @@ class WebRTCManager {
             iceServers: this.iceServers,
             iceTransportPolicy: this.iceTransportPolicy
           });
+          // A working connection keeps its path; only one still trying to
+          // connect restarts ICE to gather candidates from the new servers
           const negotiation = this.peerState.get(socketId);
-          if (!negotiation) return;
+          if (!negotiation || negotiation.polite || pc.connectionState === 'connected') return;
 
           negotiation.iceRestartPending = true;
           if (pc.signalingState === 'stable') this.flushIceRestart(socketId);
@@ -150,19 +179,71 @@ class WebRTCManager {
     this.sendOffer(socketId, { iceRestart: true });
   }
 
+  /**
+   * Emit a signalling message for one peer, tagged with both session ids.
+   * Nothing is sent while the socket is down: socket.io would buffer it and
+   * deliver it after reconnecting under a new socket id, for a peer connection
+   * that the rejoin has already replaced.
+   */
+  signal(event, socketId, payload) {
+    if (!this.socket.connected) return;
+    const negotiation = this.peerState.get(socketId);
+    this.socket.emit(event, {
+      targetSocketId: socketId,
+      type: 'mesh',
+      ...payload,
+      session: negotiation ? negotiation.localSession : undefined,
+      targetSession: (negotiation && negotiation.remoteSession) || undefined
+    });
+  }
+
   setupSocketListeners() {
     // Handle incoming WebRTC Offer
-    this.socket.on('webrtc-offer', async ({ senderSocketId, offer, type }) => {
-      console.log(`[WebRTC] Received offer from ${senderSocketId} (${type})`);
+    this.socket.on('webrtc-offer', async ({ senderSocketId, offer, session, targetSession }) => {
+      console.log(`[WebRTC] Received offer from ${senderSocketId}`);
+      let pc = this.peers.get(senderSocketId);
+      let negotiation = this.peerState.get(senderSocketId);
+
+      if (pc && session) {
+        // Meant for a connection of ours that has since been replaced
+        if (targetSession && targetSession !== negotiation.localSession) {
+          console.warn(`[WebRTC] Dropping stale offer from ${senderSocketId}`);
+          return;
+        }
+
+        // The peer opened a brand-new connection: ours belongs to one that no
+        // longer exists on their side, and renegotiating it would half-work
+        if (!targetSession && session !== negotiation.remoteSession) {
+          const bothJustOpened = !negotiation.polite && !negotiation.remoteSession;
+          if (bothJustOpened && this.socket.id < senderSocketId) {
+            // Both sides opened a connection at once: the lower socket id keeps
+            // its own, the other side yields and answers it
+            console.warn(`[WebRTC] Both sides opened a connection with ${senderSocketId}, keeping ours`);
+            return;
+          }
+          console.warn(`[WebRTC] ${senderSocketId} opened a new connection, replacing ours`);
+          const early = this.pendingCandidates.get(senderSocketId);
+          this.removePeer(senderSocketId);
+          if (early) this.pendingCandidates.set(senderSocketId, early);
+          pc = null;
+        }
+      }
+
       // Whoever receives the first offer is the polite side of this pair
-      const pc = this.peers.get(senderSocketId) ||
-        this.createPeerConnection(senderSocketId, { polite: true });
-      const negotiation = this.peerState.get(senderSocketId);
-      if (!negotiation) return;
+      if (!pc) {
+        pc = this.createPeerConnection(senderSocketId, { polite: true });
+        negotiation = this.peerState.get(senderSocketId);
+      }
+      if (session) {
+        negotiation.remoteSession = session;
+        negotiation.peerUsesSessions = true;
+        this.sessionsSeen = true;
+      }
 
       // Perfect negotiation: on a collision only the polite side gives way
       const collision = negotiation.makingOffer || pc.signalingState !== 'stable';
-      if (collision && !negotiation.polite) {
+      negotiation.ignoreOffer = collision && !negotiation.polite;
+      if (negotiation.ignoreOffer) {
         console.warn(`[WebRTC] Ignoring colliding offer from ${senderSocketId}`);
         return;
       }
@@ -170,30 +251,35 @@ class WebRTCManager {
       try {
         // Implicit rollback when we had an offer of our own in flight
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        if (this.peers.get(senderSocketId) !== pc) return;
         this.adoptChannels(senderSocketId, pc);
         await this.flushPendingCandidates(senderSocketId);
 
         const answer = await pc.createAnswer();
+        if (this.peers.get(senderSocketId) !== pc) return;
         await pc.setLocalDescription(answer);
 
-        this.socket.emit('webrtc-answer', {
-          targetSocketId: senderSocketId,
-          answer: pc.localDescription,
-          type: type || 'mesh'
-        });
-
+        this.signal('webrtc-answer', senderSocketId, { answer: pc.localDescription });
         this.armConnectTimeout(senderSocketId);
       } catch (err) {
+        if (this.peers.get(senderSocketId) !== pc) return;
         console.error('[WebRTC] Error handling offer:', err);
         this.scheduleRestart(senderSocketId);
       }
     });
 
     // Handle incoming WebRTC Answer
-    this.socket.on('webrtc-answer', async ({ senderSocketId, answer }) => {
+    this.socket.on('webrtc-answer', async ({ senderSocketId, answer, session, targetSession }) => {
       console.log(`[WebRTC] Received answer from ${senderSocketId}`);
       const pc = this.peers.get(senderSocketId);
-      if (!pc) return;
+      const negotiation = this.peerState.get(senderSocketId);
+      if (!pc || !negotiation) return;
+
+      // An answer to an offer made by a peer connection we have since replaced
+      if (session && targetSession && targetSession !== negotiation.localSession) {
+        console.warn(`[WebRTC] Dropping stale answer from ${senderSocketId}`);
+        return;
+      }
 
       // A late answer to an offer we already rolled back would throw
       if (pc.signalingState !== 'have-local-offer') {
@@ -201,10 +287,17 @@ class WebRTCManager {
         return;
       }
 
+      if (session) {
+        negotiation.remoteSession = session;
+        negotiation.peerUsesSessions = true;
+        this.sessionsSeen = true;
+      }
+
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
         await this.flushPendingCandidates(senderSocketId);
       } catch (err) {
+        if (this.peers.get(senderSocketId) !== pc) return;
         console.error('[WebRTC] Error setting remote description for answer:', err);
         this.scheduleRestart(senderSocketId);
       }
@@ -212,13 +305,27 @@ class WebRTCManager {
 
     // Handle incoming ICE candidate. Candidates routinely arrive before the
     // description they belong to; queue those instead of dropping them.
-    this.socket.on('webrtc-ice-candidate', async ({ senderSocketId, candidate }) => {
+    this.socket.on('webrtc-ice-candidate', async ({ senderSocketId, candidate, session, targetSession }) => {
       if (!candidate) return;
 
       const pc = this.peers.get(senderSocketId);
-      if (!pc || !pc.remoteDescription) {
+      const negotiation = this.peerState.get(senderSocketId);
+
+      let belongsToOtherSession = false;
+      if (negotiation && session) {
+        // Gathered for a connection of ours that was replaced
+        if (targetSession && targetSession !== negotiation.localSession) return;
+        if (negotiation.remoteSession && session !== negotiation.remoteSession) {
+          // Gathered by an old connection of theirs — or by a new one whose
+          // offer has not arrived yet: the queue keeps it until we know which
+          if (targetSession) return;
+          belongsToOtherSession = true;
+        }
+      }
+
+      if (!pc || !pc.remoteDescription || belongsToOtherSession) {
         const queue = this.pendingCandidates.get(senderSocketId) || [];
-        queue.push(candidate);
+        if (queue.length < MAX_PENDING_CANDIDATES) queue.push({ candidate, session });
         this.pendingCandidates.set(senderSocketId, queue);
         return;
       }
@@ -226,7 +333,10 @@ class WebRTCManager {
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
       } catch (err) {
-        console.error('[WebRTC] Error adding ICE candidate:', err);
+        // Candidates of an offer we deliberately ignored are expected to fail
+        if (!negotiation || !negotiation.ignoreOffer) {
+          console.warn('[WebRTC] Error adding ICE candidate:', err);
+        }
       }
     });
   }
@@ -260,15 +370,30 @@ class WebRTCManager {
     if (!queue || !queue.length) return;
 
     const pc = this.peers.get(socketId);
+    const negotiation = this.peerState.get(socketId);
     this.pendingCandidates.delete(socketId);
     if (!pc) return;
 
-    for (const candidate of queue) {
+    // Candidates of another remote session stay queued: they belong either to
+    // a connection the peer replaced, or to one whose offer is still on its way
+    const remoteSession = negotiation && negotiation.remoteSession;
+    const later = [];
+    for (const entry of queue) {
+      const { candidate, session } = entry;
+      if (remoteSession && session && session !== remoteSession) {
+        later.push(entry);
+        continue;
+      }
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
       } catch (err) {
         console.error('[WebRTC] Error adding queued ICE candidate:', err);
       }
+    }
+
+    if (later.length && this.peers.get(socketId) === pc) {
+      const arrivedMeanwhile = this.pendingCandidates.get(socketId) || [];
+      this.pendingCandidates.set(socketId, later.concat(arrivedMeanwhile).slice(-MAX_PENDING_CANDIDATES));
     }
   }
 
@@ -480,29 +605,36 @@ class WebRTCManager {
     }
   }
 
-  createPeerConnection(socketId, { polite = false } = {}) {
+  createPeerConnection(socketId, { polite = false, restartAttempts = 0 } = {}) {
     const pc = new RTCPeerConnection({
       iceServers: this.iceServers,
-      iceTransportPolicy: this.iceTransportPolicy
+      iceTransportPolicy: this.iceTransportPolicy,
+      // Gather for one transport only: without it every m-line gathers (and
+      // allocates TURN relays) on its own until the answer arrives, which makes
+      // the first connection noticeably slower
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
     });
 
     this.peerState.set(socketId, {
       polite,
+      localSession: newSessionId(),
+      remoteSession: null,
+      peerUsesSessions: false,
       makingOffer: false,
+      ignoreOffer: false,
       iceRestartPending: false,
-      restartAttempts: 0,
+      restartAttempts,
       restartTimer: null,
-      graceTimer: null
+      graceTimer: null,
+      answerTimer: null,
+      offersSent: 0
     });
 
     // Send ICE candidates to target peer
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        this.socket.emit('webrtc-ice-candidate', {
-          targetSocketId: socketId,
-          candidate: event.candidate,
-          type: 'mesh'
-        });
+        this.signal('webrtc-ice-candidate', socketId, { candidate: event.candidate });
       }
     };
 
@@ -548,7 +680,7 @@ class WebRTCManager {
     pc.onconnectionstatechange = () => {
       const negotiation = this.peerState.get(socketId);
       console.log(`[WebRTC] Connection state with ${socketId}: ${pc.connectionState}`);
-      if (!negotiation) return;
+      if (!negotiation || this.peers.get(socketId) !== pc) return;
 
       if (pc.connectionState === 'connected') {
         this.clearRecoveryTimers(socketId);
@@ -572,7 +704,7 @@ class WebRTCManager {
         negotiation.graceTimer = setTimeout(() => {
           negotiation.graceTimer = null;
           const current = this.peers.get(socketId);
-          if (current && current.connectionState !== 'connected') {
+          if (current === pc && current.connectionState !== 'connected') {
             this.scheduleRestart(socketId);
           }
         }, DISCONNECT_GRACE_MS);
@@ -604,21 +736,18 @@ class WebRTCManager {
       if (iceRestart) pc.restartIce();
 
       const offer = await pc.createOffer();
-      if (pc.signalingState !== 'stable') {
+      if (pc.signalingState !== 'stable' || this.peers.get(socketId) !== pc) {
         // An incoming offer won the race; that handshake takes over from here
         this.armConnectTimeout(socketId);
         return;
       }
       await pc.setLocalDescription(offer);
 
-      this.socket.emit('webrtc-offer', {
-        targetSocketId: socketId,
-        offer: pc.localDescription,
-        type: 'mesh'
-      });
-
+      this.signal('webrtc-offer', socketId, { offer: pc.localDescription });
       this.armConnectTimeout(socketId);
+      this.armAnswerTimeout(socketId, pc, ++negotiation.offersSent);
     } catch (err) {
+      if (this.peers.get(socketId) !== pc) return;
       console.error(`[WebRTC] Error offering to peer ${socketId}:`, err);
       this.scheduleRestart(socketId);
     } finally {
@@ -634,6 +763,7 @@ class WebRTCManager {
     const negotiation = this.peerState.get(socketId);
     if (!negotiation || negotiation.restartTimer) return;
 
+    const timeout = CONNECT_TIMEOUT_MS * (negotiation.polite ? POLITE_BACKOFF_FACTOR : 1);
     negotiation.restartTimer = setTimeout(() => {
       negotiation.restartTimer = null;
       const pc = this.peers.get(socketId);
@@ -641,7 +771,25 @@ class WebRTCManager {
         console.warn(`[WebRTC] ${socketId} still ${pc.connectionState} after handshake, restarting`);
         this.restartConnection(socketId);
       }
-    }, CONNECT_TIMEOUT_MS);
+    }, timeout);
+  }
+
+  armAnswerTimeout(socketId, pc, offerNumber) {
+    const negotiation = this.peerState.get(socketId);
+    if (!negotiation) return;
+
+    clearTimeout(negotiation.answerTimer);
+    negotiation.answerTimer = setTimeout(() => {
+      negotiation.answerTimer = null;
+      const stillWaiting = this.peers.get(socketId) === pc &&
+        pc.signalingState === 'have-local-offer' && negotiation.offersSent === offerNumber;
+      if (!stillWaiting) return;
+
+      console.warn(`[WebRTC] No answer from ${socketId}, retrying`);
+      clearTimeout(negotiation.restartTimer);
+      negotiation.restartTimer = null;
+      this.restartConnection(socketId);
+    }, ANSWER_TIMEOUT_MS);
   }
 
   scheduleRestart(socketId) {
@@ -653,20 +801,54 @@ class WebRTCManager {
       return;
     }
 
-    const delay = Math.min(1000 * Math.pow(2, negotiation.restartAttempts), 15000);
+    const base = Math.min(1000 * Math.pow(2, negotiation.restartAttempts), 15000);
+    const delay = base * (negotiation.polite ? POLITE_BACKOFF_FACTOR : 1);
     negotiation.restartTimer = setTimeout(() => {
       negotiation.restartTimer = null;
       this.restartConnection(socketId);
     }, delay);
   }
 
-  restartConnection(socketId) {
+  async restartConnection(socketId) {
     const pc = this.peers.get(socketId);
     const negotiation = this.peerState.get(socketId);
     if (!pc || !negotiation) return;
     if (pc.connectionState === 'connected') return;
 
     negotiation.restartAttempts++;
+
+    // Our very first offer was never answered. Rolling it back would reset the
+    // m-lines' mids, and a peer that did apply it would reject the next offer
+    // for not matching; only a fresh connection gets out of that.
+    const initialOfferUnanswered = pc.signalingState === 'have-local-offer' && !pc.currentRemoteDescription;
+    // Some broken states are not something an ICE restart can fix either, so
+    // every few attempts start over. The peer has to understand session ids to
+    // recognise the new connection for what it is.
+    const periodicRebuild = (negotiation.peerUsesSessions || this.sessionsSeen) &&
+      negotiation.restartAttempts % (ICE_RESTARTS_BEFORE_REBUILD + 1) === 0;
+
+    // Only the side that opened the connection rebuilds it, so the two sides
+    // never both replace theirs at once
+    if (!negotiation.polite && (initialOfferUnanswered || periodicRebuild)) {
+      console.warn(`[WebRTC] Rebuilding connection with ${socketId} (attempt ${negotiation.restartAttempts})`);
+      const attempts = negotiation.restartAttempts;
+      this.removePeer(socketId);
+      this.connectToPeer(socketId, { restartAttempts: attempts });
+      return;
+    }
+
+    // A re-offer that was never answered (lost, or ignored in a collision) would
+    // otherwise block every later offer forever. Its m-lines were negotiated
+    // before, so rolling it back keeps them intact.
+    if (pc.signalingState === 'have-local-offer') {
+      try {
+        await pc.setLocalDescription({ type: 'rollback' });
+      } catch (err) {
+        console.warn(`[WebRTC] Rollback with ${socketId} failed:`, err);
+      }
+      if (this.peers.get(socketId) !== pc) return;
+    }
+
     console.warn(`[WebRTC] Restarting ICE with ${socketId} (attempt ${negotiation.restartAttempts})`);
     this.sendOffer(socketId, { iceRestart: true });
   }
@@ -677,8 +859,10 @@ class WebRTCManager {
 
     clearTimeout(negotiation.restartTimer);
     clearTimeout(negotiation.graceTimer);
+    clearTimeout(negotiation.answerTimer);
     negotiation.restartTimer = null;
     negotiation.graceTimer = null;
+    negotiation.answerTimer = null;
   }
 
   stopQualityPolling(socketId) {
@@ -695,7 +879,10 @@ class WebRTCManager {
    */
   async pollConnectionQuality(socketId) {
     const pc = this.peers.get(socketId);
-    if (!pc || pc.connectionState !== 'connected' || !this.onConnectionQualityChanged) return;
+    if (!pc || pc.connectionState !== 'connected') return;
+
+    this.ensureSending(socketId);
+    if (!this.onConnectionQualityChanged) return;
 
     try {
       const stats = await pc.getStats();
@@ -727,6 +914,76 @@ class WebRTCManager {
   }
 
   /**
+   * Self-heal the "they can hear me but I can't hear them" case on a connected
+   * peer: the mic sender must carry the current mic track and the m-line must
+   * have been negotiated as sending.
+   */
+  ensureSending(socketId) {
+    const pc = this.peers.get(socketId);
+    const channels = this.peerChannels.get(socketId);
+    const mic = channels && channels.mic;
+    if (!pc || !mic || !mic.sender || mic.stopped) return;
+
+    const micTrack = this.localMicStream ? this.localMicStream.getAudioTracks()[0] || null : null;
+    if (micTrack && mic.sender.track !== micTrack) {
+      console.warn(`[WebRTC] Mic was not attached for ${socketId}, re-attaching`);
+      mic.sender.replaceTrack(micTrack).catch(err => {
+        console.error(`[WebRTC] Re-attaching mic for ${socketId} failed:`, err);
+      });
+    }
+
+    const notSending = mic.currentDirection === 'recvonly' || mic.currentDirection === 'inactive';
+    if (notSending && pc.signalingState === 'stable') {
+      console.warn(`[WebRTC] Mic m-line with ${socketId} negotiated as ${mic.currentDirection}, renegotiating`);
+      mic.direction = 'sendrecv';
+      this.sendOffer(socketId);
+    }
+  }
+
+  /**
+   * Snapshot of every peer connection, for debugging a call from the console.
+   */
+  async getDiagnostics() {
+    const rows = [];
+    for (const [socketId, pc] of this.peers) {
+      const negotiation = this.peerState.get(socketId) || {};
+      const channels = this.peerChannels.get(socketId) || {};
+      const row = {
+        socketId,
+        role: negotiation.polite ? 'polite' : 'impolite',
+        signaling: pc.signalingState,
+        ice: pc.iceConnectionState,
+        connection: pc.connectionState,
+        restarts: negotiation.restartAttempts,
+        micSending: !!(channels.mic && channels.mic.sender && channels.mic.sender.track),
+        micDirection: channels.mic ? channels.mic.currentDirection : null,
+        path: null,
+        audioSent: 0,
+        audioReceived: 0
+      };
+
+      try {
+        const stats = await pc.getStats();
+        const byId = new Map();
+        stats.forEach(r => byId.set(r.id, r));
+        stats.forEach(r => {
+          if (r.type === 'transport' && r.selectedCandidatePairId) {
+            const pair = byId.get(r.selectedCandidatePairId);
+            const local = pair && byId.get(pair.localCandidateId);
+            const remote = pair && byId.get(pair.remoteCandidateId);
+            if (local && remote) row.path = `${local.candidateType} -> ${remote.candidateType}`;
+          }
+          if (r.type === 'outbound-rtp' && r.kind === 'audio') row.audioSent += r.packetsSent || 0;
+          if (r.type === 'inbound-rtp' && r.kind === 'audio') row.audioReceived += r.packetsReceived || 0;
+        });
+      } catch (err) {}
+
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  /**
    * Push whatever is currently live locally onto one peer's senders.
    */
   attachLocalTracks(socketId) {
@@ -736,7 +993,9 @@ class WebRTCManager {
     const assign = (name, track) => {
       const transceiver = channels[name];
       if (transceiver && transceiver.sender) {
-        transceiver.sender.replaceTrack(track).catch(() => {});
+        transceiver.sender.replaceTrack(track).catch(err => {
+          console.error(`[WebRTC] Attaching ${name} for ${socketId} failed:`, err);
+        });
       }
     };
 
@@ -748,12 +1007,12 @@ class WebRTCManager {
     }
   }
 
-  async connectToPeer(socketId) {
+  async connectToPeer(socketId, { restartAttempts = 0 } = {}) {
     if (this.peers.has(socketId)) return;
 
     console.log(`[WebRTC] Initiating connection to peer ${socketId}`);
     // We opened this connection, so we are the impolite side of the pair
-    const pc = this.createPeerConnection(socketId, { polite: false });
+    const pc = this.createPeerConnection(socketId, { polite: false, restartAttempts });
 
     // Fixed m-line layout. Only the offering side declares it; the answering
     // side adopts the same order from the offer.

@@ -50,9 +50,6 @@ function getBaseIceServers(env = process.env) {
   return [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
     ...getConfiguredTurnServers(env),
     ...DEFAULT_TURN_SERVERS
   ];
@@ -203,6 +200,23 @@ function getRoomsSummary() {
   return list;
 }
 
+// Each end of a peer connection tags its signalling with a random session id so
+// the other end can tell a fresh connection from a renegotiation of the old one,
+// and drop messages meant for a connection that no longer exists.
+function sanitizeSessionId(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : undefined;
+}
+
+function relaySignal(socket, event, targetSocketId, payload) {
+  if (typeof targetSocketId !== 'string') return;
+  io.to(targetSocketId).emit(event, {
+    senderSocketId: socket.id,
+    ...payload,
+    session: sanitizeSessionId(payload.session),
+    targetSession: sanitizeSessionId(payload.targetSession)
+  });
+}
+
 function addReactionToggle(message, emoji, userId) {
   if (!message.reactions) message.reactions = {};
   const list = message.reactions[emoji] || [];
@@ -239,8 +253,10 @@ io.on('connection', (socket) => {
     if (typeof roomId !== 'string' || !roomId.trim()) return;
     roomId = roomId.trim().toLowerCase().slice(0, 64);
 
-    // If already in a room, leave it first
-    if (currentRoomId && currentRoomId !== roomId) {
+    // Leave the current room first — even when re-joining the same one: the
+    // client has torn its peer connections down, so the others must drop theirs
+    // too, or they would try to renegotiate a connection that no longer exists
+    if (currentRoomId) {
       leaveCurrentRoom();
     }
 
@@ -262,20 +278,50 @@ io.on('connection', (socket) => {
     }
 
     const room = rooms.get(roomId);
-    const requestingUserId = userData && userData.userId;
+    const requestingUserId = typeof (userData && userData.userId) === 'string'
+      ? userData.userId.slice(0, 64)
+      : null;
 
-    if (!isNewRoom && room.locked && room.ownerUserId !== requestingUserId) {
+    // A client that reconnects gets a new socket id, while the server may not
+    // notice the old socket is dead for up to a minute. Until then the others
+    // keep a silent ghost of this user, and the rejoining client would offer a
+    // peer connection to its own ghost.
+    const staleSessions = [];
+    if (requestingUserId) {
+      room.users.forEach((u, sId) => {
+        if (sId !== socket.id && u.userId === requestingUserId) staleSessions.push(sId);
+      });
+    }
+    // Someone who was already in the room is coming back, not a new arrival
+    const isReturning = staleSessions.length > 0;
+
+    if (!isNewRoom && !isReturning && room.locked && room.ownerUserId !== requestingUserId) {
       socket.emit('room-join-denied', { roomId, reason: 'locked' });
       return;
     }
-    if (!isNewRoom && room.maxUsers && room.users.size >= room.maxUsers && room.ownerUserId !== requestingUserId) {
+    if (!isNewRoom && !isReturning && room.maxUsers && room.users.size >= room.maxUsers &&
+        room.ownerUserId !== requestingUserId) {
       socket.emit('room-join-denied', { roomId, reason: 'full' });
       return;
     }
 
+    staleSessions.forEach(sId => {
+      const u = room.users.get(sId);
+      const stale = io.sockets.sockets.get(sId);
+      if (stale) {
+        stale.emit('session-replaced');
+        stale.disconnect(true); // its disconnect handler leaves the room
+      }
+      if (room.users.has(sId)) {
+        room.users.delete(sId);
+        io.to(roomId).emit('user-left', { socketId: sId, username: u ? u.username : 'Usuário' });
+      }
+      console.log(`[Join] Dropped stale session ${sId} of ${u ? u.username : requestingUserId} in #${roomId}`);
+    });
+
     currentRoomId = roomId;
     currentUserData = {
-      userId: typeof requestingUserId === 'string' ? requestingUserId.slice(0, 64) : `anon_${socket.id}`,
+      userId: requestingUserId || `anon_${socket.id}`,
       username: sanitizeUsername(userData && userData.username),
       avatar: sanitizeColor(userData && userData.avatar),
       status: sanitizeStatus(userData && userData.status),
@@ -319,34 +365,17 @@ io.on('connection', (socket) => {
     console.log(`[Join] ${currentUserData.username} joined room #${roomId} (${room.users.size} online)`);
   });
 
-  // WebRTC Signaling: Offer
-  socket.on('webrtc-offer', ({ targetSocketId, offer, type } = {}) => {
-    if (typeof targetSocketId !== 'string') return;
-    io.to(targetSocketId).emit('webrtc-offer', {
-      senderSocketId: socket.id,
-      offer,
-      type // 'camera', 'screen', or 'mesh'
-    });
+  // WebRTC signalling is relayed verbatim to the target socket
+  socket.on('webrtc-offer', ({ targetSocketId, offer, type, session, targetSession } = {}) => {
+    relaySignal(socket, 'webrtc-offer', targetSocketId, { offer, type, session, targetSession });
   });
 
-  // WebRTC Signaling: Answer
-  socket.on('webrtc-answer', ({ targetSocketId, answer, type } = {}) => {
-    if (typeof targetSocketId !== 'string') return;
-    io.to(targetSocketId).emit('webrtc-answer', {
-      senderSocketId: socket.id,
-      answer,
-      type
-    });
+  socket.on('webrtc-answer', ({ targetSocketId, answer, type, session, targetSession } = {}) => {
+    relaySignal(socket, 'webrtc-answer', targetSocketId, { answer, type, session, targetSession });
   });
 
-  // WebRTC Signaling: ICE Candidate
-  socket.on('webrtc-ice-candidate', ({ targetSocketId, candidate, type } = {}) => {
-    if (typeof targetSocketId !== 'string') return;
-    io.to(targetSocketId).emit('webrtc-ice-candidate', {
-      senderSocketId: socket.id,
-      candidate,
-      type
-    });
+  socket.on('webrtc-ice-candidate', ({ targetSocketId, candidate, type, session, targetSession } = {}) => {
+    relaySignal(socket, 'webrtc-ice-candidate', targetSocketId, { candidate, type, session, targetSession });
   });
 
   // User state updates (mute, camera toggle, screenshare toggle, speaking indicator, profile)
