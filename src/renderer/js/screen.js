@@ -201,10 +201,24 @@ class ScreenSharePicker {
       this.systemAudio = await window.SystemAudioCapture.start();
       stream.addTrack(this.systemAudio.stream.getAudioTracks()[0]);
     } catch (err) {
-      console.warn('System audio capture unavailable:', err);
+      console.warn('System audio capture unavailable:', err.reason, err);
       // Never fall back to the full loopback: it would echo the call's voices
-      alert('Não foi possível capturar o áudio do PC sem as vozes da chamada ' +
-        '(requer Windows 11 ou Windows 10 atualizado). A tela será compartilhada sem áudio.');
+      alert(ScreenSharePicker.systemAudioErrorMessage(err) + ' A tela será compartilhada sem áudio.');
+    }
+  }
+
+  static systemAudioErrorMessage(err) {
+    switch (err.reason) {
+      case 'windows-too-old':
+        return 'Compartilhar o áudio do PC sem as vozes da chamada requer o Windows 11 ' +
+          `(ou Windows 10 build 20348+). Este PC está no build ${err.build || 'desconhecido'}.`;
+      case 'helper-missing':
+        return 'O componente de captura de áudio não veio nesta instalação do Triscord. ' +
+          'Reinstale a versão mais recente.';
+      case 'unsupported-platform':
+        return 'Compartilhar o áudio do PC só funciona no Triscord para Windows.';
+      default:
+        return `Não foi possível capturar o áudio do PC (${err.message}).`;
     }
   }
 

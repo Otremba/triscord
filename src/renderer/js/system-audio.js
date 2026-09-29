@@ -34,7 +34,11 @@ class SystemAudioCapture {
 
       const result = await window.electronAPI.startSystemAudio();
       if (!result || !result.ok) {
-        throw new Error((result && result.error) || 'system audio capture failed');
+        const err = new Error((result && result.error) || 'system audio capture failed');
+        // Older app versions answer without a reason
+        err.reason = (result && result.reason) || 'helper-failed';
+        err.build = result && result.build;
+        throw err;
       }
 
       context.resume().catch(() => {});

@@ -25,6 +25,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # electron-builder only warns when an extraResources file is missing, so
+      # without this step the installer silently ships without system audio
+      - name: Build native audio helper
+        run: npm run build:native
+
+      - name: Check native audio helper
+        shell: pwsh
+        run: |
+          if (-not (Test-Path native/bin/loopback-capture.exe)) {
+            throw 'native/bin/loopback-capture.exe was not built'
+          }
+
       - name: Build and Publish Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

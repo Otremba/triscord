@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, desktopCapturer, session, Menu, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { spawn } = require('child_process');
 
 // Disable default menu for a clean look
@@ -78,6 +79,15 @@ const LOOPBACK_HELPER = app.isPackaged
   ? path.join(process.resourcesPath, 'loopback-capture.exe')
   : path.join(__dirname, '../native/bin/loopback-capture.exe');
 
+// WASAPI process loopback, which can leave one process tree out of the capture,
+// exists since Windows build 20348 (Windows 11 is 22000+)
+const MIN_PROCESS_LOOPBACK_BUILD = 20348;
+
+function windowsBuild() {
+  // os.release() is "10.0.<build>" on both Windows 10 and 11
+  return parseInt(os.release().split('.')[2], 10) || 0;
+}
+
 const systemAudioCaptures = new Map(); // webContents.id -> helper process
 const watchedContents = new WeakSet();
 
@@ -93,8 +103,18 @@ ipcMain.handle('system-audio-start', (event) => {
   const sender = event.sender;
   stopSystemAudio(sender.id);
 
-  if (process.platform !== 'win32' || !fs.existsSync(LOOPBACK_HELPER)) {
-    return { ok: false, error: 'unsupported' };
+  // Each failure says why, so the renderer never blames the Windows version
+  // for something else (a missing helper used to show "requires Windows 11")
+  if (process.platform !== 'win32') {
+    return { ok: false, reason: 'unsupported-platform', error: process.platform };
+  }
+  const build = windowsBuild();
+  if (build < MIN_PROCESS_LOOPBACK_BUILD) {
+    return { ok: false, reason: 'windows-too-old', error: `Windows build ${build}`, build };
+  }
+  if (!fs.existsSync(LOOPBACK_HELPER)) {
+    console.error(`[SystemAudio] Helper not found at ${LOOPBACK_HELPER}`);
+    return { ok: false, reason: 'helper-missing', error: LOOPBACK_HELPER };
   }
 
   return new Promise((resolve) => {
@@ -106,7 +126,10 @@ ipcMain.handle('system-audio-start', (event) => {
     const settle = (result) => {
       if (settled) return;
       settled = true;
-      if (!result.ok) stopSystemAudio(sender.id);
+      if (!result.ok) {
+        stopSystemAudio(sender.id);
+        console.error('[SystemAudio] Capture failed:', result.error);
+      }
       resolve(result);
     };
 
@@ -114,17 +137,18 @@ ipcMain.handle('system-audio-start', (event) => {
       stderr += chunk.toString();
       if (stderr.includes('READY')) settle({ ok: true });
       const error = stderr.match(/ERROR (.*)/);
-      if (error) settle({ ok: false, error: error[1].trim() });
+      if (error) settle({ ok: false, reason: 'helper-failed', error: error[1].trim() });
     });
 
     helper.stdout.on('data', (chunk) => {
       if (!sender.isDestroyed()) sender.send('system-audio-data', chunk);
     });
 
-    helper.on('error', (err) => settle({ ok: false, error: err.message }));
+    // 'error' is typically the helper being blocked (antivirus) or unreadable
+    helper.on('error', (err) => settle({ ok: false, reason: 'helper-failed', error: err.message }));
     helper.on('exit', (code) => {
       if (systemAudioCaptures.get(sender.id) === helper) systemAudioCaptures.delete(sender.id);
-      settle({ ok: false, error: `helper exited with code ${code}` });
+      settle({ ok: false, reason: 'helper-failed', error: `helper exited with code ${code}` });
     });
 
     if (!watchedContents.has(sender)) {

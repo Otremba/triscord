@@ -55,6 +55,12 @@ static class Program
         {
             return 0; // stdout closed by the parent: normal shutdown
         }
+        catch (COMException e)
+        {
+            // The HRESULT is language-independent; the message is localized
+            Console.Error.WriteLine("ERROR 0x" + e.ErrorCode.ToString("X8") + " " + e.Message);
+            return 1;
+        }
         catch (Exception e)
         {
             Console.Error.WriteLine("ERROR " + e.Message);
