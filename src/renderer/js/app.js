@@ -469,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       // Successfully joined room
-      state.socket.on('room-joined', ({ roomId, existingUsers, chatHistory, isOwner, locked, maxUsers }) => {
+      state.socket.on('room-joined', async ({ roomId, existingUsers, chatHistory, isOwner, locked, maxUsers }) => {
         state.currentRoomId = roomId;
         state.roomMembers.clear();
         state.isRoomOwner = !!isOwner;
@@ -486,10 +486,14 @@ document.addEventListener('DOMContentLoaded', () => {
         clearChat();
         (chatHistory || []).forEach(msg => addChatMessage(msg));
 
-        // Connect WebRTC to all existing members
-        existingUsers.forEach(u => {
-          state.webrtc.connectToPeer(u.socketId);
-        });
+        // Join the mediasoup SFU. The SFU handles all media fan-out;
+        // there are no peer-to-peer connections between participants.
+        try {
+          await state.webrtc.joinRoom(roomId);
+        } catch (error) {
+          console.error('[SFU] Failed to join media room:', error);
+          showToast('Não foi possível conectar à sala de mídia.', 'error');
+        }
       });
 
       // The server refused to let us in (room locked or at its user limit)

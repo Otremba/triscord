@@ -5,11 +5,13 @@
   "main": "src/main.js",
   "scripts": {
     "start": "concurrently \"npm run server\" \"npm run electron\"",
-    "preelectron": "npm run build:native",
+    "preelectron": "npm run build:native && npm run build:client",
     "electron": "electron .",
     "server": "node server/server.js",
     "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -File native/loopback-capture/build.ps1",
-    "prebuild:win": "npm run build:native",
+    "build:client": "esbuild mediasoup-client --bundle --format=iife --global-name=mediasoupClient --outfile=src/renderer/js/vendor/mediasoup-client.js",
+    "prestart": "npm run build:client",
+    "prebuild:win": "npm run build:native && npm run build:client",
     "build:win": "electron-builder --win",
     "test": "jest",
     "lint": "eslint server src --ext .js"
@@ -30,6 +32,8 @@
     "cors": "^2.8.5",
     "electron-updater": "^6.3.9",
     "express": "^4.21.2",
+    "mediasoup": "^3.27.1",
+    "mediasoup-client": "^3.24.1",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1"
   },
@@ -37,6 +41,7 @@
     "concurrently": "^9.1.2",
     "electron": "^33.2.1",
     "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
     "eslint": "^8.57.1",
     "jest": "^29.7.0",
     "lucide": "^1.47.0",

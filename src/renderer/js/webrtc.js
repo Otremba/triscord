@@ -1,396 +1,437 @@
 /**
- * WebRTC Multi-Peer Mesh Manager
+ * Triscord SFU media manager.
  *
- * Every peer connection carries four m-lines in a fixed order — mic, camera,
- * screen, screen audio — so camera and screen share travel on separate tracks
- * and can be active at the same time. Toggling a device is a replaceTrack() on
- * the matching sender, which needs no renegotiation and therefore never
- * disturbs the voice channel.
+ * Media path:
+ *   client -> mediasoup WebRtcTransport -> Router/SFU -> consumers -> clients
  *
- * Only the offering side calls addTransceiver: per spec, setRemoteDescription
- * associates m-lines with transceivers created by addTrack, never with ones
- * created by addTransceiver, so pre-creating them on the answering side just
- * leaves orphans and the answer ends up recvonly. The answering side therefore
- * adopts the transceivers that setRemoteDescription creates for it.
- *
- * Signalling follows the "perfect negotiation" pattern: the side that opens the
- * connection is impolite, the side that receives the first offer is polite, so
- * either one can re-offer to restart ICE without the two colliding. ICE
- * candidates that arrive before the matching description is set are queued
- * instead of thrown away — dropping them is what used to leave one pair of a
- * three-way call silently half-connected.
+ * Socket.io remains signaling only. There is no peer-to-peer mesh here.
  */
-
-const CHANNEL_ORDER = ['mic', 'cam', 'screen', 'screenAudio'];
-
-// A connection that never reaches 'connected', or falls out of it, is retried
-// with a backoff instead of being torn down: 'disconnected' is often transient.
-const CONNECT_TIMEOUT_MS = 12000;
-const DISCONNECT_GRACE_MS = 6000;
-const MAX_RESTART_ATTEMPTS = 10;
-
-const DEFAULT_STUN_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun3.l.google.com:19302' },
-  { urls: 'stun:stun4.l.google.com:19302' }
-];
-
-const DEFAULT_TURN_SERVERS = [
-  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-];
-
-// How often to sample getStats() for the on-tile connection quality indicator
-const QUALITY_POLL_MS = 3000;
-
 class WebRTCManager {
   constructor(socket, currentUserId, options = {}) {
     this.socket = socket;
     this.currentUserId = currentUserId;
 
-    // Map: socketId -> RTCPeerConnection
-    this.peers = new Map();
-    // Map: socketId -> { mic, cam, screen, screenAudio } RTCRtpTransceivers
-    this.peerChannels = new Map();
-    // Map: socketId -> negotiation bookkeeping (see createPeerConnection)
-    this.peerState = new Map();
-    // Map: socketId -> ICE candidates that arrived before the remote description
-    this.pendingCandidates = new Map();
-    // Map: socketId -> remote MediaStream (mic + camera)
-    this.remoteStreams = new Map();
-    // Map: socketId -> remote MediaStream (screen video + screen audio)
-    this.remoteScreenStreams = new Map();
+    this.device = null;
+    this.sendTransport = null;
+    this.recvTransport = null;
+    this.joinedRoomId = null;
+    this.transportReady = false;
 
-    // Local streams
+    this.producers = new Map();
+    this.consumers = new Map();
+    this.remoteStreams = new Map();
+    this.remoteScreenStreams = new Map();
+    this.remoteProducerMeta = new Map();
+
     this.localMicStream = null;
     this.localCamStream = null;
     this.localScreenStream = null;
 
-    // Camera background effects (see startCamera / setCameraEffect)
     this.rawCamStream = null;
     this.cameraEffects = null;
     this.cameraEffect = { type: 'none' };
     this.cameraEffectVersion = 0;
-    this.onLocalCameraChanged = null; // (stream)
-
-    // Owns the raw capture + RNNoise pipeline behind localMicStream
     this.micCapture = null;
-    this.noiseSuppressionMode = null; // 'rnnoise' | 'native' | 'off'
+    this.noiseSuppressionMode = null;
 
-    // Callbacks
-    this.onRemoteStreamAdded = null; // (socketId, stream, isScreen)
-    this.onRemoteStreamRemoved = null; // (socketId, isScreen)
-    this.onConnectionQualityChanged = null; // (socketId, { level: 'good'|'ok'|'bad', rttMs, lossPct })
+    this.onRemoteStreamAdded = null;
+    this.onRemoteStreamRemoved = null;
+    this.onConnectionQualityChanged = null;
+    this.onLocalCameraChanged = null;
 
     this.userCustomIceServers = Array.isArray(options.iceServers) ? options.iceServers : [];
+    this.iceServers = this.userCustomIceServers;
     this.iceTransportPolicy = options.iceTransportPolicy === 'relay' ? 'relay' : 'all';
-    this.iceServers = [
-      ...this.userCustomIceServers,
-      ...DEFAULT_STUN_SERVERS,
-      ...DEFAULT_TURN_SERVERS
-    ];
 
-    this.setupSocketListeners();
+    this._joinPromise = null;
+    this._joinResolve = null;
+    this._joinReject = null;
+    this._setupSocketListeners();
   }
 
-  updateIceServers(servers, iceTransportPolicy = this.iceTransportPolicy) {
-    if (Array.isArray(servers) && servers.length > 0) {
-      const combined = [
-        ...this.userCustomIceServers,
-        ...servers,
-        ...DEFAULT_STUN_SERVERS,
-        ...DEFAULT_TURN_SERVERS
-      ];
-      const seen = new Set();
-      const iceServers = combined.filter(s => {
-        const key = JSON.stringify(s);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
+  updateIceServers(servers, policy = this.iceTransportPolicy) {
+    if (!Array.isArray(servers) || !servers.length) return;
+    this.iceServers = servers;
+    this.iceTransportPolicy = policy === 'relay' ? 'relay' : 'all';
+
+    [this.sendTransport, this.recvTransport].forEach(async transport => {
+      if (!transport?.updateIceServers) return;
+      try {
+        await transport.updateIceServers({ iceServers: this.iceServers });
+      } catch (error) {
+        console.warn('[SFU] Failed to update ICE servers:', error);
+      }
+    });
+  }
+
+  _setupSocketListeners() {
+    this.socket.on('sfu-router-capabilities', async data => {
+      try {
+        await this._loadDevice(data.routerRtpCapabilities);
+        await this._ensureTransports();
+
+        for (const producer of data.existingProducers || []) {
+          await this._consumeProducer(producer);
+        }
+
+        await this._produceAllLocalTracks();
+        this._joinResolve?.();
+        this._joinResolve = null;
+        this._joinReject = null;
+      } catch (error) {
+        console.error('[SFU] Initialization failed:', error);
+        this._joinReject?.(error);
+        this._joinResolve = null;
+        this._joinReject = null;
+      }
+    });
+
+    this.socket.on('sfu-new-producer', producer => {
+      this._consumeProducer(producer).catch(error => {
+        console.error('[SFU] New producer failed:', error);
       });
+    });
 
-      const transportPolicy = iceTransportPolicy === 'relay' ? 'relay' : 'all';
-      const serversChanged = JSON.stringify(iceServers) !== JSON.stringify(this.iceServers);
-      const policyChanged = transportPolicy !== this.iceTransportPolicy;
-      if (!serversChanged && !policyChanged) return;
+    this.socket.on('sfu-producer-closed', ({ producerId }) => {
+      this._closeConsumerByProducerId(producerId);
+    });
+  }
 
-      this.iceServers = iceServers;
-      this.iceTransportPolicy = transportPolicy;
-      console.log(`[WebRTC] Updated ICE servers (${this.iceServers.length}), transport policy: ${transportPolicy}`);
+  async _loadDevice(routerRtpCapabilities) {
+    if (this.device?.loaded) return;
 
-      this.peers.forEach((pc, socketId) => {
+    const mediasoupClient = window.mediasoupClient;
+    if (!mediasoupClient?.Device) {
+      throw new Error('mediasoup-client não foi carregado');
+    }
+
+    this.device = await mediasoupClient.Device.factory();
+    await this.device.load({ routerRtpCapabilities });
+    console.log('[SFU] Device loaded:', this.device.handlerName);
+  }
+
+  _request(event, payload) {
+    return new Promise((resolve, reject) => {
+      this.socket.emit(event, payload, response => {
+        if (!response?.ok) {
+          reject(new Error(response?.error || event + ' failed'));
+          return;
+        }
+        resolve(response);
+      });
+    });
+  }
+
+  async _createTransport(direction) {
+    const response = await this._request('sfu-create-transport', { direction });
+    const params = {
+      ...response.transport,
+      iceServers: this.iceServers,
+      iceTransportPolicy: this.iceTransportPolicy
+    };
+
+    const transport = direction === 'send'
+      ? this.device.createSendTransport(params)
+      : this.device.createRecvTransport(params);
+
+    transport.on('connect', async ({ dtlsParameters }, callback, errback) => {
+      try {
+        await this._request('sfu-connect-transport', {
+          transportId: transport.id,
+          dtlsParameters
+        });
+        callback();
+      } catch (error) {
+        errback(error);
+      }
+    });
+
+    if (direction === 'send') {
+      transport.on('produce', async ({ kind, rtpParameters, appData }, callback, errback) => {
         try {
-          pc.setConfiguration({
-            ...pc.getConfiguration(),
-            iceServers: this.iceServers,
-            iceTransportPolicy: this.iceTransportPolicy
+          const result = await this._request('sfu-produce', {
+            transportId: transport.id,
+            kind,
+            rtpParameters,
+            source: appData?.source
           });
-          const negotiation = this.peerState.get(socketId);
-          if (!negotiation) return;
-
-          negotiation.iceRestartPending = true;
-          if (pc.signalingState === 'stable') this.flushIceRestart(socketId);
-        } catch (err) {
-          console.error(`[WebRTC] Failed to update ICE configuration for ${socketId}:`, err);
+          callback({ id: result.producerId });
+        } catch (error) {
+          errback(error);
         }
       });
     }
-  }
 
-  flushIceRestart(socketId) {
-    const pc = this.peers.get(socketId);
-    const negotiation = this.peerState.get(socketId);
-    if (!pc || !negotiation || !negotiation.iceRestartPending || pc.signalingState !== 'stable') return;
-
-    negotiation.iceRestartPending = false;
-    console.log(`[WebRTC] Restarting ICE with ${socketId} after ICE server update`);
-    this.sendOffer(socketId, { iceRestart: true });
-  }
-
-  setupSocketListeners() {
-    // Handle incoming WebRTC Offer
-    this.socket.on('webrtc-offer', async ({ senderSocketId, offer, type }) => {
-      console.log(`[WebRTC] Received offer from ${senderSocketId} (${type})`);
-      // Whoever receives the first offer is the polite side of this pair
-      const pc = this.peers.get(senderSocketId) ||
-        this.createPeerConnection(senderSocketId, { polite: true });
-      const negotiation = this.peerState.get(senderSocketId);
-      if (!negotiation) return;
-
-      // Perfect negotiation: on a collision only the polite side gives way
-      const collision = negotiation.makingOffer || pc.signalingState !== 'stable';
-      if (collision && !negotiation.polite) {
-        console.warn(`[WebRTC] Ignoring colliding offer from ${senderSocketId}`);
-        return;
-      }
-
-      try {
-        // Implicit rollback when we had an offer of our own in flight
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        this.adoptChannels(senderSocketId, pc);
-        await this.flushPendingCandidates(senderSocketId);
-
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-
-        this.socket.emit('webrtc-answer', {
-          targetSocketId: senderSocketId,
-          answer: pc.localDescription,
-          type: type || 'mesh'
+    transport.on('connectionstatechange', state => {
+      console.log('[SFU] ' + direction + ' transport: ' + state);
+      if (['failed', 'disconnected'].includes(state)) {
+        this.onConnectionQualityChanged?.('sfu', {
+          level: state === 'failed' ? 'bad' : 'ok',
+          rttMs: null,
+          lossPct: null
         });
-
-        this.armConnectTimeout(senderSocketId);
-      } catch (err) {
-        console.error('[WebRTC] Error handling offer:', err);
-        this.scheduleRestart(senderSocketId);
       }
     });
 
-    // Handle incoming WebRTC Answer
-    this.socket.on('webrtc-answer', async ({ senderSocketId, answer }) => {
-      console.log(`[WebRTC] Received answer from ${senderSocketId}`);
-      const pc = this.peers.get(senderSocketId);
-      if (!pc) return;
-
-      // A late answer to an offer we already rolled back would throw
-      if (pc.signalingState !== 'have-local-offer') {
-        console.warn(`[WebRTC] Dropping answer from ${senderSocketId} in state ${pc.signalingState}`);
-        return;
-      }
-
-      try {
-        await pc.setRemoteDescription(new RTCSessionDescription(answer));
-        await this.flushPendingCandidates(senderSocketId);
-      } catch (err) {
-        console.error('[WebRTC] Error setting remote description for answer:', err);
-        this.scheduleRestart(senderSocketId);
-      }
-    });
-
-    // Handle incoming ICE candidate. Candidates routinely arrive before the
-    // description they belong to; queue those instead of dropping them.
-    this.socket.on('webrtc-ice-candidate', async ({ senderSocketId, candidate }) => {
-      if (!candidate) return;
-
-      const pc = this.peers.get(senderSocketId);
-      if (!pc || !pc.remoteDescription) {
-        const queue = this.pendingCandidates.get(senderSocketId) || [];
-        queue.push(candidate);
-        this.pendingCandidates.set(senderSocketId, queue);
-        return;
-      }
-
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (err) {
-        console.error('[WebRTC] Error adding ICE candidate:', err);
-      }
-    });
+    return transport;
+  }  async _ensureTransports() {
+    if (!this.sendTransport) this.sendTransport = await this._createTransport('send');
+    if (!this.recvTransport) this.recvTransport = await this._createTransport('recv');
+    this.transportReady = true;
   }
 
-  /**
-   * Adopt the transceivers setRemoteDescription created for us, in m-line
-   * order. Only needed once per peer: later offers reuse the same m-lines.
-   */
-  adoptChannels(socketId, pc) {
-    if (this.peerChannels.has(socketId)) return;
+  async joinRoom(roomId) {
+    if (!roomId) return;
+    if (this.joinedRoomId === roomId && this.transportReady) return;
 
-    const transceivers = pc.getTransceivers();
-    const channels = {};
-    CHANNEL_ORDER.forEach((name, index) => {
-      const transceiver = transceivers[index];
-      if (!transceiver) return;
-      // They arrive recvonly; we have to answer sendrecv to be able to send
-      transceiver.direction = 'sendrecv';
-      channels[name] = transceiver;
+    this.resetPeers(false);
+    this.joinedRoomId = roomId;
+
+    this._joinPromise = new Promise((resolve, reject) => {
+      this._joinResolve = resolve;
+      this._joinReject = reject;
     });
 
-    this.peerChannels.set(socketId, channels);
-    this.attachLocalTracks(socketId);
+    this.socket.emit('sfu-join-room', { roomId });
+
+    return this._joinPromise;
   }
 
-  /**
-   * Drain the candidates that arrived before the remote description was set.
-   */
-  async flushPendingCandidates(socketId) {
-    const queue = this.pendingCandidates.get(socketId);
-    if (!queue || !queue.length) return;
+  _sourceStream(source) {
+    if (source === 'mic') return this.localMicStream;
+    if (source === 'cam') return this.localCamStream;
+    if (source === 'screen') return this.localScreenStream;
+    return this.localScreenStream;
+  }
 
-    const pc = this.peers.get(socketId);
-    this.pendingCandidates.delete(socketId);
-    if (!pc) return;
+  async _produceSource(source, stream) {
+    if (!this.sendTransport || !stream) return null;
+    const track = stream.getTracks()[source === 'screenAudio' ? 0 : 0];
+    if (!track) return null;
 
-    for (const candidate of queue) {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (err) {
-        console.error('[WebRTC] Error adding queued ICE candidate:', err);
-      }
+    const existing = this.producers.get(source);
+    if (existing && !existing.closed) {
+      await existing.replaceTrack({ track });
+      return existing;
+    }
+
+    const producer = await this.sendTransport.produce({
+      track,
+      stopTracks: false,
+      appData: { source },
+      streamId: stream.id,
+      ...(track.kind === 'video' && source === 'cam'
+        ? {
+            encodings: [
+              { maxBitrate: 150000 },
+              { maxBitrate: 500000 },
+              { maxBitrate: 1200000 }
+            ],
+            codecOptions: { videoGoogleStartBitrate: 600 }
+          }
+        : {})
+    });
+
+    this.producers.set(source, producer);
+    producer.on('transportclose', () => this.producers.delete(source));
+    producer.on('trackended', () => {
+      if (this.producers.get(source) === producer) this.producers.delete(source);
+    });
+    return producer;
+  }
+
+  async _produceAllLocalTracks() {
+    if (!this.transportReady) return;
+    if (this.localMicStream) await this._produceSource('mic', this.localMicStream);
+    if (this.localCamStream) await this._produceSource('cam', this.localCamStream);
+    if (this.localScreenStream) {
+      await this._produceSource('screen', this.localScreenStream);
+      const audioTrack = this.localScreenStream.getAudioTracks()[0];
+      if (audioTrack) await this._produceTrack('screenAudio', audioTrack, this.localScreenStream);
     }
   }
 
-  /**
-   * Push a track (or null to stop sending) onto the matching sender of every peer.
-   */
-  applyTrackToPeers(channel, track) {
-    this.peerChannels.forEach((channels, socketId) => {
-      const transceiver = channels[channel];
-      if (!transceiver || !transceiver.sender) return;
+  async _produceTrack(source, track, stream) {
+    if (!this.sendTransport || !track) return null;
+    const existing = this.producers.get(source);
+    if (existing && !existing.closed) {
+      await existing.replaceTrack({ track });
+      return existing;
+    }
 
-      transceiver.sender.replaceTrack(track).catch(err => {
-        console.error(`[WebRTC] replaceTrack(${channel}) failed for ${socketId}:`, err);
-      });
+    const producer = await this.sendTransport.produce({
+      track,
+      stopTracks: false,
+      appData: { source },
+      streamId: stream?.id || source
     });
+    this.producers.set(source, producer);
+    producer.on('transportclose', () => this.producers.delete(source));
+    producer.on('trackended', () => {
+      if (this.producers.get(source) === producer) this.producers.delete(source);
+    });
+    return producer;
   }
 
-  /**
-   * Acquire the microphone with echo cancellation and noise suppression
-   * (RNNoise when available, the browser's built-in suppressor otherwise).
-   */
-  async startMicrophone(audioDeviceId = null, noiseSuppression = true) {
-    try {
-      const constraints = {
-        echoCancellation: true,
-        autoGainControl: true
-      };
-      if (audioDeviceId && audioDeviceId !== 'default' && audioDeviceId !== 'communications') {
-        constraints.deviceId = { exact: audioDeviceId };
+  async _consumeProducer(info) {
+    if (!this.recvTransport || this.consumers.has(info.producerId)) return;
+
+    const response = await this._request('sfu-consume', {
+      producerId: info.producerId,
+      rtpCapabilities: this.device.recvRtpCapabilities
+    });
+
+    const data = response.consumer;
+    const consumer = await this.recvTransport.consume({
+      id: data.id,
+      producerId: data.producerId,
+      kind: data.kind,
+      rtpParameters: data.rtpParameters
+    });
+
+    this.consumers.set(consumer.id, {
+      consumer,
+      socketId: info.socketId,
+      source: info.source,
+      producerId: info.producerId
+    });
+
+    this.remoteProducerMeta.set(info.producerId, info);
+
+    consumer.on('transportclose', () => this._removeConsumer(consumer.id));
+    consumer.on('producerclose', () => this._removeConsumer(consumer.id));
+
+    await this._request('sfu-resume-consumer', { consumerId: consumer.id });
+    this._addRemoteTrack(info.socketId, info.source, consumer.track);
+  }
+
+  _addRemoteTrack(socketId, source, track) {
+    const isScreen = source === 'screen' || source === 'screenAudio';
+    const map = isScreen ? this.remoteScreenStreams : this.remoteStreams;
+    let stream = map.get(socketId);
+
+    if (!stream) {
+      stream = new MediaStream();
+      map.set(socketId, stream);
+    }
+
+    if (!stream.getTracks().some(existing => existing.id === track.id)) {
+      stream.addTrack(track);
+    }
+
+    this.onRemoteStreamAdded?.(socketId, stream, isScreen);
+  }
+
+  _removeConsumer(consumerId) {
+    const entry = this.consumers.get(consumerId);
+    if (!entry) return;
+
+    const { socketId, source, consumer } = entry;
+    const isScreen = source === 'screen' || source === 'screenAudio';
+    const map = isScreen ? this.remoteScreenStreams : this.remoteStreams;
+    const stream = map.get(socketId);
+
+    if (stream) {
+      const track = consumer.track;
+      if (track) stream.removeTrack(track);
+      if (!stream.getTracks().length) map.delete(socketId);
+    }
+
+    this.consumers.delete(consumerId);
+    this.remoteProducerMeta.delete(entry.producerId);
+    this.onRemoteStreamRemoved?.(socketId, isScreen);
+  }
+
+  _closeConsumerByProducerId(producerId) {
+    for (const [consumerId, entry] of this.consumers) {
+      if (entry.producerId === producerId) {
+        entry.consumer.close();
+        this._removeConsumer(consumerId);
       }
+    }
+  }  async startMicrophone(audioDeviceId = null, noiseSuppression = true) {
+    const constraints = {
+      echoCancellation: true,
+      autoGainControl: true
+    };
+    if (audioDeviceId && !['default', 'communications'].includes(audioDeviceId)) {
+      constraints.deviceId = { exact: audioDeviceId };
+    }
 
+    try {
       const mic = await window.captureMicrophone(constraints, noiseSuppression);
-
       this.stopMicrophone();
       this.micCapture = mic;
       this.localMicStream = mic.stream;
       this.noiseSuppressionMode = mic.mode;
-      console.info(`[WebRTC] Microphone started, noise suppression: ${mic.mode}`);
 
-      this.applyTrackToPeers('mic', this.localMicStream.getAudioTracks()[0] || null);
+      if (this.transportReady) await this._produceSource('mic', this.localMicStream);
       return this.localMicStream;
-    } catch (err) {
-      console.error('[WebRTC] Error accessing microphone:', err);
-      // Final mobile fallback: pure audio
-      try {
-        console.warn('[WebRTC] Retrying microphone with pure audio: true');
-        const fallbackStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        this.stopMicrophone();
-        this.localMicStream = fallbackStream;
-        this.noiseSuppressionMode = 'off';
-        this.applyTrackToPeers('mic', this.localMicStream.getAudioTracks()[0] || null);
-        return this.localMicStream;
-      } catch (fallbackErr) {
-        console.error('[WebRTC] Ultimate microphone fallback failed:', fallbackErr);
-        throw err;
-      }
+    } catch (error) {
+      console.warn('[SFU] Mic capture fallback:', error);
+      const fallback = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      this.stopMicrophone();
+      this.localMicStream = fallback;
+      this.noiseSuppressionMode = 'off';
+      if (this.transportReady) await this._produceSource('mic', fallback);
+      return fallback;
     }
   }
 
   stopMicrophone() {
+    const producer = this.producers.get('mic');
+    if (producer) {
+      const producerId = producer.id;
+      producer.close();
+      this.producers.delete('mic');
+      if (this.joinedRoomId) this.socket.emit('sfu-close-producer', { producerId });
+    }
+
     if (this.micCapture) {
       this.micCapture.release();
       this.micCapture = null;
     }
     if (this.localMicStream) {
-      this.localMicStream.getTracks().forEach(t => t.stop());
+      this.localMicStream.getTracks().forEach(track => track.stop());
       this.localMicStream = null;
     }
     this.noiseSuppressionMode = null;
   }
 
-  /**
-   * Acquire the webcam. rawCamStream is the device capture; localCamStream is
-   * what peers and the local preview see: the raw stream, or the background
-   * effects output once it is ready.
-   */
   async startCamera(videoDeviceId = null) {
-    try {
-      const videoConstraints = {
-        width: { ideal: 1280, max: 1920 },
-        height: { ideal: 720, max: 1080 },
-        frameRate: { ideal: 30 }
-      };
+    const video = {
+      width: { ideal: 1280, max: 1920 },
+      height: { ideal: 720, max: 1080 },
+      frameRate: { ideal: 30 }
+    };
 
-      if (videoDeviceId && videoDeviceId !== 'default') {
-        videoConstraints.deviceId = { exact: videoDeviceId };
-      } else {
-        videoConstraints.facingMode = 'user';
-      }
-
-      const constraints = {
-        audio: false,
-        video: videoConstraints
-      };
-
-      try {
-        this.rawCamStream = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch (camErr) {
-        console.warn('[WebRTC] Constrained camera failed, falling back to basic video:', camErr);
-        this.rawCamStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
-      }
-
-      this.useCameraStream(this.rawCamStream);
-
-      // The camera shows up immediately; the effect takes over when the model has loaded
-      if (this.cameraEffect.type !== 'none') {
-        this.setCameraEffect(this.cameraEffect).catch(err => {
-          console.warn('[WebRTC] Camera effect unavailable:', err);
-        });
-      }
-
-      return this.localCamStream;
-    } catch (err) {
-      console.error('[WebRTC] Error accessing camera:', err);
-      throw err;
+    if (videoDeviceId && videoDeviceId !== 'default') {
+      video.deviceId = { exact: videoDeviceId };
+    } else {
+      video.facingMode = 'user';
     }
+
+    try {
+      this.rawCamStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video
+      });
+    } catch (error) {
+      console.warn('[SFU] Constrained camera failed, using basic video:', error);
+      this.rawCamStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+    }
+
+    this.useCameraStream(this.rawCamStream);
+
+    if (this.cameraEffect.type !== 'none') {
+      this.setCameraEffect(this.cameraEffect).catch(err => {
+        console.warn('[SFU] Camera effect unavailable:', err);
+      });
+    }
+
+    return this.localCamStream;
   }
 
-  /**
-   * Switch the background effect, live if the camera is on. Swapping between
-   * raw and processed video is a replaceTrack, so no renegotiation happens.
-   */
   async setCameraEffect(effect) {
     this.cameraEffect = effect;
     const version = ++this.cameraEffectVersion;
@@ -410,10 +451,7 @@ class WebRTCManager {
     const rawTrack = this.rawCamStream.getVideoTracks()[0];
     const processor = await window.CameraEffectsProcessor.create(rawTrack, effect);
 
-    // The camera was turned off or another effect was picked while loading
-    const stale = version !== this.cameraEffectVersion ||
-      !this.rawCamStream || this.rawCamStream.getVideoTracks()[0] !== rawTrack;
-    if (stale) {
+    if (version !== this.cameraEffectVersion || !this.rawCamStream) {
       processor.stop();
       return;
     }
@@ -423,14 +461,22 @@ class WebRTCManager {
   }
 
   useCameraStream(stream) {
-    if (this.localCamStream === stream) return;
     this.localCamStream = stream;
-
-    const track = stream.getVideoTracks()[0] || null;
+    const track = stream?.getVideoTracks()[0] || null;
     if (track) track.contentHint = 'motion';
-    this.applyTrackToPeers('cam', track);
 
-    if (this.onLocalCameraChanged) this.onLocalCameraChanged(stream);
+    const producer = this.producers.get('cam');
+    if (producer && track) {
+      producer.replaceTrack({ track }).catch(error =>
+        console.error('[SFU] Camera replaceTrack failed:', error)
+      );
+    } else if (track && this.transportReady) {
+      this._produceTrack('cam', track, stream).catch(error =>
+        console.error('[SFU] Camera produce failed:', error)
+      );
+    }
+
+    this.onLocalCameraChanged?.(stream);
   }
 
   stopCameraEffects() {
@@ -441,388 +487,119 @@ class WebRTCManager {
   }
 
   stopCamera() {
-    this.applyTrackToPeers('cam', null);
+    const producer = this.producers.get('cam');
+    if (producer) {
+      const producerId = producer.id;
+      producer.close();
+      this.producers.delete('cam');
+      if (this.joinedRoomId) this.socket.emit('sfu-close-producer', { producerId });
+    }
+
     this.cameraEffectVersion++;
     this.stopCameraEffects();
-
-    if (this.rawCamStream) {
-      this.rawCamStream.getTracks().forEach(t => t.stop());
-      this.rawCamStream = null;
-    }
+    if (this.rawCamStream) this.rawCamStream.getTracks().forEach(track => track.stop());
+    this.rawCamStream = null;
     this.localCamStream = null;
-  }
-
-  /**
-   * Set local screen share stream
-   */
-  setScreenStream(screenStream) {
+  }  setScreenStream(screenStream) {
     this.localScreenStream = screenStream;
+
     if (!screenStream) {
-      this.applyTrackToPeers('screen', null);
-      this.applyTrackToPeers('screenAudio', null);
+      this._closeProducer('screen');
+      this._closeProducer('screenAudio');
       return;
     }
 
     const screenTrack = screenStream.getVideoTracks()[0];
-    if (screenTrack) screenTrack.contentHint = 'detail';
+    const audioTrack = screenStream.getAudioTracks()[0];
 
-    this.applyTrackToPeers('screen', screenTrack || null);
-    this.applyTrackToPeers('screenAudio', screenStream.getAudioTracks()[0] || null);
+    if (screenTrack) {
+      screenTrack.contentHint = 'detail';
+      this._produceTrack('screen', screenTrack, screenStream).catch(error =>
+        console.error('[SFU] Screen produce failed:', error)
+      );
+    }
+
+    if (audioTrack) {
+      this._produceTrack('screenAudio', audioTrack, screenStream).catch(error =>
+        console.error('[SFU] Screen audio produce failed:', error)
+      );
+    }
   }
 
   stopScreenShare() {
-    this.applyTrackToPeers('screen', null);
-    this.applyTrackToPeers('screenAudio', null);
+    const stream = this.localScreenStream;
+    this.setScreenStream(null);
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    this.localScreenStream = null;
+  }
 
-    if (this.localScreenStream) {
-      this.localScreenStream.getTracks().forEach(t => t.stop());
-      this.localScreenStream = null;
+  _closeProducer(source) {
+    const producer = this.producers.get(source);
+    if (!producer) return;
+
+    const producerId = producer.id;
+    producer.close();
+    this.producers.delete(source);
+    if (this.joinedRoomId) {
+      this.socket.emit('sfu-close-producer', { producerId });
     }
   }
 
-  createPeerConnection(socketId, { polite = false } = {}) {
-    const pc = new RTCPeerConnection({
-      iceServers: this.iceServers,
-      iceTransportPolicy: this.iceTransportPolicy
+  applyTrackToPeers(source, track) {
+    const producer = this.producers.get(source);
+    if (!producer || !track) return;
+    producer.replaceTrack({ track }).catch(error => {
+      console.error('[SFU] replaceTrack failed:', source, error);
     });
-
-    this.peerState.set(socketId, {
-      polite,
-      makingOffer: false,
-      iceRestartPending: false,
-      restartAttempts: 0,
-      restartTimer: null,
-      graceTimer: null
-    });
-
-    // Send ICE candidates to target peer
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        this.socket.emit('webrtc-ice-candidate', {
-          targetSocketId: socketId,
-          candidate: event.candidate,
-          type: 'mesh'
-        });
-      }
-    };
-
-    pc.onsignalingstatechange = () => {
-      if (pc.signalingState === 'stable') {
-        setTimeout(() => this.flushIceRestart(socketId), 0);
-      }
-    };
-
-    // Receive remote tracks, routed by the m-line they arrived on. The index
-    // into getTransceivers() matches CHANNEL_ORDER on both sides, and is
-    // available even before the answering side has adopted its channels.
-    pc.ontrack = (event) => {
-      const channel = CHANNEL_ORDER[pc.getTransceivers().indexOf(event.transceiver)];
-      const isScreen = channel === 'screen' || channel === 'screenAudio';
-      console.log(`[WebRTC] Remote ${event.track.kind} track from ${socketId} (${channel || 'unknown'})`);
-
-      const streamMap = isScreen ? this.remoteScreenStreams : this.remoteStreams;
-      let remoteStream = streamMap.get(socketId);
-      if (!remoteStream) {
-        remoteStream = new MediaStream();
-        streamMap.set(socketId, remoteStream);
-      }
-
-      if (!remoteStream.getTracks().includes(event.track)) {
-        remoteStream.addTrack(event.track);
-      }
-
-      event.track.onunmute = () => {
-        console.log(`[WebRTC] Remote track unmuted: ${event.track.kind} from ${socketId}`);
-        if (this.onRemoteStreamAdded) {
-          this.onRemoteStreamAdded(socketId, remoteStream, isScreen);
-        }
-      };
-
-      if (this.onRemoteStreamAdded) {
-        this.onRemoteStreamAdded(socketId, remoteStream, isScreen);
-      }
-    };
-
-    // A peer is only dropped when it actually leaves the room; a connection
-    // that breaks is retried, because nothing else would ever bring it back.
-    pc.onconnectionstatechange = () => {
-      const negotiation = this.peerState.get(socketId);
-      console.log(`[WebRTC] Connection state with ${socketId}: ${pc.connectionState}`);
-      if (!negotiation) return;
-
-      if (pc.connectionState === 'connected') {
-        this.clearRecoveryTimers(socketId);
-        negotiation.restartAttempts = 0;
-        if (!negotiation.statsInterval) {
-          negotiation.statsInterval = setInterval(() => this.pollConnectionQuality(socketId), QUALITY_POLL_MS);
-          this.pollConnectionQuality(socketId);
-        }
-        return;
-      }
-
-      this.stopQualityPolling(socketId);
-
-      if (pc.connectionState === 'failed') {
-        this.scheduleRestart(socketId);
-        return;
-      }
-
-      // 'disconnected' usually heals by itself within a few seconds
-      if (pc.connectionState === 'disconnected' && !negotiation.graceTimer) {
-        negotiation.graceTimer = setTimeout(() => {
-          negotiation.graceTimer = null;
-          const current = this.peers.get(socketId);
-          if (current && current.connectionState !== 'connected') {
-            this.scheduleRestart(socketId);
-          }
-        }, DISCONNECT_GRACE_MS);
-      }
-    };
-
-    this.peers.set(socketId, pc);
-    return pc;
-  }
-
-  /**
-   * Send an offer to a peer, optionally restarting ICE. Safe to call from
-   * either side: a collision is resolved by the perfect-negotiation rules.
-   */
-  async sendOffer(socketId, { iceRestart = false } = {}) {
-    const pc = this.peers.get(socketId);
-    const negotiation = this.peerState.get(socketId);
-    if (!pc || !negotiation) return;
-
-    // A negotiation is already in flight; come back to it if it does not settle
-    if (pc.signalingState !== 'stable') {
-      console.warn(`[WebRTC] Skipping offer to ${socketId}, state ${pc.signalingState}`);
-      this.scheduleRestart(socketId);
-      return;
-    }
-
-    try {
-      negotiation.makingOffer = true;
-      if (iceRestart) pc.restartIce();
-
-      const offer = await pc.createOffer();
-      if (pc.signalingState !== 'stable') {
-        // An incoming offer won the race; that handshake takes over from here
-        this.armConnectTimeout(socketId);
-        return;
-      }
-      await pc.setLocalDescription(offer);
-
-      this.socket.emit('webrtc-offer', {
-        targetSocketId: socketId,
-        offer: pc.localDescription,
-        type: 'mesh'
-      });
-
-      this.armConnectTimeout(socketId);
-    } catch (err) {
-      console.error(`[WebRTC] Error offering to peer ${socketId}:`, err);
-      this.scheduleRestart(socketId);
-    } finally {
-      negotiation.makingOffer = false;
-    }
-  }
-
-  /**
-   * If the handshake never produces a connected peer — a lost candidate, an
-   * answer that never came — retry rather than sit there mute.
-   */
-  armConnectTimeout(socketId) {
-    const negotiation = this.peerState.get(socketId);
-    if (!negotiation || negotiation.restartTimer) return;
-
-    negotiation.restartTimer = setTimeout(() => {
-      negotiation.restartTimer = null;
-      const pc = this.peers.get(socketId);
-      if (pc && pc.connectionState !== 'connected') {
-        console.warn(`[WebRTC] ${socketId} still ${pc.connectionState} after handshake, restarting`);
-        this.restartConnection(socketId);
-      }
-    }, CONNECT_TIMEOUT_MS);
-  }
-
-  scheduleRestart(socketId) {
-    const negotiation = this.peerState.get(socketId);
-    if (!negotiation || negotiation.restartTimer) return;
-
-    if (negotiation.restartAttempts >= MAX_RESTART_ATTEMPTS) {
-      console.error(`[WebRTC] Giving up on ${socketId} after ${negotiation.restartAttempts} attempts`);
-      return;
-    }
-
-    const delay = Math.min(1000 * Math.pow(2, negotiation.restartAttempts), 15000);
-    negotiation.restartTimer = setTimeout(() => {
-      negotiation.restartTimer = null;
-      this.restartConnection(socketId);
-    }, delay);
-  }
-
-  restartConnection(socketId) {
-    const pc = this.peers.get(socketId);
-    const negotiation = this.peerState.get(socketId);
-    if (!pc || !negotiation) return;
-    if (pc.connectionState === 'connected') return;
-
-    negotiation.restartAttempts++;
-    console.warn(`[WebRTC] Restarting ICE with ${socketId} (attempt ${negotiation.restartAttempts})`);
-    this.sendOffer(socketId, { iceRestart: true });
-  }
-
-  clearRecoveryTimers(socketId) {
-    const negotiation = this.peerState.get(socketId);
-    if (!negotiation) return;
-
-    clearTimeout(negotiation.restartTimer);
-    clearTimeout(negotiation.graceTimer);
-    negotiation.restartTimer = null;
-    negotiation.graceTimer = null;
-  }
-
-  stopQualityPolling(socketId) {
-    const negotiation = this.peerState.get(socketId);
-    if (!negotiation || !negotiation.statsInterval) return;
-    clearInterval(negotiation.statsInterval);
-    negotiation.statsInterval = null;
-  }
-
-  /**
-   * Sample getStats() for a rough, cheap-to-compute signal: round-trip time on
-   * the active candidate pair plus inbound packet loss, bucketed into
-   * good/ok/bad for the little indicator on each tile.
-   */
-  async pollConnectionQuality(socketId) {
-    const pc = this.peers.get(socketId);
-    if (!pc || pc.connectionState !== 'connected' || !this.onConnectionQualityChanged) return;
-
-    try {
-      const stats = await pc.getStats();
-      let rttMs = null;
-      let packetsLost = 0;
-      let packetsTotal = 0;
-
-      stats.forEach((report) => {
-        if (report.type === 'candidate-pair' && report.state === 'succeeded' &&
-            (report.nominated || report.selected) && typeof report.currentRoundTripTime === 'number') {
-          rttMs = report.currentRoundTripTime * 1000;
-        }
-        if (report.type === 'inbound-rtp' && !report.isRemote) {
-          const lost = report.packetsLost || 0;
-          packetsLost += lost;
-          packetsTotal += lost + (report.packetsReceived || 0);
-        }
-      });
-
-      const lossPct = packetsTotal > 0 ? (packetsLost / packetsTotal) * 100 : 0;
-      let level = 'good';
-      if ((rttMs !== null && rttMs > 300) || lossPct > 8) level = 'bad';
-      else if ((rttMs !== null && rttMs > 150) || lossPct > 3) level = 'ok';
-
-      this.onConnectionQualityChanged(socketId, { level, rttMs, lossPct });
-    } catch (err) {
-      // getStats() rejecting mid-teardown isn't worth logging
-    }
-  }
-
-  /**
-   * Push whatever is currently live locally onto one peer's senders.
-   */
-  attachLocalTracks(socketId) {
-    const channels = this.peerChannels.get(socketId);
-    if (!channels) return;
-
-    const assign = (name, track) => {
-      const transceiver = channels[name];
-      if (transceiver && transceiver.sender) {
-        transceiver.sender.replaceTrack(track).catch(() => {});
-      }
-    };
-
-    if (this.localMicStream) assign('mic', this.localMicStream.getAudioTracks()[0] || null);
-    if (this.localCamStream) assign('cam', this.localCamStream.getVideoTracks()[0] || null);
-    if (this.localScreenStream) {
-      assign('screen', this.localScreenStream.getVideoTracks()[0] || null);
-      assign('screenAudio', this.localScreenStream.getAudioTracks()[0] || null);
-    }
   }
 
   async connectToPeer(socketId) {
-    if (this.peers.has(socketId)) return;
-
-    console.log(`[WebRTC] Initiating connection to peer ${socketId}`);
-    // We opened this connection, so we are the impolite side of the pair
-    const pc = this.createPeerConnection(socketId, { polite: false });
-
-    // Fixed m-line layout. Only the offering side declares it; the answering
-    // side adopts the same order from the offer.
-    this.peerChannels.set(socketId, {
-      mic: pc.addTransceiver('audio', { direction: 'sendrecv' }),
-      cam: pc.addTransceiver('video', { direction: 'sendrecv' }),
-      screen: pc.addTransceiver('video', { direction: 'sendrecv' }),
-      screenAudio: pc.addTransceiver('audio', { direction: 'sendrecv' })
-    });
-    this.attachLocalTracks(socketId);
-
-    await this.sendOffer(socketId);
+    if (!this.joinedRoomId) return;
+    return this._joinPromise;
   }
 
   removePeer(socketId) {
-    this.clearRecoveryTimers(socketId);
-    this.stopQualityPolling(socketId);
-
-    if (this.peers.has(socketId)) {
-      const pc = this.peers.get(socketId);
-      pc.onconnectionstatechange = null;
-      pc.onsignalingstatechange = null;
-      pc.onicecandidate = null;
-      pc.ontrack = null;
-      pc.close();
-      this.peers.delete(socketId);
-    }
-
-    this.peerChannels.delete(socketId);
-    this.peerState.delete(socketId);
-    this.pendingCandidates.delete(socketId);
-
-    [this.remoteStreams, this.remoteScreenStreams].forEach(streamMap => {
-      const stream = streamMap.get(socketId);
-      if (stream) {
-        stream.getTracks().forEach(t => t.stop());
-        streamMap.delete(socketId);
+    for (const [consumerId, entry] of this.consumers) {
+      if (entry.socketId === socketId) {
+        entry.consumer.close();
+        this._removeConsumer(consumerId);
       }
-    });
-
-    if (this.onRemoteStreamRemoved) {
-      this.onRemoteStreamRemoved(socketId);
     }
   }
 
-  /**
-   * Tear down every peer connection but keep the local mic/camera/screen
-   * running — what switching channels needs. Leaving stale connections behind
-   * makes connectToPeer() skip a peer we meet again in the next channel.
-   */
-  resetPeers() {
-    Array.from(this.peers.keys()).forEach(socketId => this.removePeer(socketId));
-    this.peers.clear();
-    this.peerChannels.clear();
-    this.peerState.clear();
-    this.pendingCandidates.clear();
+  resetPeers(sendLeave = true) {
+    if (sendLeave && this.joinedRoomId) {
+      this.socket.emit('sfu-leave-room');
+    }
+
+    this.consumers.forEach(entry => entry.consumer.close());
+    this.consumers.clear();
     this.remoteStreams.clear();
     this.remoteScreenStreams.clear();
+    this.remoteProducerMeta.clear();
+
+    this.producers.forEach(producer => producer.close());
+    this.producers.clear();
+
+    if (this.sendTransport) this.sendTransport.close();
+    if (this.recvTransport) this.recvTransport.close();
+
+    this.sendTransport = null;
+    this.recvTransport = null;
+    this.transportReady = false;
+    this.joinedRoomId = null;
+    this.device = null;
+
+    this._joinPromise = null;
+    this._joinResolve = null;
+    this._joinReject = null;
   }
 
   cleanupAll() {
-    this.resetPeers();
-
-    this.stopMicrophone();
+    this.resetPeers(true);
     this.stopCamera();
-    if (this.localScreenStream) {
-      this.localScreenStream.getTracks().forEach(t => t.stop());
-      this.localScreenStream = null;
-    }
+    this.stopMicrophone();
+    this.stopScreenShare();
   }
 }
 

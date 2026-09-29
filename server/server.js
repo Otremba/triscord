@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const cors = require('cors');
+const sfu = require('./sfu');
 const {
   sanitizeUsername,
   sanitizeColor,
@@ -215,6 +216,7 @@ function addReactionToggle(message, emoji, userId) {
 }
 
 io.on('connection', (socket) => {
+  sfu.attachSocket(socket);
   console.log(`[Socket Connected] ID: ${socket.id}`);
 
   // Send current room list and user state on connect
@@ -317,36 +319,6 @@ io.on('connection', (socket) => {
     // 3. Broadcast updated global room directory to everyone
     io.emit('rooms-update', getRoomsSummary());
     console.log(`[Join] ${currentUserData.username} joined room #${roomId} (${room.users.size} online)`);
-  });
-
-  // WebRTC Signaling: Offer
-  socket.on('webrtc-offer', ({ targetSocketId, offer, type } = {}) => {
-    if (typeof targetSocketId !== 'string') return;
-    io.to(targetSocketId).emit('webrtc-offer', {
-      senderSocketId: socket.id,
-      offer,
-      type // 'camera', 'screen', or 'mesh'
-    });
-  });
-
-  // WebRTC Signaling: Answer
-  socket.on('webrtc-answer', ({ targetSocketId, answer, type } = {}) => {
-    if (typeof targetSocketId !== 'string') return;
-    io.to(targetSocketId).emit('webrtc-answer', {
-      senderSocketId: socket.id,
-      answer,
-      type
-    });
-  });
-
-  // WebRTC Signaling: ICE Candidate
-  socket.on('webrtc-ice-candidate', ({ targetSocketId, candidate, type } = {}) => {
-    if (typeof targetSocketId !== 'string') return;
-    io.to(targetSocketId).emit('webrtc-ice-candidate', {
-      senderSocketId: socket.id,
-      candidate,
-      type
-    });
   });
 
   // User state updates (mute, camera toggle, screenshare toggle, speaking indicator, profile)
@@ -504,12 +476,15 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 if (require.main === module) {
-  server.listen(PORT, '0.0.0.0', () => {
+  sfu.init().then(() => server.listen(PORT, '0.0.0.0', () => {
     console.log(`=========================================`);
     console.log(`🚀 Servidor Triscord Ativo!`);
     console.log(`📡 Porta: ${PORT}`);
     console.log(`🔗 Local: http://localhost:${PORT}`);
     console.log(`=========================================`);
+  })).catch(error => {
+    console.error('[SFU] Failed to initialize mediasoup:', error);
+    process.exit(1);
   });
 }
 
