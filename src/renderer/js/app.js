@@ -243,6 +243,13 @@ document.addEventListener('DOMContentLoaded', () => {
     btnCamera: document.getElementById('btnToggleCamera'),
     btnScreenShare: document.getElementById('btnToggleScreenShare'),
     btnToggleRecording: document.getElementById('btnToggleRecording'),
+    btnSoundboard: document.getElementById('btnSoundboard'),
+    soundboardPanel: document.getElementById('soundboardPanel'),
+    soundboardGrid: document.getElementById('soundboardGrid'),
+    soundboardVolume: document.getElementById('soundboardVolume'),
+    btnSoundboardMute: document.getElementById('btnSoundboardMute'),
+    btnSoundboardImport: document.getElementById('btnSoundboardImport'),
+    soundboardFileInput: document.getElementById('soundboardFileInput'),
     btnDisconnect: document.getElementById('btnDisconnectVoice'),
 
     // Chat Drawer
@@ -576,6 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPresetBackgroundButtons();
   initNameGate();
   initSidebarLayout();
+  initSoundboardUI();
 
   // Initialize Screen Share Picker
   state.screenPicker = new window.ScreenSharePicker();
@@ -615,6 +623,13 @@ document.addEventListener('DOMContentLoaded', () => {
         iceServers: buildCustomIceServers()
       });
       state.webrtc.cameraEffect = state.cameraEffect;
+      // Soundboard clips travel over this socket; a new socket needs a new one
+      if (state.soundboard) state.soundboard.destroy();
+      state.soundboard = new window.Soundboard(state.socket, {
+        shouldPlay: () => !!state.currentRoomId && !state.user.isDeafened
+      });
+      state.soundboard.onPlayed = showSoundBadge;
+
       state.webrtc.onConnectionQualityChanged = (socketId, quality) => {
         updateConnectionQualityIndicator(socketId, quality);
         // Polled every few seconds while connected: a good moment to make sure
@@ -1120,7 +1135,271 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Leave room
+  // ---- Soundboard (see soundboard.js for how clips reach everyone) ----
+
+  function isSoundboardOpen() {
+    return !el.soundboardPanel.classList.contains('hidden');
+  }
+
+  // Fixed-position above its button, clamped to the window, like a popover
+  function positionSoundboardPanel() {
+    const button = el.btnSoundboard.getBoundingClientRect();
+    const panelWidth = el.soundboardPanel.offsetWidth;
+    const left = Math.min(
+      Math.max(12, button.left + button.width / 2 - panelWidth / 2),
+      window.innerWidth - panelWidth - 12
+    );
+    el.soundboardPanel.style.left = `${left}px`;
+    el.soundboardPanel.style.bottom = `${window.innerHeight - button.top + 8}px`;
+  }
+
+  function openSoundboard() {
+    if (!state.soundboard) return;
+    el.soundboardVolume.value = state.soundboard.volume;
+    updateSoundboardMuteButton();
+    renderSoundboard();
+    positionSoundboardPanel();
+    el.soundboardPanel.classList.remove('hidden');
+    el.btnSoundboard.classList.add('panel-open');
+    el.btnSoundboard.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeSoundboard() {
+    el.soundboardPanel.classList.add('hidden');
+    el.btnSoundboard.classList.remove('panel-open');
+    el.btnSoundboard.setAttribute('aria-expanded', 'false');
+  }
+
+  function updateSoundboardMuteButton() {
+    const muted = !!(state.soundboard && state.soundboard.muted);
+    window.setIcon(el.btnSoundboardMute, muted ? 'volume-x' : 'volume-2');
+    const label = muted ? 'Ouvir sons de todos' : 'Silenciar sons de todos';
+    el.btnSoundboardMute.title = label;
+    el.btnSoundboardMute.setAttribute('aria-label', label);
+    el.soundboardVolume.disabled = muted;
+  }
+
+  async function renderSoundboard() {
+    if (!state.soundboard) return;
+    const sounds = await state.soundboard.listSounds();
+    el.soundboardGrid.innerHTML = '';
+
+    if (!sounds.length) {
+      const empty = document.createElement('div');
+      empty.className = 'soundboard-empty';
+      empty.textContent = 'Nenhum som ainda. Clique em + ou arraste arquivos de áudio para cá.';
+      el.soundboardGrid.appendChild(empty);
+      return;
+    }
+
+    sounds.forEach(sound => el.soundboardGrid.appendChild(createSoundTile(sound)));
+    window.renderIcons(el.soundboardGrid);
+  }
+
+  function createSoundTile(sound) {
+    const tile = document.createElement('div');
+    tile.className = 'sound-tile';
+    tile.tabIndex = 0;
+    tile.setAttribute('role', 'button');
+    tile.title = `Tocar "${sound.name}" para todos`;
+
+    const emoji = document.createElement('span');
+    emoji.className = 'sound-tile-emoji';
+    emoji.textContent = sound.emoji;
+    const name = document.createElement('span');
+    name.className = 'sound-tile-name';
+    name.textContent = sound.name;
+
+    const actions = document.createElement('div');
+    actions.className = 'sound-tile-actions';
+    [
+      ['headphones', 'Ouvir só para mim', () => state.soundboard.preview(sound)],
+      ['pencil', 'Renomear', () => startEditingSound(tile, sound)],
+      ['trash-2', 'Remover', () => removeSound(sound)]
+    ].forEach(([icon, label, action]) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.title = label;
+      button.setAttribute('aria-label', label);
+      button.innerHTML = `<i data-lucide="${icon}"></i>`;
+      button.addEventListener('click', (e) => {
+        e.stopPropagation();
+        Promise.resolve(action()).catch(err => showToast(err.message, 'error'));
+      });
+      actions.appendChild(button);
+    });
+
+    tile.append(emoji, name, actions);
+
+    const play = () => {
+      if (tile.classList.contains('editing')) return;
+      playSound(sound, tile);
+    };
+    tile.addEventListener('click', play);
+    tile.addEventListener('keydown', (e) => {
+      if (e.target !== tile || (e.key !== 'Enter' && e.key !== ' ')) return;
+      e.preventDefault();
+      play();
+    });
+    return tile;
+  }
+
+  async function playSound(sound, tile) {
+    if (!state.currentRoomId) {
+      showToast('Entre em um canal de voz para tocar sons.', 'error');
+      return;
+    }
+    // Restart the pulse so every click visibly registers
+    tile.classList.remove('just-played');
+    void tile.offsetWidth;
+    tile.classList.add('just-played');
+
+    try {
+      await state.soundboard.play(sound);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function startEditingSound(tile, sound) {
+    tile.classList.add('editing');
+    tile.innerHTML = '';
+
+    const emojiInput = document.createElement('input');
+    emojiInput.className = 'sound-edit-emoji';
+    emojiInput.value = sound.emoji;
+    emojiInput.maxLength = 8;
+    emojiInput.setAttribute('aria-label', 'Emoji');
+
+    const nameInput = document.createElement('input');
+    nameInput.className = 'sound-edit-name';
+    nameInput.value = sound.name;
+    nameInput.maxLength = window.SOUNDBOARD_MAX_NAME_LENGTH;
+    nameInput.setAttribute('aria-label', 'Nome do som');
+
+    let finished = false;
+    const finish = async (save) => {
+      if (finished) return;
+      finished = true;
+      if (save) {
+        const newName = nameInput.value.trim() || sound.name;
+        const newEmoji = emojiInput.value.trim() || sound.emoji;
+        await state.soundboard.updateSound(sound, { name: newName, emoji: newEmoji });
+      }
+      renderSoundboard();
+    };
+
+    [emojiInput, nameInput].forEach((input) => {
+      input.addEventListener('click', e => e.stopPropagation());
+      input.addEventListener('keydown', (e) => {
+        e.stopPropagation(); // keeps Escape and shortcuts from reaching the document
+        if (e.key === 'Enter') finish(true);
+        if (e.key === 'Escape') finish(false);
+      });
+    });
+    // Leaving both fields saves, like renaming a file
+    tile.addEventListener('focusout', () => {
+      setTimeout(() => {
+        if (!tile.contains(document.activeElement)) finish(true);
+      }, 0);
+    });
+
+    tile.append(emojiInput, nameInput);
+    nameInput.focus();
+    nameInput.select();
+  }
+
+  async function removeSound(sound) {
+    if (!confirm(`Remover "${sound.name}" do seu soundboard?`)) return;
+    await state.soundboard.deleteSound(sound);
+    renderSoundboard();
+  }
+
+  async function importSoundFiles(files) {
+    if (!state.soundboard) return;
+    let added = 0;
+    for (const file of Array.from(files)) {
+      try {
+        await state.soundboard.importFile(file);
+        added++;
+      } catch (err) {
+        const message = err instanceof window.SoundboardError ? err.message : `Não foi possível adicionar "${file.name}".`;
+        showToast(message, 'error');
+      }
+    }
+    if (added) {
+      showToast(added === 1 ? 'Som adicionado ao soundboard.' : `${added} sons adicionados ao soundboard.`);
+      renderSoundboard();
+    }
+  }
+
+  // "Fulano: 🔊 Buzina" floating over the tile of whoever played it
+  function showSoundBadge({ bySocketId, byUsername, emoji, name }) {
+    const isMe = !!state.socket && bySocketId === state.socket.id;
+    const tile = document.getElementById(isMe ? 'tile-local' : `tile-${bySocketId}`);
+    if (!tile) return;
+
+    tile.querySelectorAll('.soundboard-badge').forEach(b => b.remove());
+    const badge = document.createElement('div');
+    badge.className = 'soundboard-badge';
+    badge.textContent = `${isMe ? 'Você' : byUsername}: ${emoji} ${name}`;
+    tile.appendChild(badge);
+    setTimeout(() => badge.remove(), 2700);
+  }
+
+  function initSoundboardUI() {
+    el.btnSoundboard.addEventListener('click', () => {
+      if (isSoundboardOpen()) closeSoundboard();
+      else openSoundboard();
+    });
+
+    el.btnSoundboardImport.addEventListener('click', () => el.soundboardFileInput.click());
+    el.soundboardFileInput.addEventListener('change', () => {
+      importSoundFiles(el.soundboardFileInput.files);
+      el.soundboardFileInput.value = '';
+    });
+
+    el.soundboardVolume.addEventListener('input', () => {
+      if (state.soundboard) state.soundboard.setVolume(parseInt(el.soundboardVolume.value, 10));
+    });
+
+    el.btnSoundboardMute.addEventListener('click', () => {
+      if (!state.soundboard) return;
+      state.soundboard.setMuted(!state.soundboard.muted);
+      updateSoundboardMuteButton();
+    });
+
+    // Drop audio files straight onto the panel
+    el.soundboardPanel.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer || !Array.from(e.dataTransfer.types).includes('Files')) return;
+      e.preventDefault();
+      el.soundboardPanel.classList.add('drag-over');
+    });
+    el.soundboardPanel.addEventListener('dragleave', (e) => {
+      if (!el.soundboardPanel.contains(e.relatedTarget)) el.soundboardPanel.classList.remove('drag-over');
+    });
+    el.soundboardPanel.addEventListener('drop', (e) => {
+      e.preventDefault();
+      el.soundboardPanel.classList.remove('drag-over');
+      if (e.dataTransfer && e.dataTransfer.files.length) importSoundFiles(e.dataTransfer.files);
+    });
+
+    // Clicking anywhere else closes it
+    document.addEventListener('mousedown', (e) => {
+      if (!isSoundboardOpen()) return;
+      if (el.soundboardPanel.contains(e.target) || el.btnSoundboard.contains(e.target)) return;
+      closeSoundboard();
+    });
+
+    window.addEventListener('resize', () => {
+      if (isSoundboardOpen()) positionSoundboardPanel();
+    });
+  }
+
   function leaveCurrentRoom() {
+    closeSoundboard();
+    if (state.soundboard) state.soundboard.stopAll();
+
     if (state.currentRoomId && state.socket) {
       state.socket.emit('leave-room');
     }
@@ -2453,6 +2732,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Toggle Deafen
   function toggleDeafen() {
     state.user.isDeafened = !state.user.isDeafened;
+    if (state.user.isDeafened && state.soundboard) state.soundboard.stopAll();
     if (state.user.isDeafened && !state.user.isMuted) {
       // Deafen automatically mutes mic
       toggleMute();
@@ -3003,6 +3283,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } else if (!el.effectsModal.classList.contains('hidden')) {
         closeEffectsModal();
+      } else if (isSoundboardOpen()) {
+        closeSoundboard();
       } else if (state.volumePopover) {
         closeVolumePopover();
       } else if (state.focusedTileId) {

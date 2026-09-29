@@ -13,6 +13,15 @@ const MAX_MESSAGE_LENGTH = 2000;
 const MAX_ROOM_NAME_LENGTH = 48;
 const MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024; // 3MB decoded image cap
 
+// Soundboard clips: short, small, and only formats Chromium decodes natively
+const MAX_SOUND_BYTES = 1024 * 1024;
+const MAX_SOUND_NAME_LENGTH = 32;
+const MAX_SOUND_EMOJI_LENGTH = 8;
+const DEFAULT_SOUND_EMOJI = '\u{1F50A}';
+const SOUND_MIME_TYPES = ['audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/wave', 'audio/x-wav', 'audio/webm', 'audio/mp4', 'audio/aac'];
+// A sound's id is the SHA-256 of its bytes, so the same file always maps to it
+const SOUND_ID_RE = /^[0-9a-f]{64}$/;
+
 // Small, fixed emoji set - keeps reactions from becoming a free-text field
 const ALLOWED_REACTIONS = ['\u{1F44D}', '❤️', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F389}'];
 
@@ -95,6 +104,31 @@ function sanitizeUserStateUpdate(update) {
   return clean;
 }
 
+function sanitizeSoundId(id) {
+  return typeof id === 'string' && SOUND_ID_RE.test(id) ? id : null;
+}
+
+// Name and emoji are only ever rendered as text, but keep them short and clean
+function sanitizeSoundMeta(meta = {}) {
+  const name = typeof meta.name === 'string'
+    ? stripControlChars(meta.name).trim().slice(0, MAX_SOUND_NAME_LENGTH)
+    : '';
+  const emoji = typeof meta.emoji === 'string'
+    ? Array.from(stripControlChars(meta.emoji).trim()).slice(0, MAX_SOUND_EMOJI_LENGTH).join('')
+    : '';
+  return { name: name || 'Som', emoji: emoji || DEFAULT_SOUND_EMOJI };
+}
+
+// The audio bytes as a Buffer, or null when they are not acceptable
+function sanitizeSoundData(data, mime) {
+  if (!SOUND_MIME_TYPES.includes(mime)) return null;
+  let buffer = null;
+  if (Buffer.isBuffer(data)) buffer = data;
+  else if (data instanceof ArrayBuffer) buffer = Buffer.from(data);
+  if (!buffer || buffer.length === 0 || buffer.length > MAX_SOUND_BYTES) return null;
+  return buffer;
+}
+
 module.exports = {
   HEX_COLOR_RE,
   DEFAULT_COLOR,
@@ -102,6 +136,8 @@ module.exports = {
   MAX_STATUS_LENGTH,
   MAX_MESSAGE_LENGTH,
   MAX_ATTACHMENT_BYTES,
+  MAX_SOUND_BYTES,
+  SOUND_MIME_TYPES,
   ALLOWED_REACTIONS,
   sanitizeUsername,
   sanitizeColor,
@@ -109,5 +145,8 @@ module.exports = {
   sanitizeMessageText,
   sanitizeRoomName,
   sanitizeAttachment,
-  sanitizeUserStateUpdate
+  sanitizeUserStateUpdate,
+  sanitizeSoundId,
+  sanitizeSoundMeta,
+  sanitizeSoundData
 };

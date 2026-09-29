@@ -2293,6 +2293,248 @@ body {
     fill var(--dur-slow) var(--ease-in-out) !important;
 }
 
+/* ==========================================================================
+   Soundboard panel (positioned above its button by positionSoundboardPanel)
+   ========================================================================== */
+.soundboard-panel {
+  position: fixed;
+  z-index: 900;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(420px, 60vh);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-floating);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-high);
+  overflow: hidden;
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-pop),
+    visibility var(--dur-base) linear;
+}
+
+/* Kept rendered while hidden so it can animate out, like the modals */
+.soundboard-panel.hidden {
+  display: flex !important;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.97);
+}
+
+.soundboard-panel.drag-over {
+  border-color: var(--accent-blurple);
+  box-shadow: var(--shadow-high), var(--focus-ring);
+}
+
+.soundboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--control-border);
+}
+
+.soundboard-title {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  color: var(--text-header);
+}
+
+.soundboard-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.soundboard-header-actions input[type="range"] {
+  width: 110px;
+  accent-color: var(--accent-blurple);
+}
+
+.soundboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.soundboard-empty {
+  grid-column: 1 / -1;
+  padding: 20px 8px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sound-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 10px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-in-out),
+    border-color var(--dur-fast) var(--ease-in-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+.sound-tile:hover {
+  border-color: var(--accent-blurple);
+}
+
+.sound-tile:active {
+  transform: scale(0.95);
+}
+
+.sound-tile:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* A short pulse when a clip is sent, so the click visibly registered */
+.sound-tile.just-played {
+  animation: soundPulse 600ms var(--ease-out);
+}
+
+@keyframes soundPulse {
+  0% { box-shadow: 0 0 0 0 rgba(88, 101, 242, 0.6); }
+  100% { box-shadow: 0 0 0 10px rgba(88, 101, 242, 0); }
+}
+
+.sound-tile-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.sound-tile-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Preview / edit / delete appear on hover, over the end of the name */
+.sound-tile-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background-color: var(--bg-floating);
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-in-out);
+}
+
+.sound-tile:hover .sound-tile-actions,
+.sound-tile:focus-within .sound-tile-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sound-tile-actions button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.sound-tile-actions button:hover {
+  background-color: var(--channel-hover);
+  color: var(--text-header);
+}
+
+.sound-tile-actions .lucide {
+  width: 14px;
+  height: 14px;
+}
+
+/* Inline rename */
+.sound-tile.editing {
+  cursor: default;
+}
+
+.sound-tile.editing input {
+  min-width: 0;
+  padding: 4px 6px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-normal);
+  font: inherit;
+}
+
+.sound-tile.editing .sound-edit-emoji {
+  width: 36px;
+  text-align: center;
+}
+
+.sound-tile.editing .sound-edit-name {
+  flex: 1;
+}
+
+.soundboard-hint {
+  padding: 8px 12px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--control-border);
+}
+
+.btn-voice-control.panel-open {
+  border-color: var(--accent-blurple);
+  color: var(--text-header);
+}
+
+/* "Fulano tocou 🔊 Buzina", floating over the player's tile */
+.soundboard-badge {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  z-index: 5;
+  max-width: calc(100% - 20px);
+  padding: 4px 10px;
+  background-color: rgba(0, 0, 0, 0.72);
+  border-radius: var(--radius-full);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  animation: soundBadge 2600ms var(--ease-out) forwards;
+}
+
+@keyframes soundBadge {
+  0% { opacity: 0; transform: translate(-50%, -6px) scale(0.9); }
+  10% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -4px) scale(0.98); }
+}
+
 /* Someone who never wants motion gets none of it */
 @media (prefers-reduced-motion: reduce) {
   *,

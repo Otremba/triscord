@@ -163,6 +163,21 @@
             </div>
           </div>
 
+          <!-- Soundboard: opens above the action bar -->
+          <div class="soundboard-panel hidden" id="soundboardPanel" role="dialog" aria-label="Soundboard">
+            <div class="soundboard-header">
+              <span class="soundboard-title">Soundboard</span>
+              <div class="soundboard-header-actions">
+                <button type="button" class="btn-icon-small" id="btnSoundboardMute" title="Silenciar sons de todos" aria-label="Silenciar sons de todos"><i data-lucide="volume-2"></i></button>
+                <input type="range" id="soundboardVolume" min="0" max="100" step="5" value="70" aria-label="Volume do soundboard" title="Volume dos sons que você ouve" />
+                <button type="button" class="btn-icon-small" id="btnSoundboardImport" title="Adicionar sons" aria-label="Adicionar sons"><i data-lucide="plus"></i></button>
+                <input type="file" id="soundboardFileInput" accept="audio/*,.mp3,.ogg,.wav,.m4a,.webm,.opus" multiple hidden />
+              </div>
+            </div>
+            <div class="soundboard-grid" id="soundboardGrid"></div>
+            <div class="soundboard-hint">Clique para tocar para todos · arraste arquivos aqui · MP3, OGG, WAV, M4A · até 1 MB e 10 s</div>
+          </div>
+
           <!-- Bottom Voice Action Controls -->
           <div class="voice-action-bar">
             <button class="btn-voice-control" id="btnToggleCamera">
@@ -183,6 +198,11 @@
             <button class="btn-voice-control hidden" id="btnToggleRecording" title="Gravar chamada">
               <i data-lucide="circle-dot"></i>
               <span class="btn-label">Gravar</span>
+            </button>
+
+            <button class="btn-voice-control" id="btnSoundboard" title="Soundboard" aria-expanded="false" aria-controls="soundboardPanel">
+              <i data-lucide="music-2"></i>
+              <span class="btn-label">Sons</span>
             </button>
 
             <button class="btn-voice-control btn-disconnect" id="btnDisconnectVoice">
@@ -500,6 +520,7 @@
   <script src="js/webrtc.js"></script>
   <script src="js/system-audio.js"></script>
   <script src="js/screen.js"></script>
+  <script src="js/soundboard.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

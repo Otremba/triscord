@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const crypto = require('crypto');
 const cors = require('cors');
 const {
   sanitizeUsername,
@@ -11,6 +12,9 @@ const {
   sanitizeRoomName,
   sanitizeAttachment,
   sanitizeUserStateUpdate,
+  sanitizeSoundId,
+  sanitizeSoundMeta,
+  sanitizeSoundData,
   ALLOWED_REACTIONS
 } = require('./sanitize');
 
@@ -137,7 +141,7 @@ const io = new Server(server, {
 const MAX_CHAT_HISTORY = 200;
 
 // Rooms state: roomId -> { id, name, category, users: Map(socketId -> userData),
-//   messages: [], ownerUserId, locked, maxUsers }
+//   messages: [], ownerUserId, locked, maxUsers, sounds: Map(soundId -> clip), soundBytes }
 const defaultRooms = [
   { id: 'geral', name: 'Geral', category: 'Canais de Voz', type: 'voice' },
   { id: 'jogos', name: 'Jogos & Gameplay', category: 'Canais de Voz', type: 'voice' },
@@ -149,8 +153,35 @@ const defaultRooms = [
 const rooms = new Map();
 defaultRooms.forEach(r => {
   // Default rooms have no owner: nobody can lock them or kick from them
-  rooms.set(r.id, { ...r, users: new Map(), messages: [], ownerUserId: null, locked: false, maxUsers: null });
+  rooms.set(r.id, {
+    ...r, users: new Map(), messages: [], ownerUserId: null, locked: false, maxUsers: null,
+    sounds: new Map(), soundBytes: 0
+  });
 });
+
+// Soundboard clips live in memory per room, only while someone is in it.
+// Bounded so a room cannot grow without limit on a small server.
+const MAX_ROOM_SOUNDS = 30;
+const MAX_ROOM_SOUND_BYTES = 15 * 1024 * 1024;
+
+function storeRoomSound(room, clip) {
+  if (room.sounds.has(clip.id)) return;
+  room.sounds.set(clip.id, clip);
+  room.soundBytes += clip.data.length;
+
+  // Map order is insertion order, and plays re-insert, so the first entry is
+  // the least recently played
+  while (room.sounds.size > MAX_ROOM_SOUNDS || room.soundBytes > MAX_ROOM_SOUND_BYTES) {
+    const [oldestId, oldest] = room.sounds.entries().next().value;
+    room.sounds.delete(oldestId);
+    room.soundBytes -= oldest.data.length;
+  }
+}
+
+function touchRoomSound(room, clip) {
+  room.sounds.delete(clip.id);
+  room.sounds.set(clip.id, clip);
+}
 
 // A tiny sliding-window limiter so one client can't flood the room with chat
 function makeRateLimiter(maxEvents, windowMs) {
@@ -243,6 +274,9 @@ io.on('connection', (socket) => {
   let currentUserData = null;
   const chatLimiter = makeRateLimiter(6, 4000);
   const reactionLimiter = makeRateLimiter(20, 4000);
+  const soundPlayLimiter = makeRateLimiter(2, 3000);
+  const soundUploadLimiter = makeRateLimiter(10, 60000);
+  const soundFetchLimiter = makeRateLimiter(40, 60000);
 
   function isOwner(room) {
     return !!room && !!room.ownerUserId && !!currentUserData && room.ownerUserId === currentUserData.userId;
@@ -273,7 +307,9 @@ io.on('connection', (socket) => {
         // The first person to create a custom room owns it (kick/mute/lock rights)
         ownerUserId: (userData && userData.userId) || null,
         locked: false,
-        maxUsers: null
+        maxUsers: null,
+        sounds: new Map(),
+        soundBytes: 0
       });
     }
 
@@ -454,6 +490,75 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Soundboard ---------------------------------------------------------
+  // A clip is identified by the SHA-256 of its bytes. Playing sends only that
+  // id; the bytes are uploaded once per room (when the server answers
+  // needData) and each listener fetches them once, then plays from its cache.
+
+  function currentRoomForSound() {
+    return currentRoomId && currentUserData ? rooms.get(currentRoomId) : null;
+  }
+
+  function broadcastSound(room, soundId, meta) {
+    const { name, emoji } = sanitizeSoundMeta(meta);
+    io.to(room.id).emit('soundboard-played', {
+      soundId,
+      name,
+      emoji,
+      bySocketId: socket.id,
+      byUsername: currentUserData.username
+    });
+  }
+
+  socket.on('soundboard-play', (payload, ack) => {
+    const reply = typeof ack === 'function' ? ack : () => {};
+    const room = currentRoomForSound();
+    const soundId = sanitizeSoundId(payload && payload.soundId);
+    if (!room || !soundId) return reply({ ok: false, error: 'invalid' });
+
+    const clip = room.sounds.get(soundId);
+    // Asking for the upload does not count against the play limit
+    if (!clip) return reply({ ok: false, needData: true });
+    if (!soundPlayLimiter()) return reply({ ok: false, error: 'rate-limited' });
+
+    touchRoomSound(room, clip);
+    broadcastSound(room, soundId, payload);
+    reply({ ok: true });
+  });
+
+  socket.on('soundboard-upload', (payload, ack) => {
+    const reply = typeof ack === 'function' ? ack : () => {};
+    const room = currentRoomForSound();
+    const soundId = sanitizeSoundId(payload && payload.soundId);
+    if (!room || !soundId) return reply({ ok: false, error: 'invalid' });
+
+    const data = sanitizeSoundData(payload.data, payload.mime);
+    if (!data) return reply({ ok: false, error: 'invalid-sound' });
+    // Limited before hashing, which is the expensive part
+    if (!soundUploadLimiter()) return reply({ ok: false, error: 'rate-limited' });
+    // The id must really be the hash of these bytes, or one client could
+    // plant different audio under an id another client will play
+    if (crypto.createHash('sha256').update(data).digest('hex') !== soundId) {
+      return reply({ ok: false, error: 'hash-mismatch' });
+    }
+
+    // Kept even when this play is over the limit, so a later one needs no upload
+    storeRoomSound(room, { id: soundId, mime: payload.mime, data });
+    if (!soundPlayLimiter()) return reply({ ok: false, error: 'rate-limited' });
+    broadcastSound(room, soundId, payload);
+    reply({ ok: true });
+  });
+
+  socket.on('soundboard-fetch', (payload, ack) => {
+    if (typeof ack !== 'function') return;
+    const room = currentRoomForSound();
+    const soundId = sanitizeSoundId(payload && payload.soundId);
+    const clip = room && soundId && room.sounds.get(soundId);
+    if (!clip) return ack({ ok: false, error: 'not-found' });
+    if (!soundFetchLimiter()) return ack({ ok: false, error: 'rate-limited' });
+    ack({ ok: true, mime: clip.mime, data: clip.data });
+  });
+
   // Room owner controls -------------------------------------------------
 
   socket.on('kick-user', ({ socketId } = {}) => {
@@ -514,6 +619,12 @@ io.on('connection', (socket) => {
       room.users.delete(socket.id);
       socket.leave(currentRoomId);
 
+      // Nobody left to play them to
+      if (room.users.size === 0) {
+        room.sounds.clear();
+        room.soundBytes = 0;
+      }
+
       socket.to(currentRoomId).emit('user-left', {
         socketId: socket.id,
         username: currentUserData ? currentUserData.username : 'Usuário'
@@ -542,4 +653,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, server, io, rooms, getRoomsSummary, getConfiguredTurnServers, getIceTransportPolicy, getBaseIceServers };
+module.exports = { app, server, io, rooms, getRoomsSummary, MAX_ROOM_SOUNDS, MAX_ROOM_SOUND_BYTES, getConfiguredTurnServers, getIceTransportPolicy, getBaseIceServers };

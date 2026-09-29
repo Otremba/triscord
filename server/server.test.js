@@ -1,5 +1,5 @@
 const io = require('socket.io-client');
-const { server, getConfiguredTurnServers, getIceTransportPolicy, getBaseIceServers } = require('./server');
+const { server, rooms, getConfiguredTurnServers, getIceTransportPolicy, getBaseIceServers } = require('./server');
 
 let port;
 
@@ -274,5 +274,86 @@ describe('stale sessions', () => {
 
     other.client.close();
     rejoiner.client.close();
+  }, 10000);
+});
+
+describe('soundboard', () => {
+  const crypto = require('crypto');
+  const clip = Buffer.from('fake mp3 bytes for the soundboard test');
+  const clipId = crypto.createHash('sha256').update(clip).digest('hex');
+
+  test('uploads a clip once, broadcasts plays and serves it to listeners', async () => {
+    const roomId = `room-${Date.now()}-sb1`;
+    const player = await joinAs(roomId, 'sb-player', 'Player');
+    const listener = await joinAs(roomId, 'sb-listener', 'Listener');
+
+    // The room has never seen this clip, so the server asks for the bytes
+    expect(await player.client.emitWithAck('soundboard-play', { soundId: clipId, name: 'Buzina' }))
+      .toEqual({ ok: false, needData: true });
+
+    // An id that is not the hash of the bytes is refused
+    const wrongId = 'f'.repeat(64);
+    expect(await player.client.emitWithAck('soundboard-upload', { soundId: wrongId, mime: 'audio/mpeg', data: clip }))
+      .toEqual({ ok: false, error: 'hash-mismatch' });
+
+    const heard = once(listener.client, 'soundboard-played');
+    expect(await player.client.emitWithAck('soundboard-upload', {
+      soundId: clipId, mime: 'audio/mpeg', data: clip, name: '  Buzina\u0007 ', emoji: '\u{1F4EF}'
+    })).toEqual({ ok: true });
+
+    expect(await heard).toEqual({
+      soundId: clipId, name: 'Buzina', emoji: '\u{1F4EF}', bySocketId: player.id, byUsername: 'Player'
+    });
+
+    const fetched = await listener.client.emitWithAck('soundboard-fetch', { soundId: clipId });
+    expect(fetched.ok).toBe(true);
+    expect(fetched.mime).toBe('audio/mpeg');
+    expect(Buffer.from(fetched.data).equals(clip)).toBe(true);
+
+    // Cached now: a play carries only the id
+    await new Promise(resolve => setTimeout(resolve, 3100)); // past the play rate limit window
+    expect(await player.client.emitWithAck('soundboard-play', { soundId: clipId })).toEqual({ ok: true });
+
+    player.client.close();
+    listener.client.close();
+  }, 10000);
+
+  test('rejects bad clips, outsiders and spam', async () => {
+    const roomId = `room-${Date.now()}-sb2`;
+    const player = await joinAs(roomId, 'sb-spammer', 'Spammer');
+
+    expect(await player.client.emitWithAck('soundboard-upload', { soundId: clipId, mime: 'text/html', data: clip }))
+      .toEqual({ ok: false, error: 'invalid-sound' });
+    expect(await player.client.emitWithAck('soundboard-play', { soundId: 'not-a-hash' }))
+      .toEqual({ ok: false, error: 'invalid' });
+
+    expect(await player.client.emitWithAck('soundboard-upload', { soundId: clipId, mime: 'audio/mpeg', data: clip }))
+      .toEqual({ ok: true });
+    expect(await player.client.emitWithAck('soundboard-play', { soundId: clipId })).toEqual({ ok: true });
+    expect(await player.client.emitWithAck('soundboard-play', { soundId: clipId }))
+      .toEqual({ ok: false, error: 'rate-limited' });
+
+    // Someone who is not in the room cannot play or fetch anything
+    const outsider = connect();
+    await once(outsider, 'connect');
+    expect(await outsider.emitWithAck('soundboard-fetch', { soundId: clipId })).toEqual({ ok: false, error: 'not-found' });
+
+    player.client.close();
+    outsider.close();
+  }, 10000);
+
+  test('forgets a room\'s clips once everyone has left', async () => {
+    const roomId = `room-${Date.now()}-sb3`;
+    const player = await joinAs(roomId, 'sb-leaver', 'Leaver');
+    await player.client.emitWithAck('soundboard-upload', { soundId: clipId, mime: 'audio/mpeg', data: clip });
+    expect(rooms.get(roomId).sounds.size).toBe(1);
+
+    const left = new Promise(resolve => player.client.on('disconnect', resolve));
+    player.client.close();
+    await left;
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    expect(rooms.get(roomId).sounds.size).toBe(0);
+    expect(rooms.get(roomId).soundBytes).toBe(0);
   }, 10000);
 });
