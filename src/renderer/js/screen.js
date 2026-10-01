@@ -7,8 +7,6 @@ class ScreenSharePicker {
     this.modalEl = document.getElementById('screenShareModal');
     this.tabsEl = document.getElementById('screenShareTabs');
     this.gridEl = document.getElementById('screenSourcesGrid');
-    this.qualitySelect = document.getElementById('screenQualitySelect');
-    this.modeSelect = document.getElementById('screenModeSelect');
     this.audioCheckbox = document.getElementById('screenAudioCheckbox');
     this.btnCancel = document.getElementById('screenShareCancel');
     this.btnConfirm = document.getElementById('screenShareConfirm');
@@ -18,8 +16,6 @@ class ScreenSharePicker {
     this.sources = [];
     this.resolvePromise = null;
     this.systemAudio = null;
-    // { height, frameRate, mode } of the last capture, for the encoder settings
-    this.lastProfile = null;
 
     this.initEvents();
   }
@@ -27,13 +23,6 @@ class ScreenSharePicker {
   initEvents() {
     if (!this.modalEl) return;
 
-    // Remember the last quality/mode picked, so a regular streamer sets it once
-    [[this.qualitySelect, 'triscord_screen_quality'], [this.modeSelect, 'triscord_screen_mode']].forEach(([select, key]) => {
-      if (!select) return;
-      const saved = localStorage.getItem(key);
-      if (saved && Array.from(select.options).some(o => o.value === saved)) select.value = saved;
-      select.addEventListener('change', () => localStorage.setItem(key, select.value));
-    });
 
     // Tab buttons
     document.querySelectorAll('.screen-tab-btn').forEach(btn => {
@@ -90,7 +79,6 @@ class ScreenSharePicker {
 
   async fallbackBrowserPicker() {
     this.closeModal(null);
-    this.lastProfile = null; // the browser's own picker: default encoding
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { cursor: 'always' },
@@ -159,20 +147,11 @@ class ScreenSharePicker {
   async startCapture() {
     if (!this.selectedSourceId) return null;
 
-    const quality = this.qualitySelect.value; // '720p30', '1080p30', '1080p60'
-    let width = 1920;
-    let height = 1080;
-    let frameRate = 30;
-
-    if (quality === '720p30') {
-      width = 1280;
-      height = 720;
-      frameRate = 30;
-    } else if (quality === '1080p60') {
-      width = 1920;
-      height = 1080;
-      frameRate = 60;
-    }
+    // One setting for everyone: capture up to 1080p60 and let the encoder
+    // adapt to each viewer (see SCREEN_ENCODING in webrtc.js)
+    const width = 1920;
+    const height = 1080;
+    const frameRate = 60;
 
     try {
       // Chromium's desktop audio is a plain loopback of everything, including
@@ -191,11 +170,6 @@ class ScreenSharePicker {
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      this.lastProfile = {
-        height,
-        frameRate,
-        mode: this.modeSelect ? this.modeSelect.value : 'motion'
-      };
 
       if (this.audioCheckbox && this.audioCheckbox.checked) {
         await this.attachSystemAudio(stream);

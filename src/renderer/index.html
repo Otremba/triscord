@@ -266,27 +266,14 @@
         </div>
 
         <div class="screen-options-row">
-          <div class="option-group">
-            <label for="screenQualitySelect">Qualidade:</label>
-            <select id="screenQualitySelect" class="setting-select">
-              <option value="720p30">720p (30 FPS)</option>
-              <option value="1080p30" selected>1080p (30 FPS) - Recomendado</option>
-              <option value="1080p60">1080p (60 FPS) - Suave para Jogos</option>
-            </select>
-          </div>
-
-          <div class="option-group">
-            <label for="screenModeSelect">Otimizar para:</label>
-            <select id="screenModeSelect" class="setting-select"
-              title="Fluidez mantém o movimento suave e ajusta a resolução à internet. Nitidez mantém o texto legível e pode perder quadros.">
-              <option value="motion" selected>Fluidez (jogos e vídeos)</option>
-              <option value="detail">Nitidez (texto e código)</option>
-            </select>
-          </div>
+          <span class="screen-quality-note">
+            <i data-lucide="sparkles"></i>
+            Alta qualidade: até 1080p a 60 FPS, ajustada à internet de cada pessoa
+          </span>
 
           <div class="option-group">
             <input type="checkbox" id="screenAudioCheckbox" checked />
-            <label for="screenAudioCheckbox">Compartilhar Áudio do PC (sem as vozes da chamada)</label>
+            <label for="screenAudioCheckbox">Compartilhar áudio do PC (sem as vozes da chamada)</label>
           </div>
         </div>
       </div>

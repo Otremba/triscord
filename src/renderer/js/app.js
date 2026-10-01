@@ -638,6 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       state.webrtc.onConnectionQualityChanged = (socketId, quality) => {
         updateConnectionQualityIndicator(socketId, quality);
+        updateScreenQualityLabel(socketId, quality.screen);
         // Polled every few seconds while connected: a good moment to make sure
         // this peer's voice is actually playing
         ensureRemoteVoicePlaying(socketId);
@@ -2380,6 +2381,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Dedicated tile for a screen share, separate from the owner's camera tile
+  // "1080p · 60 FPS" on a screen share tile: what this viewer actually gets,
+  // which differs per viewer in a mesh (each one has its own connection)
+  function updateScreenQualityLabel(socketId, screen) {
+    const tile = document.getElementById(`tile-screen-${socketId}`);
+    const label = tile && tile.querySelector('.screen-quality-label');
+    if (!label) return;
+    if (!screen || !screen.height) {
+      label.classList.add('hidden');
+      return;
+    }
+    label.textContent = `${screen.height}p · ${screen.fps} FPS`;
+    label.classList.toggle('degraded', screen.height < 720 || screen.fps < 24);
+    label.title = 'Qualidade que você está recebendo. Ela se ajusta à sua internet e à de quem transmite.';
+    label.classList.remove('hidden');
+  }
+
   function createScreenTile(id, label, stream, isLocal) {
     const tile = document.createElement('div');
     tile.className = 'video-tile screen-tile';
@@ -2391,6 +2408,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <video id="video-screen-${id}" autoplay playsinline muted></video>
         ${isLocal ? '' : `<audio id="audio-screen-${id}" autoplay></audio>`}
         <div class="live-tag">${isLocal ? 'TRANSMITINDO TELA' : 'AO VIVO'}</div>
+        ${isLocal ? '' : '<div class="screen-quality-label hidden"></div>'}
         ${isLocal ? '' : `
         <div class="watch-paused-view hidden">
           <i data-lucide="eye-off"></i>
@@ -2809,7 +2827,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const stream = await state.screenPicker.open();
       if (!stream) return; // cancelled
 
-      state.webrtc.setScreenStream(stream, state.screenPicker.lastProfile || {});
+      state.webrtc.setScreenStream(stream);
       state.user.isScreenSharing = true;
 
       // Handle user stopping stream from OS prompt
