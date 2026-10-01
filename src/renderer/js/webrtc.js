@@ -1071,6 +1071,11 @@ class WebRTCManager {
         micSending: !!(channels.mic && channels.mic.sender && channels.mic.sender.track),
         micDirection: channels.mic ? channels.mic.currentDirection : null,
         path: null,
+        rttMs: null,
+        // Share of everything received from this peer that never arrived
+        lossPct: null,
+        // What WebRTC estimates it can send to this peer right now
+        uploadEstimateKbps: null,
         audioSent: 0,
         audioReceived: 0,
         // Screen share: what we send to this peer / what we get from them.
@@ -1084,6 +1089,8 @@ class WebRTCManager {
         const stats = await pc.getStats();
         const byId = new Map();
         const screenMid = channels.screen ? channels.screen.mid : null;
+        let received = 0;
+        let lost = 0;
         stats.forEach(r => byId.set(r.id, r));
         stats.forEach(r => {
           if (r.type === 'transport' && r.selectedCandidatePairId) {
@@ -1091,6 +1098,12 @@ class WebRTCManager {
             const local = pair && byId.get(pair.localCandidateId);
             const remote = pair && byId.get(pair.remoteCandidateId);
             if (local && remote) row.path = `${local.candidateType} -> ${remote.candidateType}`;
+            if (pair && typeof pair.currentRoundTripTime === 'number') row.rttMs = Math.round(pair.currentRoundTripTime * 1000);
+            if (pair && pair.availableOutgoingBitrate) row.uploadEstimateKbps = Math.round(pair.availableOutgoingBitrate / 1000);
+          }
+          if (r.type === 'inbound-rtp') {
+            received += r.packetsReceived || 0;
+            lost += Math.max(0, r.packetsLost || 0);
           }
           if (r.type === 'outbound-rtp' && r.kind === 'audio') row.audioSent += r.packetsSent || 0;
           if (r.type === 'inbound-rtp' && r.kind === 'audio') row.audioReceived += r.packetsReceived || 0;
@@ -1105,6 +1118,7 @@ class WebRTCManager {
               `dropped=${r.framesDropped || 0} freezes=${r.freezeCount || 0}`;
           }
         });
+        if (received + lost > 0) row.lossPct = Math.round((lost / (received + lost)) * 1000) / 10;
       } catch (err) {}
 
       rows.push(row);

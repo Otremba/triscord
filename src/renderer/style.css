@@ -2800,6 +2800,59 @@ input[type="radio"]:disabled {
   color: var(--accent-red);
 }
 
+/* Settings: diagnostics */
+.diagnostics-description {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.diagnostics-summary {
+  font-size: 12px;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnostics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.diagnostics-actions .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.diagnostics-actions .lucide {
+  width: 14px;
+  height: 14px;
+}
+
+.diagnostics-test-result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.diagnostics-test-result .ok {
+  color: var(--accent-green);
+}
+
+.diagnostics-test-result .fail {
+  color: var(--accent-red);
+}
+
 .ptt-key-row {
   align-items: center;
   gap: 8px;

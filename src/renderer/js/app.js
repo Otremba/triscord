@@ -3,6 +3,9 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Event log behind Settings > Diagnóstico (diagnostics.js loads first)
+  const diag = window.triscordDiagnostics;
+
   // Settings saved before the app was renamed still live under the old prefix
   Object.keys(localStorage)
     .filter(key => key.startsWith('discord_'))
@@ -268,6 +271,12 @@ document.addEventListener('DOMContentLoaded', () => {
     settingsModal: document.getElementById('settingsModal'),
     btnCloseSettings: document.getElementById('btnCloseSettings'),
     btnSaveSettings: document.getElementById('btnSaveSettings'),
+    diagnosticsSummary: document.getElementById('diagnosticsSummary'),
+    diagnosticsTestResult: document.getElementById('diagnosticsTestResult'),
+    btnCopyDiagnostics: document.getElementById('btnCopyDiagnostics'),
+    btnSaveDiagnostics: document.getElementById('btnSaveDiagnostics'),
+    btnTestConnection: document.getElementById('btnTestConnection'),
+    btnClearDiagnostics: document.getElementById('btnClearDiagnostics'),
     inputSettingsUsername: document.getElementById('settingsUsername'),
     nameModal: document.getElementById('nameModal'),
     nameForm: document.getElementById('nameForm'),
@@ -582,6 +591,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSettingsUI();
   initPresetBackgroundButtons();
   initNameGate();
+  initDiagnostics();
   initSidebarLayout();
   initSoundboardUI();
 
@@ -670,6 +680,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Socket Events
       state.socket.on('connect', () => {
         console.log('Connected to server with ID:', state.socket.id);
+        diag.log('socket', `Conectado ao servidor como ${state.socket.id}`);
         setConnectionStatus('connected', 'RTC Conectado');
 
         // If we were previously in a room, rejoin it
@@ -681,6 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // The server only closes a socket itself when this session was replaced;
       // socket.io does not reconnect after that on its own
       state.socket.on('disconnect', (reason) => {
+        diag.log('socket', `Desconectado do servidor: ${reason}`, null, 'warn');
         setConnectionStatus('connecting', 'Reconectando...');
         if (reason === 'io server disconnect') {
           setTimeout(() => state.socket && state.socket.connect(), 1000);
@@ -707,6 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Successfully joined room
       state.socket.on('room-joined', ({ roomId, existingUsers, chatHistory, isOwner, locked, maxUsers }) => {
+        diag.log('app', `Entrou na sala ${roomId}`, { others: existingUsers.map(u => `${u.username} (${u.socketId})`) });
         state.currentRoomId = roomId;
         state.roomMembers.clear();
         state.isRoomOwner = !!isOwner;
@@ -731,6 +744,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // The server refused to let us in (room locked or at its user limit)
       state.socket.on('room-join-denied', ({ reason }) => {
+        diag.log('app', `Entrada na sala recusada: ${reason}`, null, 'warn');
         state.currentRoomId = null;
         state.currentRoomName = '';
         // The mic was opened for this call; do not leave it running
@@ -745,6 +759,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Another user joined our current room
       state.socket.on('user-joined', ({ socketId, userData }) => {
+        diag.log('app', `${userData.username} entrou (${socketId})`);
         state.roomMembers.set(socketId, userData);
         window.SoundEffects.playJoin();
         updateStageView();
@@ -759,12 +774,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // The same user joined the room from another window or device
       state.socket.on('session-replaced', () => {
+        diag.log('app', 'Sessão substituída por outra janela ou aparelho', null, 'warn');
         showToast('Você entrou nesta sala em outra janela.', 'error');
         leaveCurrentRoom();
       });
 
       // A room owner kicked us out
       state.socket.on('kicked', ({ byUsername }) => {
+        diag.log('app', `Removido da sala por ${byUsername}`, null, 'warn');
         showToast(`Você foi removido da sala por ${byUsername}.`, 'error');
         leaveCurrentRoom();
       });
@@ -806,6 +823,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // User left room
       state.socket.on('user-left', ({ socketId, username }) => {
+        diag.log('app', `${username} saiu (${socketId})`);
         state.webrtc.removePeer(socketId);
         removeRemoteAudio(socketId);
         state.roomMembers.delete(socketId);
@@ -1006,6 +1024,158 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+
+  // ---- Diagnostics (see diagnostics.js): Settings > Diagnóstico ----
+
+  async function systemInfo() {
+    if (!window.electronAPI || !window.electronAPI.getDiagnosticsInfo) return null;
+    try {
+      return await window.electronAPI.getDiagnosticsInfo();
+    } catch (err) {
+      return null;
+    }
+  }
+
+  async function connectionRows() {
+    if (!state.webrtc) return [];
+    const rows = await state.webrtc.getDiagnostics();
+    rows.forEach((row) => {
+      const member = state.roomMembers.get(row.socketId);
+      row.user = member ? member.username : row.socketId;
+    });
+    return rows;
+  }
+
+  // Server addresses only: credentials never go into a report
+  function describeIceServers() {
+    if (!state.webrtc) return '-';
+    const urls = state.webrtc.iceServers.flatMap(s => (Array.isArray(s.urls) ? s.urls : [s.urls]));
+    return `${urls.join(', ')} (política: ${state.webrtc.iceTransportPolicy})`;
+  }
+
+  async function buildDiagnosticsReport() {
+    const info = await systemInfo();
+    const environment = {
+      'App': info ? `${info.appVersion} · Electron ${info.electron} · Chrome ${info.chrome}` : `navegador (${navigator.userAgent})`,
+      'Sistema': info ? `${info.os} · ${info.cpu}` : navigator.platform,
+      'Memória': info ? `${info.totalMemoryMB} MB no total, ${info.freeMemoryMB} MB livres` : '-',
+      'Triscord agora': info ? `CPU ${info.appCpuPercent}% · RAM ${info.appMemoryMB} MB` : '-',
+      'Servidor': `${state.serverUrl} (${state.socket && state.socket.connected ? 'conectado' : 'desconectado'})`,
+      'Servidores ICE': describeIceServers(),
+      'Você': `${state.user.username || '(sem nome)'} · ${state.socket ? state.socket.id : '-'}`,
+      'Chamada': state.currentRoomId
+        ? `${state.currentRoomName} com ${state.roomMembers.size} outra(s) pessoa(s)` +
+          `${state.user.isMuted ? ' · mutado' : ''}${state.user.isDeafened ? ' · ensurdecido' : ''}` +
+          `${state.user.isScreenSharing ? ' · transmitindo tela' : ''}`
+        : 'fora de uma chamada',
+      'Microfone': state.webrtc && state.webrtc.localMicStream
+        ? `supressão de ruído: ${state.webrtc.noiseSuppressionMode}`
+        : 'desligado'
+    };
+    return diag.buildReport({
+      environment,
+      peers: await connectionRows(),
+      mainLog: info ? info.mainLog : []
+    });
+  }
+
+  function updateDiagnosticsSummary() {
+    const s = diag.summary();
+    const since = s.since ? new Date(s.since).toLocaleString('pt-BR') : '-';
+    el.diagnosticsSummary.textContent =
+      `${s.events} eventos desde ${since} · ${s.serverDisconnects} queda(s) do servidor · ` +
+      `${s.peerDrops} queda(s) de conexão · ${s.errors} erro(s) · ${s.warnings} aviso(s)`;
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      // Clipboard API refused (no focus, no permission): the old way
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand('copy');
+      area.remove();
+      return ok;
+    }
+  }
+
+  async function runConnectionTest() {
+    if (!state.webrtc) return;
+    el.btnTestConnection.disabled = true;
+    el.diagnosticsTestResult.classList.remove('hidden');
+    el.diagnosticsTestResult.textContent = 'Testando os servidores de conexão…';
+    try {
+      const results = await window.Diagnostics.testConnection(state.webrtc.iceServers);
+      diag.log('network', 'Teste de conexão', results, results.some(r => r.kind === 'TURN' && r.ok) ? 'info' : 'warn');
+
+      el.diagnosticsTestResult.innerHTML = '';
+      results.forEach((r) => {
+        const row = document.createElement('div');
+        row.className = r.ok ? 'ok' : 'fail';
+        const what = r.kind === 'TURN' ? 'relay' : 'conexão direta';
+        row.textContent = `${r.ok ? '✓' : '✗'} ${r.kind} ${r.url} — ${r.ok ? `${what} ok (${r.ms} ms)` : `falhou${r.errors.length ? `: ${r.errors.join('; ')}` : ''}`}`;
+        el.diagnosticsTestResult.appendChild(row);
+      });
+      const turnOk = results.some(r => r.kind === 'TURN' && r.ok);
+      const note = document.createElement('div');
+      note.textContent = turnOk
+        ? 'Há relay funcionando: quem está em rede restrita (4G/5G, CGNAT) consegue se conectar.'
+        : 'Nenhum relay funcionando: quem está em rede restrita (4G/5G, CGNAT) pode não conseguir se conectar com os outros.';
+      el.diagnosticsTestResult.appendChild(note);
+    } finally {
+      el.btnTestConnection.disabled = false;
+      updateDiagnosticsSummary();
+    }
+  }
+
+  function initDiagnostics() {
+    window.renderIcons(el.btnCopyDiagnostics.parentElement);
+    // Console access for whoever is debugging: await triscordReport()
+    window.triscordReport = buildDiagnosticsReport;
+
+    // Quality snapshot of every connection while in a call. Declared here, not
+    // next to the helpers: initDiagnostics() runs before that code is reached
+    const statsIntervalMs = 10000;
+    setInterval(async () => {
+      if (!state.currentRoomId || !state.webrtc) return;
+      const [rows, info] = await Promise.all([connectionRows(), systemInfo()]);
+      const resources = info
+        ? { appCpuPercent: info.appCpuPercent, appMemoryMB: info.appMemoryMB, freeMemoryMB: info.freeMemoryMB }
+        : null;
+      diag.recordStats(rows, resources);
+    }, statsIntervalMs);
+
+    el.btnCopyDiagnostics.addEventListener('click', async () => {
+      const report = await buildDiagnosticsReport();
+      const ok = await copyText(report);
+      showToast(ok ? 'Relatório copiado. Cole numa conversa com o Claude.' : 'Não foi possível copiar; use "Salvar arquivo".', ok ? 'info' : 'error');
+    });
+
+    el.btnSaveDiagnostics.addEventListener('click', async () => {
+      const report = await buildDiagnosticsReport();
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([report], { type: 'text/markdown' }));
+      link.download = `triscord-diagnostico-${stamp}.md`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    });
+
+    el.btnTestConnection.addEventListener('click', runConnectionTest);
+
+    el.btnClearDiagnostics.addEventListener('click', () => {
+      if (!confirm('Apagar todo o registro de diagnóstico deste computador?')) return;
+      diag.clear();
+      el.diagnosticsTestResult.classList.add('hidden');
+      updateDiagnosticsSummary();
+    });
+  }
 
   // ---- Name gate: nobody enters a call without having picked a name ----
 
@@ -2815,6 +2985,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (state.user.isScreenSharing) {
+      diag.log('screen', 'Parou de transmitir a tela');
       state.user.isScreenSharing = false;
       state.webrtc.stopScreenShare();
       state.screenPicker.releaseSystemAudio();
@@ -2828,6 +2999,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!stream) return; // cancelled
 
       state.webrtc.setScreenStream(stream);
+      const captured = stream.getVideoTracks()[0];
+      diag.log('screen', 'Começou a transmitir a tela', {
+        capture: captured ? captured.getSettings() : null,
+        systemAudio: stream.getAudioTracks().length > 0
+      });
       state.user.isScreenSharing = true;
 
       // Handle user stopping stream from OS prompt
@@ -3416,6 +3592,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Open Settings Modal
   el.btnSettings.addEventListener('click', () => {
+    updateDiagnosticsSummary();
     el.settingsModal.classList.remove('hidden');
   });
 

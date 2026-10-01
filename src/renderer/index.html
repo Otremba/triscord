@@ -479,6 +479,24 @@
           <input type="password" id="settingsTurnCredential" class="setting-input" placeholder="senha/credencial" />
         </div>
 
+        <!-- Diagnostics: a report to send to Claude (or whoever maintains the app) -->
+        <div class="setting-section">
+          <label class="setting-label">Diagnóstico</label>
+          <small class="diagnostics-description">
+            O Triscord registra neste computador as conexões, quedas, erros e a qualidade das chamadas e
+            transmissões. Nada é enviado sozinho: copie o relatório e cole numa conversa com o Claude,
+            contando o que aconteceu.
+          </small>
+          <div class="diagnostics-summary" id="diagnosticsSummary"></div>
+          <div class="diagnostics-actions">
+            <button type="button" class="btn-secondary" id="btnCopyDiagnostics"><i data-lucide="clipboard-copy"></i>Copiar relatório</button>
+            <button type="button" class="btn-secondary" id="btnSaveDiagnostics"><i data-lucide="download"></i>Salvar arquivo</button>
+            <button type="button" class="btn-secondary" id="btnTestConnection"><i data-lucide="activity"></i>Testar conexão</button>
+            <button type="button" class="btn-secondary" id="btnClearDiagnostics"><i data-lucide="trash-2"></i>Limpar</button>
+          </div>
+          <div class="diagnostics-test-result hidden" id="diagnosticsTestResult"></div>
+        </div>
+
       </div>
 
       <div class="modal-footer">
@@ -509,6 +527,8 @@
 
   <script src="js/vendor/lucide/lucide.min.js"></script>
   <script src="js/icons.js"></script>
+  <!-- First, so it records everything the other modules log -->
+  <script src="js/diagnostics.js"></script>
   <script src="js/socket.io.min.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/noise-suppression.js"></script>

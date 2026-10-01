@@ -7,6 +7,22 @@ const { spawn } = require('child_process');
 // Disable default menu for a clean look
 Menu.setApplicationMenu(null);
 
+// Warnings and errors of the main process (system audio helper, updater...),
+// kept for the diagnostics report in Settings. The renderer cannot see these.
+const MAIN_LOG_LIMIT = 200;
+const mainLog = [];
+['warn', 'error'].forEach((level) => {
+  const original = console[level].bind(console);
+  console[level] = (...args) => {
+    original(...args);
+    const message = args.map(a => (a instanceof Error ? a.message : typeof a === 'string' ? a : JSON.stringify(a)))
+      .join(' ')
+      .slice(0, 500);
+    mainLog.push({ t: Date.now(), level, message });
+    if (mainLog.length > MAIN_LOG_LIMIT) mainLog.shift();
+  };
+});
+
 let mainWindow = null;
 
 function createWindow() {
@@ -174,6 +190,25 @@ app.on('will-quit', () => {
 // Global "toggle mute" shortcut — works even while Triscord is in the
 // background, since it's registered with the OS rather than the page
 let currentMuteAccelerator = null;
+
+// Environment and live resource use, for the diagnostics report
+ipcMain.handle('get-diagnostics-info', () => {
+  const metrics = app.getAppMetrics();
+  const cpus = os.cpus();
+  return {
+    appVersion: app.getVersion(),
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    os: `${process.platform} ${os.release()} (${process.arch})`,
+    cpu: cpus.length ? `${cpus[0].model.trim()} x${cpus.length}` : 'unknown',
+    totalMemoryMB: Math.round(os.totalmem() / 1048576),
+    freeMemoryMB: Math.round(os.freemem() / 1048576),
+    // All of Triscord's processes together
+    appCpuPercent: Math.round(metrics.reduce((sum, m) => sum + (m.cpu ? m.cpu.percentCPUUsage : 0), 0) * 10) / 10,
+    appMemoryMB: Math.round(metrics.reduce((sum, m) => sum + (m.memory ? m.memory.workingSetSize : 0), 0) / 1024),
+    mainLog: mainLog.slice()
+  };
+});
 
 ipcMain.handle('set-global-mute-shortcut', (event, accelerator) => {
   if (typeof accelerator !== 'string' || !accelerator.trim()) {
