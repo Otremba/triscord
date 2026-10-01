@@ -78,21 +78,19 @@ class ScreenSharePicker {
   }
 
   async fallbackBrowserPicker() {
-    this.closeModal(null);
+    // The browser shows its own picker: hide ours, but resolve only once that
+    // one returns (closeModal(null) here used to report a cancel right away)
+    this.modalEl.classList.add('hidden');
+    let stream = null;
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
+      stream = await navigator.mediaDevices.getDisplayMedia({
         video: { cursor: 'always' },
         audio: true
       });
-      if (this.resolvePromise) {
-        this.resolvePromise(stream);
-      }
     } catch (err) {
       console.warn('Browser getDisplayMedia cancelled or error:', err);
-      if (this.resolvePromise) {
-        this.resolvePromise(null);
-      }
     }
+    this.closeModal(stream);
   }
 
   renderSources() {
@@ -114,7 +112,15 @@ class ScreenSharePicker {
       return div.innerHTML;
     };
 
-    this.gridEl.innerHTML = filtered.map(source => `
+    // Capturing a game's window can deliver only a frame or two per second
+    // (seen on a laptop with two GPUs), where the whole screen ran at 58 fps
+    const windowsHint = isScreensTab ? '' : `
+      <div class="sources-hint">
+        <i data-lucide="gamepad-2"></i>
+        <span>Vai transmitir um jogo? Prefira a <strong>tela inteira</strong>: em alguns PCs a janela do jogo é capturada a poucos quadros por segundo.</span>
+      </div>`;
+
+    this.gridEl.innerHTML = windowsHint + filtered.map(source => `
       <div class="source-card ${this.selectedSourceId === source.id ? 'selected' : ''}" data-id="${source.id}">
         <div class="source-thumb-container">
           <img src="${source.thumbnail}" class="source-thumbnail" alt="${escapeHtml(source.name)}" />
@@ -125,6 +131,7 @@ class ScreenSharePicker {
         </div>
       </div>
     `).join('');
+    if (windowsHint && window.renderIcons) window.renderIcons(this.gridEl);
 
     // Attach click listeners
     this.gridEl.querySelectorAll('.source-card').forEach(card => {

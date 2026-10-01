@@ -43,9 +43,17 @@ describe('SoundLibrary', () => {
   test('renames keep who added the sound', () => {
     const lib = new SoundLibrary();
     const { id } = clipOf('d');
-    lib.merge(entry(id, { addedBy: 'Ana' }));
-    lib.merge(entry(id, { name: 'Renomeado', addedBy: 'Bia', updatedAt: NOW - 1 }));
-    expect(lib.entries.get(id)).toMatchObject({ name: 'Renomeado', addedBy: 'Ana' });
+    lib.merge(entry(id, { addedBy: 'Ana', addedById: 'user_ana' }));
+    lib.merge(entry(id, { name: 'Renomeado', addedBy: 'Bia', addedById: 'user_bia', updatedAt: NOW - 1 }));
+    expect(lib.entries.get(id)).toMatchObject({ name: 'Renomeado', addedBy: 'Ana', addedById: 'user_ana' });
+  });
+
+  test('keeps a valid uploader id and drops a malformed one', () => {
+    const { id } = clipOf('k');
+    expect(SoundLibrary.sanitizeEntry(entry(id, { addedById: 'user_abc123' }), NOW).addedById).toBe('user_abc123');
+    expect(SoundLibrary.sanitizeEntry(entry(id, { addedById: 'x y<script>' }), NOW).addedById).toBe(null);
+    // Sounds from before folders existed have no id
+    expect(SoundLibrary.sanitizeEntry(entry(id), NOW).addedById).toBe(null);
   });
 
   test('refuses new sounds once the library is full, but not edits', () => {

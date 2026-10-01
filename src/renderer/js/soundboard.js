@@ -30,7 +30,7 @@ const SOUNDBOARD_PENDING_RETRY_MS = 1500;
 
 /**
  * The local copy of the library: one IndexedDB store of entries
- * { id, name, emoji, mime, addedBy, addedAt, updatedAt, deleted, data }.
+ * { id, name, emoji, mime, addedBy, addedById, addedAt, updatedAt, deleted, data }.
  * A deleted sound stays as a tombstone (deleted: true, data: null) so this app
  * never offers it back. Falls back to memory when IndexedDB is unavailable.
  */
@@ -92,11 +92,14 @@ class Soundboard {
    * @param socket the Socket.IO connection to the signalling server
    * @param options.shouldPlay (event) => boolean, e.g. false while deafened
    * @param options.getUsername () => string, credited on sounds this app adds
+   * @param options.getUserId () => string, this app's user id (sounds are
+   *   grouped into a folder per person by it)
    */
-  constructor(socket, { shouldPlay = () => true, getUsername = () => '' } = {}) {
+  constructor(socket, { shouldPlay = () => true, getUsername = () => '', getUserId = () => '' } = {}) {
     this.socket = socket;
     this.shouldPlay = shouldPlay;
     this.getUsername = getUsername;
+    this.getUserId = getUserId;
     this.library = new SoundLibrary();
 
     // soundId -> { mime, data } and soundId -> decoded AudioBuffer
@@ -178,6 +181,7 @@ class Soundboard {
       emoji: entry.emoji,
       mime: entry.mime,
       addedBy: entry.addedBy,
+      addedById: entry.addedById || null,
       addedAt: entry.addedAt,
       // Sounds saved by 1.1.4 have no updatedAt: they count as old edits
       updatedAt: entry.updatedAt || entry.addedAt || 0,
@@ -217,12 +221,15 @@ class Soundboard {
     try {
       const local = await this.library.all();
       const username = this.getUsername();
+      const userId = this.getUserId();
       const result = await this.request('soundboard-sync', {
         username,
+        userId,
         entries: local.map(e => ({
           ...Soundboard.meta(e),
           // Sounds saved by 1.1.4 have no author: they were this user's own
           addedBy: e.addedBy || username,
+          addedById: e.addedById || (e.addedBy ? null : userId),
           hasData: !!e.data
         }))
       });
@@ -269,7 +276,7 @@ class Soundboard {
     if (!entry || entry.deleted || !entry.data) return;
     await this.request('soundboard-upload', {
       soundId: entry.id, mime: entry.mime, data: entry.data, name: entry.name, emoji: entry.emoji,
-      username: this.getUsername(), play: false
+      username: this.getUsername(), userId: this.getUserId(), play: false
     });
   }
 
@@ -329,6 +336,7 @@ class Soundboard {
   async publish(entry, data) {
     const result = await this.request('soundboard-upsert', {
       username: this.getUsername(),
+      userId: this.getUserId(),
       entry: Soundboard.meta(entry),
       ...(data ? { data } : {})
     });
@@ -364,7 +372,7 @@ class Soundboard {
     const name = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, SOUNDBOARD_MAX_NAME_LENGTH) || 'Som';
     const sound = {
       id, name, emoji: SOUNDBOARD_DEFAULT_EMOJI, mime, data,
-      addedBy: this.getUsername(), addedAt: now, updatedAt: now, deleted: false
+      addedBy: this.getUsername(), addedById: this.getUserId() || null, addedAt: now, updatedAt: now, deleted: false
     };
 
     this.decoded.set(id, buffer);
@@ -419,7 +427,7 @@ class Soundboard {
     let result = await this.request('soundboard-play', meta);
     if (result && result.needData) {
       result = await this.request('soundboard-upload', {
-        ...meta, mime: clip.mime, data: clip.data, username: this.getUsername()
+        ...meta, mime: clip.mime, data: clip.data, username: this.getUsername(), userId: this.getUserId()
       });
     }
     if (!result || !result.ok) throw new SoundboardError(Soundboard.describeError(result && result.error));

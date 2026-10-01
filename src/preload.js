@@ -25,5 +25,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('update-downloaded', listener);
   },
   restartToUpdate: () => ipcRenderer.send('restart-to-update'),
-  getDiagnosticsInfo: () => ipcRenderer.invoke('get-diagnostics-info')
+  getDiagnosticsInfo: () => ipcRenderer.invoke('get-diagnostics-info'),
+  getPcHealth: () => ipcRenderer.invoke('get-pc-health')
 });

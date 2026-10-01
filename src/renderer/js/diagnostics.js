@@ -26,7 +26,8 @@ const DIAG_CONSOLE_PREFIXES = {
   '[Microphone]': 'audio',
   '[RNNoise]': 'audio',
   '[Soundboard]': 'soundboard',
-  '[SystemAudio]': 'screen'
+  '[SystemAudio]': 'screen',
+  '[GpuRelay]': 'screen'
 };
 // Lines that only repeat what another line already says
 const DIAG_IGNORED = [/^\[App\] Remote stream received/];
@@ -149,7 +150,9 @@ class Diagnostics {
       uploadKbps: r.uploadEstimateKbps,
       micSending: r.micSending,
       screenOut: r.screenOut,
-      screenIn: r.screenIn
+      screenIn: r.screenIn,
+      // Their PC's load, as they reported it (see PC health in app.js)
+      pc: r.pc
     }));
     this.log('stats', `${peers.length} conexão(ões)`, { peers, resources });
   }

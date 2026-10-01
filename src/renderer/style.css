@@ -55,6 +55,13 @@
   user-select: none;
 }
 
+/* Text fields stay selectable, so Ctrl+A / Ctrl+C / Ctrl+X work inside them */
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--bg-tertiary);
@@ -467,6 +474,35 @@ body {
   background-color: rgba(0, 0, 0, 0.2);
 }
 
+/* This PC's load during a call; yellow when something is at its limit */
+.pc-health-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background-color: rgba(0, 0, 0, 0.2);
+  color: var(--text-muted);
+  cursor: default;
+  white-space: nowrap;
+  transition: background-color var(--dur-slow) var(--ease-in-out), color var(--dur-slow) var(--ease-in-out);
+}
+
+.pc-health-badge .lucide {
+  width: 14px;
+  height: 14px;
+}
+
+.pc-health-badge.warn {
+  background-color: rgba(240, 178, 50, 0.16);
+  color: var(--accent-yellow);
+}
+
+.status-badge-mini.yellow { color: var(--accent-yellow); }
+
 .connection-status-badge.connected { color: var(--accent-green); }
 .connection-status-badge.connecting { color: var(--accent-yellow); }
 .connection-status-badge.disconnected { color: var(--accent-red); }
@@ -684,15 +720,37 @@ body {
   align-content: stretch;
 }
 
+/* Every focused tile gets an equal share of the big area */
 .focus-main {
   min-height: 0;
   min-width: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(var(--focus-cols, 1), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--focus-rows, 1), minmax(0, 1fr));
+  gap: 14px;
 }
 
 .focus-main .video-tile {
   width: 100%;
   height: 100%;
+  min-height: 0;
+}
+
+.focus-main .video-tile.focus-enter {
+  animation: focus-tile-in 0.22s ease-out;
+}
+
+@keyframes focus-tile-in {
+  from {
+    opacity: 0.6;
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focus-main .video-tile.focus-enter {
+    animation: none;
+  }
 }
 
 .focus-strip {
@@ -1546,6 +1604,9 @@ body {
   font-size: 13px;
   color: var(--text-normal);
   word-break: break-word;
+  /* The app turns selection off everywhere (see *); messages must be copyable */
+  user-select: text;
+  cursor: text;
 }
 
 .chat-input-area {
@@ -1699,6 +1760,28 @@ body {
   padding: 4px;
 }
 
+/* Advice above the windows tab: spans the whole grid row */
+.sources-hint {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-tertiary);
+  border-left: 3px solid var(--accent-blurple);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-normal);
+}
+
+.sources-hint .lucide {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--accent-blurple);
+}
+
 .source-card {
   background-color: var(--bg-tertiary);
   border: 2px solid transparent;
@@ -1799,8 +1882,145 @@ body {
 }
 
 .screen-quality-label.degraded {
-  background-color: rgba(240, 178, 50, 0.85);
+  background-color: rgba(240, 178, 50, 0.9);
   color: #1e1f22;
+}
+
+.screen-quality-label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  max-width: calc(100% - 24px);
+  border-radius: var(--radius-md);
+}
+
+.screen-quality-label.hidden {
+  display: none;
+}
+
+/* Green when the share arrives well, dark on the yellow of a degraded one */
+.screen-quality-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--accent-green);
+  flex-shrink: 0;
+}
+
+.screen-quality-label.degraded .screen-quality-dot {
+  background-color: #1e1f22;
+}
+
+/* What limits the share, and what to do, each on a line of its own */
+.screen-quality-cause,
+.screen-quality-action {
+  flex-basis: 100%;
+}
+
+.screen-quality-cause {
+  font-weight: 700;
+}
+
+.screen-quality-action {
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+/* The sharer's panel: how the share reaches each viewer */
+.screen-send-panel {
+  position: absolute;
+  top: 40px;
+  left: 12px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: min(380px, calc(100% - 24px));
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background-color: rgba(0, 0, 0, 0.66);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.screen-send-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.screen-send-summary::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background-color: var(--accent-green);
+}
+
+.screen-send-panel[data-level="warn"] .screen-send-summary::before {
+  background-color: var(--accent-yellow);
+}
+
+.screen-send-panel[data-level="bad"] .screen-send-summary::before {
+  background-color: var(--accent-red);
+}
+
+.screen-send-panel[data-level="idle"] .screen-send-summary::before {
+  background-color: var(--text-muted);
+}
+
+/* What to check, under the summary when something is limiting */
+.screen-send-hint {
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.85;
+  margin-bottom: 2px;
+  white-space: normal;
+}
+
+.screen-send-row {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  opacity: 0.85;
+}
+
+.screen-send-row.limited {
+  color: var(--accent-yellow);
+  opacity: 1;
+}
+
+.screen-send-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.screen-send-detail {
+  flex-shrink: 0;
+}
+
+/* Small tiles (the strip under a focused one) keep only the summary */
+.focus-strip .screen-send-panel {
+  top: 26px;
+  left: 6px;
+  padding: 4px 7px;
+}
+
+.focus-strip .screen-send-row,
+.focus-strip .screen-send-hint,
+.focus-strip .screen-quality-cause,
+.focus-strip .screen-quality-action {
+  display: none;
 }
 
 .option-group {
@@ -2394,16 +2614,87 @@ body {
   accent-color: var(--accent-blurple);
 }
 
+/* A folder per person who added sounds (see soundFolders in app.js) */
 .soundboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
-  gap: 8px;
-  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
   overflow-y: auto;
 }
 
+.sound-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.sound-folder-header:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-normal);
+}
+
+.sound-folder-header:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.sound-folder-header .lucide {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.sound-folder-chevron {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.sound-folder.collapsed .sound-folder-chevron {
+  transform: rotate(-90deg);
+}
+
+.sound-folder-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sound-folder-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background-color: var(--bg-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sound-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.sound-folder.collapsed .sound-folder-grid {
+  display: none;
+}
+
 .soundboard-empty {
-  grid-column: 1 / -1;
   padding: 20px 8px;
   text-align: center;
   color: var(--text-muted);
@@ -2801,13 +3092,6 @@ input[type="radio"]:disabled {
 }
 
 /* Settings: diagnostics */
-.diagnostics-description {
-  display: block;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text-muted);
-}
-
 .diagnostics-summary {
   font-size: 12px;
   color: var(--text-normal);
@@ -3341,6 +3625,11 @@ input[type="radio"]:disabled {
     font-size: 11px;
   }
 
+  /* Only the gauge on a narrow screen, unless something is at its limit */
+  .pc-health-badge:not(.warn) .pc-health-text {
+    display: none;
+  }
+
   .connection-status-badge .status-text {
     max-width: 80px;
     white-space: nowrap;
@@ -3405,6 +3694,14 @@ input[type="radio"]:disabled {
   .video-grid.grid-6,
   .video-grid.grid-many {
     grid-template-columns: 1fr 1fr;
+  }
+
+  /* Too narrow for side by side: focused tiles stack */
+  .focus-main {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-auto-rows: minmax(0, 1fr);
+    gap: 6px;
   }
 
   .video-tile {

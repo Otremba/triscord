@@ -73,15 +73,19 @@ const QUALITY_POLL_MS = 3000;
 //   fell to 6-25 fps;
 // - 'maintain-framerate' kept 60 fps but dropped straight to 480x270 whenever
 //   a viewer's bandwidth was tight;
-// - 'balanced' gives up a little frame rate to stay sharp;
+// - 'balanced' gave up frame rate to stay sharp;
 // - 8 Mbps was not enough for heavy motion at 1080p60 (held at 720p); 15 Mbps
 //   was.
+// Smooth motion comes first for games, so it is 'maintain-framerate': under
+// pressure the resolution drops and 60 fps stay. The fall to 480x270 is
+// stopped by the resolution floor below (SCREEN_MIN_HEIGHT), and only once a
+// viewer is held at that floor does the frame rate give way.
 // The cap is per viewer: in a mesh every viewer is a separate encode and
 // upload, and bandwidth estimation still keeps each one within what its
 // connection can carry.
 const SCREEN_ENCODING = {
   contentHint: 'motion',
-  degradationPreference: 'balanced',
+  degradationPreference: 'maintain-framerate',
   maxBitrate: 15000000,
   maxFramerate: 60
 };
@@ -93,6 +97,115 @@ const SCREEN_JITTER_BUFFER_MS = 100;
 // Starting the estimate here opened it at 720p-1080p in the same test. A link
 // that cannot carry it backs off within a second or two.
 const VIDEO_START_BITRATE_KBPS = 2500;
+
+// The screen share never goes below this height for any viewer: below it
+// text and detail stop being readable. With 'maintain-framerate', WebRTC
+// lowers the resolution when a viewer's bandwidth or our CPU runs short; once
+// it goes under this height we pin that viewer's encode at it with
+// 'maintain-resolution', so only then does the frame rate give way, and from
+// time to time try full resolution again.
+const SCREEN_MIN_HEIGHT = 720;
+const SCREEN_ADAPT = {
+  // Quality polls below the floor before holding it (~3 s): 'maintain-
+  // framerate' can drop far below it at once, so the floor steps in at the
+  // first sample
+  lowSamples: 1,
+  // When to try full resolution again; doubled after each attempt that
+  // drops right back, up to the max
+  retryMs: 20000,
+  maxRetryMs: 5 * 60000,
+  // An attempt that drops below the floor within this long has failed
+  trialMs: 30000,
+  // Bandwidth estimate needed to attempt full resolution
+  upgradeMinKbps: 5000
+};
+
+/**
+ * One step of the screen share resolution floor for one viewer. Pure, so it
+ * can be reasoned about (and tested) without a connection.
+ * @param adapt { mode: 'auto'|'floor', low, retryAt, retryMs, trialUntil }
+ * @param sample { height, sourceHeight, limitedBy, availableKbps } from getStats()
+ * @returns the new adapt state (a copy) and whether the mode changed
+ */
+function nextScreenAdapt(adapt, sample, now) {
+  const next = { ...adapt };
+  const floor = Math.min(SCREEN_MIN_HEIGHT, sample.sourceHeight || SCREEN_MIN_HEIGHT);
+
+  if (next.mode === 'auto') {
+    const below = sample.height > 0 && sample.height < floor && sample.limitedBy && sample.limitedBy !== 'none';
+    next.low = below ? next.low + 1 : 0;
+    if (next.low < SCREEN_ADAPT.lowSamples) return { adapt: next, changed: false };
+
+    // A full-resolution attempt that failed quickly waits longer next time
+    next.retryMs = now < next.trialUntil
+      ? Math.min(next.retryMs * 2, SCREEN_ADAPT.maxRetryMs)
+      : SCREEN_ADAPT.retryMs;
+    next.mode = 'floor';
+    next.low = 0;
+    next.retryAt = now + next.retryMs;
+    return { adapt: next, changed: true };
+  }
+
+  // Holding the floor: try full resolution once nothing limits the encode
+  // and the link looks able to carry more
+  const headroom = sample.limitedBy === 'none' &&
+    (sample.availableKbps == null || sample.availableKbps >= SCREEN_ADAPT.upgradeMinKbps);
+  if (now >= next.retryAt && headroom) {
+    next.mode = 'auto';
+    next.trialUntil = now + SCREEN_ADAPT.trialMs;
+    return { adapt: next, changed: true };
+  }
+  return { adapt: next, changed: false };
+}
+
+// A shared window delivering fewer frames than this, with nothing limiting the
+// encoder, for this long: the capture itself is stalling. Seen with a game's
+// window on a laptop with two GPUs (1-2 fps, where the whole screen ran at 58)
+const SLOW_CAPTURE_FPS = 5;
+const SLOW_CAPTURE_MS = 15000;
+
+/**
+ * Why our screen share reaches one viewer the way it does, from what the
+ * encoder reports for every viewer. A limit on one viewer only is that
+ * viewer's connection; a limit on every viewer is our own upload; with a
+ * single viewer the two cannot be told apart.
+ * @param me { limitedBy, floor } for this viewer
+ * @param all the same for every viewer currently receiving the share
+ * @returns 'ok' | 'sender-cpu' | 'sender-upload' | 'viewer-network' | 'network'
+ */
+function screenSendCause(me, all) {
+  if (me.limitedBy === 'cpu') return 'sender-cpu';
+  const constrained = s => s.limitedBy === 'bandwidth' || s.floor;
+  if (!constrained(me)) return 'ok';
+  if (all.length < 2) return 'network';
+  return all.every(constrained) ? 'sender-upload' : 'viewer-network';
+}
+const SCREEN_SEND_CAUSES = ['ok', 'sender-cpu', 'sender-upload', 'viewer-network', 'network'];
+// How long a viewer trusts the sharer's last report (sent every quality poll)
+const SCREEN_SEND_STATS_TTL_MS = 10000;
+
+function initialScreenAdapt() {
+  return { mode: 'auto', low: 0, retryAt: 0, retryMs: SCREEN_ADAPT.retryMs, trialUntil: 0 };
+}
+
+/**
+ * Put H.264 first on the screen share's m-line: it is the codec GPUs encode
+ * (see gpu-relay.js). Both ends call this: each side sends with the first
+ * codec of the other side's description. A peer on an older version keeps
+ * VP8 first and simply gets VP8, as before.
+ */
+function preferH264(transceiver) {
+  if (!transceiver || typeof transceiver.setCodecPreferences !== 'function' ||
+      typeof RTCRtpReceiver === 'undefined' || !RTCRtpReceiver.getCapabilities) return;
+  const codecs = RTCRtpReceiver.getCapabilities('video').codecs;
+  const h264 = codecs.filter(c => c.mimeType.toLowerCase() === 'video/h264');
+  if (!h264.length) return;
+  try {
+    transceiver.setCodecPreferences([...h264, ...codecs.filter(c => !h264.includes(c))]);
+  } catch (err) {
+    console.warn('[WebRTC] Could not prefer H.264 for the screen share:', err);
+  }
+}
 
 /**
  * Add x-google-start-bitrate to every video codec of a description we are
@@ -153,6 +266,19 @@ class WebRTCManager {
     this.remoteStreams = new Map();
     // Map: socketId -> remote MediaStream (screen video + screen audio)
     this.remoteScreenStreams = new Map();
+    // Map: socketId -> resolution floor state of our screen share to that peer (see nextScreenAdapt)
+    this.screenAdapt = new Map();
+    // Peers that clicked "Parar de assistir" on our screen share: nothing is
+    // encoded or uploaded for them until they watch again
+    this.screenPausedBy = new Set();
+    // What the peers receive of our screen share: the GPU relay's track, or
+    // the capture itself (see gpu-relay.js)
+    this.screenRelay = null;
+    this.screenSendTrack = null;
+    // Map: socketId -> what our screen share reaches that viewer at, and why
+    // (see reportScreenSend); and what each sharer told us about theirs
+    this.screenSendStats = new Map();
+    this.remoteScreenSendStats = new Map();
 
     // Local streams
     this.localMicStream = null;
@@ -174,6 +300,8 @@ class WebRTCManager {
     this.onRemoteStreamAdded = null; // (socketId, stream, isScreen)
     this.onRemoteStreamRemoved = null; // (socketId, isScreen)
     this.onConnectionQualityChanged = null; // (socketId, { level: 'good'|'ok'|'bad', rttMs, lossPct })
+    this.onScreenCaptureSlow = null; // () — the shared window delivers almost no frames (see checkCaptureRate)
+    this.onScreenSendReport = null; // ([{ socketId, height, fps, cause, paused }]) — how our share reaches each viewer
 
     this.userCustomIceServers = Array.isArray(options.iceServers) ? options.iceServers : [];
     this.iceTransportPolicy = options.iceTransportPolicy === 'relay' ? 'relay' : 'all';
@@ -261,6 +389,17 @@ class WebRTCManager {
   }
 
   setupSocketListeners() {
+    // A viewer of our screen share stopped (or resumed) watching it
+    this.socket.on('screen-watch', ({ senderSocketId, watching } = {}) => {
+      if (typeof senderSocketId === 'string') this.setPeerWatchingScreen(senderSocketId, watching !== false);
+    });
+
+    // A sharer telling us what it sends us and why (see reportScreenSend)
+    this.socket.on('screen-stats', ({ senderSocketId, height, fps, cause } = {}) => {
+      if (typeof senderSocketId !== 'string' || !SCREEN_SEND_CAUSES.includes(cause)) return;
+      this.remoteScreenSendStats.set(senderSocketId, { height, fps, cause, at: Date.now() });
+    });
+
     // Handle incoming WebRTC Offer
     this.socket.on('webrtc-offer', async ({ senderSocketId, offer, session, targetSession }) => {
       console.log(`[WebRTC] Received offer from ${senderSocketId}`);
@@ -420,6 +559,7 @@ class WebRTCManager {
       transceiver.direction = 'sendrecv';
       channels[name] = transceiver;
     });
+    preferH264(channels.screen);
 
     this.peerChannels.set(socketId, channels);
     this.attachLocalTracks(socketId);
@@ -654,9 +794,70 @@ class WebRTCManager {
     const screenTrack = screenStream.getVideoTracks()[0];
     if (screenTrack) screenTrack.contentHint = SCREEN_ENCODING.contentHint;
 
-    this.applyTrackToPeers('screen', screenTrack || null);
+    // Send it through the GPU relay where the browser supports one
+    this.stopScreenRelay();
+    this.screenSendTrack = screenTrack || null;
+    if (screenTrack && window.GpuScreenRelay && window.GpuScreenRelay.isSupported()) {
+      try {
+        this.screenRelay = new window.GpuScreenRelay(screenTrack);
+        this.screenRelay.track.contentHint = SCREEN_ENCODING.contentHint;
+        this.screenSendTrack = this.screenRelay.track;
+      } catch (err) {
+        console.warn('[WebRTC] GPU relay unavailable, sending the capture directly:', err);
+        this.screenRelay = null;
+      }
+    }
+
+    // A new share starts at full resolution for everyone
+    this.screenAdapt.clear();
+    this.screenSendStats.clear();
+    this.slowCaptureSince = null;
+    this.slowCaptureReported = false;
+    this.applyTrackToPeers('screen', this.screenSendTrack);
     this.applyTrackToPeers('screenAudio', screenStream.getAudioTracks()[0] || null);
     this.peerChannels.forEach((_, socketId) => this.applyScreenEncoding(socketId));
+  }
+
+  stopScreenRelay() {
+    if (!this.screenRelay) return;
+    this.screenRelay.stop();
+    this.screenRelay = null;
+  }
+
+  /**
+   * The GPU is not encoding our share (no hardware encoder, or a peer that
+   * cannot take H.264): the relay would only add work, so the peers get the
+   * capture directly. Swapping the track needs no renegotiation.
+   */
+  useDirectScreenTrack(reason) {
+    if (!this.screenRelay || !this.localScreenStream) return;
+    console.warn(`[WebRTC] Screen share not encoded on the GPU (${reason}); sending the capture directly`);
+    this.screenSendTrack = this.localScreenStream.getVideoTracks()[0] || null;
+    this.applyTrackToPeers('screen', this.screenSendTrack);
+    this.stopScreenRelay();
+  }
+
+  /**
+   * A peer told us (through the server) whether it is watching our screen
+   * share. Not watching turns that peer's screen encodings off, so nothing is
+   * encoded or uploaded for it; the other viewers are unaffected.
+   */
+  setPeerWatchingScreen(socketId, watching) {
+    const wasPaused = this.screenPausedBy.has(socketId);
+    if (watching) this.screenPausedBy.delete(socketId);
+    else this.screenPausedBy.add(socketId);
+    if (wasPaused === !watching) return;
+    console.log(`[WebRTC] ${socketId} ${watching ? 'is watching our screen again' : 'stopped watching our screen'}`);
+    // The encode restarts from a low bandwidth estimate after a pause: that
+    // ramp is not a struggling link, so the resolution floor starts over
+    this.screenAdapt.delete(socketId);
+    this.applyScreenEncoding(socketId);
+  }
+
+  /** Tell a screen sharer whether we are watching their share. */
+  sendScreenWatch(targetSocketId, watching) {
+    if (!this.socket || !this.socket.connected) return;
+    this.socket.emit('screen-watch', { targetSocketId, watching });
   }
 
   /**
@@ -664,22 +865,42 @@ class WebRTCManager {
    * on one peer's screen sender. Each viewer has its own encoder in a mesh,
    * so this runs per peer — again once a peer finishes connecting, because a
    * sender has no encodings to configure before its first negotiation.
+   * A viewer held at the resolution floor gets a fixed downscale to it, and
+   * one who stopped watching gets nothing at all.
    */
   async applyScreenEncoding(socketId) {
     const channels = this.peerChannels.get(socketId);
     const sender = channels && channels.screen && channels.screen.sender;
     if (!sender || !this.localScreenStream) return;
 
+    const active = !this.screenPausedBy.has(socketId);
+    this.setScreenAudioActive(channels, active, socketId);
+
     const params = sender.getParameters();
     if (!params.encodings || !params.encodings.length) return;
 
-    const { maxBitrate, maxFramerate, degradationPreference } = SCREEN_ENCODING;
+    const { maxBitrate, maxFramerate } = SCREEN_ENCODING;
+    let degradationPreference = SCREEN_ENCODING.degradationPreference;
+    let scaleResolutionDownBy = 1;
+    const adapt = this.screenAdapt.get(socketId);
+    const track = this.localScreenStream.getVideoTracks()[0];
+    const sourceHeight = track ? track.getSettings().height : 0;
+    if (adapt && adapt.mode === 'floor') {
+      degradationPreference = 'maintain-resolution';
+      // A capture already at or under the floor (a small window) is kept as is
+      scaleResolutionDownBy = Math.max(1, sourceHeight / SCREEN_MIN_HEIGHT);
+    }
+
     const encoding = params.encodings[0];
     if (encoding.maxBitrate === maxBitrate && encoding.maxFramerate === maxFramerate &&
+        (encoding.scaleResolutionDownBy || 1) === scaleResolutionDownBy &&
+        encoding.active === active &&
         params.degradationPreference === degradationPreference) return;
 
     encoding.maxBitrate = maxBitrate;
     encoding.maxFramerate = maxFramerate;
+    encoding.scaleResolutionDownBy = scaleResolutionDownBy;
+    encoding.active = active;
     params.degradationPreference = degradationPreference;
     try {
       await sender.setParameters(params);
@@ -688,9 +909,26 @@ class WebRTCManager {
     }
   }
 
+  // The share's sound follows its picture: off for a peer who is not watching
+  async setScreenAudioActive(channels, active, socketId) {
+    const sender = channels.screenAudio && channels.screenAudio.sender;
+    if (!sender) return;
+    const params = sender.getParameters();
+    if (!params.encodings || !params.encodings.length || params.encodings[0].active === active) return;
+    params.encodings[0].active = active;
+    try {
+      await sender.setParameters(params);
+    } catch (err) {
+      console.warn(`[WebRTC] Could not ${active ? 'resume' : 'pause'} screen audio for ${socketId}:`, err);
+    }
+  }
+
   stopScreenShare() {
     this.applyTrackToPeers('screen', null);
     this.applyTrackToPeers('screenAudio', null);
+    this.stopScreenRelay();
+    this.screenSendTrack = null;
+    this.screenSendStats.clear();
 
     if (this.localScreenStream) {
       this.localScreenStream.getTracks().forEach(t => t.stop());
@@ -973,6 +1211,133 @@ class WebRTCManager {
   }
 
   /**
+   * Tell one viewer what our screen share reaches them at and why (see
+   * screenSendCause), and give the app the picture for every viewer, so both
+   * sides can see whose connection is holding the share back.
+   */
+  reportScreenSend(socketId) {
+    if (!this.localScreenStream) return;
+    const now = Date.now();
+    const fresh = s => s && now - s.at < SCREEN_SEND_STATS_TTL_MS;
+    const receiving = Array.from(this.screenSendStats.entries())
+      .filter(([id, s]) => this.peers.has(id) && !this.screenPausedBy.has(id) && fresh(s))
+      .map(([, s]) => s);
+
+    const mine = this.screenSendStats.get(socketId);
+    if (fresh(mine) && !this.screenPausedBy.has(socketId)) {
+      mine.cause = screenSendCause(mine, receiving);
+      if (this.socket && this.socket.connected) {
+        this.socket.emit('screen-stats', { targetSocketId: socketId, height: mine.height, fps: mine.fps, cause: mine.cause });
+      }
+    }
+
+    if (this.onScreenSendReport) this.onScreenSendReport(this.screenSendReport());
+  }
+
+  /** How our screen share reaches each connected viewer right now. */
+  screenSendReport() {
+    const now = Date.now();
+    return Array.from(this.peers.keys()).map((socketId) => {
+      if (this.screenPausedBy.has(socketId)) return { socketId, paused: true };
+      const s = this.screenSendStats.get(socketId);
+      if (!s || !s.cause || now - s.at >= SCREEN_SEND_STATS_TTL_MS) return { socketId, pending: true };
+      return { socketId, height: s.height, fps: s.fps, cause: s.cause };
+    });
+  }
+
+  /** What a sharer last told us about the share it sends us, if recent. */
+  remoteScreenSendInfo(socketId) {
+    const s = this.remoteScreenSendStats.get(socketId);
+    return s && Date.now() - s.at < SCREEN_SEND_STATS_TTL_MS ? s : null;
+  }
+
+  /**
+   * Warn once per share when a shared window delivers almost no frames while
+   * nothing limits the encoder (see SLOW_CAPTURE_FPS). Whole screens are left
+   * alone, and a still window can trip it too, so the advice is phrased for
+   * games. Any peer's encode reflects the capture rate, so all polls count.
+   */
+  checkCaptureRate(track, outbound) {
+    if (this.slowCaptureReported) return;
+    const isWindow = String(track.getSettings().deviceId || '').startsWith('window:');
+    const slow = isWindow && outbound.qualityLimitationReason === 'none' &&
+      (outbound.framesPerSecond || 0) < SLOW_CAPTURE_FPS;
+    if (!slow) {
+      this.slowCaptureSince = null;
+      return;
+    }
+    const now = Date.now();
+    if (!this.slowCaptureSince) this.slowCaptureSince = now;
+    if (now - this.slowCaptureSince < SLOW_CAPTURE_MS) return;
+
+    this.slowCaptureReported = true;
+    console.warn(`[WebRTC] Shared window delivers ${outbound.framesPerSecond || 0} fps with nothing limiting the encoder`);
+    if (this.onScreenCaptureSlow) this.onScreenCaptureSlow();
+  }
+
+  /**
+   * Keep our screen share to this peer at or above SCREEN_MIN_HEIGHT (see
+   * nextScreenAdapt), from the stats the quality poll already took.
+   */
+  adaptScreenResolution(socketId, stats) {
+    const track = this.localScreenStream && this.localScreenStream.getVideoTracks()[0];
+    const channels = this.peerChannels.get(socketId);
+    const screenMid = channels && channels.screen ? channels.screen.mid : null;
+    // Nothing is encoded for a peer who is not watching
+    if (!track || screenMid === null || this.screenPausedBy.has(socketId)) return;
+
+    let outbound = null;
+    let availableKbps = null;
+    stats.forEach((r) => {
+      if (r.type === 'outbound-rtp' && r.kind === 'video' && r.mid === screenMid && r.framesEncoded) outbound = r;
+      if (r.type === 'transport' && r.selectedCandidatePairId) {
+        const pair = stats.get(r.selectedCandidatePairId);
+        if (pair && pair.availableOutgoingBitrate) availableKbps = Math.round(pair.availableOutgoingBitrate / 1000);
+      }
+    });
+    if (!outbound) return;
+    this.checkCaptureRate(track, outbound);
+
+    // Is the GPU encoding the share? Judged on H.264 only, the codec the
+    // relay is for: a peer on an older version negotiates VP8, which says
+    // nothing about the GPU. Two samples in a row, so a transient doesn't count.
+    if (this.screenRelay) {
+      const codec = outbound.codecId ? stats.get(outbound.codecId) : null;
+      if (codec && /h264/i.test(codec.mimeType) && outbound.powerEfficientEncoder === false) {
+        this.screenRelay.softwareSamples = (this.screenRelay.softwareSamples || 0) + 1;
+        if (this.screenRelay.softwareSamples >= 2) this.useDirectScreenTrack(outbound.encoderImplementation || 'software');
+      } else if (codec && /h264/i.test(codec.mimeType)) {
+        this.screenRelay.softwareSamples = 0;
+      }
+    }
+
+    const sample = {
+      height: outbound.frameHeight || 0,
+      sourceHeight: track.getSettings().height || 0,
+      limitedBy: outbound.qualityLimitationReason,
+      availableKbps
+    };
+    const { adapt, changed } = nextScreenAdapt(this.screenAdapt.get(socketId) || initialScreenAdapt(), sample, Date.now());
+    this.screenAdapt.set(socketId, adapt);
+    this.screenSendStats.set(socketId, {
+      height: sample.height,
+      fps: Math.round(outbound.framesPerSecond || 0),
+      limitedBy: sample.limitedBy,
+      floor: adapt.mode === 'floor',
+      at: Date.now()
+    });
+    if (!changed) return;
+
+    if (adapt.mode === 'floor') {
+      console.log(`[WebRTC] Screen to ${socketId}: holding ${SCREEN_MIN_HEIGHT}p (was ${outbound.frameWidth}x${sample.height}, ` +
+        `limitedBy=${sample.limitedBy}, upload estimate ${availableKbps} kbps); full resolution again in ${Math.round(adapt.retryMs / 1000)} s`);
+    } else {
+      console.log(`[WebRTC] Screen to ${socketId}: trying full resolution again (upload estimate ${availableKbps} kbps)`);
+    }
+    this.applyScreenEncoding(socketId);
+  }
+
+  /**
    * Sample getStats() for a rough, cheap-to-compute signal: round-trip time on
    * the active candidate pair plus inbound packet loss, bucketed into
    * good/ok/bad for the little indicator on each tile.
@@ -982,10 +1347,13 @@ class WebRTCManager {
     if (!pc || pc.connectionState !== 'connected') return;
 
     this.ensureSending(socketId);
-    if (!this.onConnectionQualityChanged) return;
 
     try {
       const stats = await pc.getStats();
+      this.adaptScreenResolution(socketId, stats);
+      this.reportScreenSend(socketId);
+      if (!this.onConnectionQualityChanged) return;
+
       let rttMs = null;
       let packetsLost = 0;
       let packetsTotal = 0;
@@ -1001,7 +1369,9 @@ class WebRTCManager {
             width: report.frameWidth,
             height: report.frameHeight,
             fps: Math.round(report.framesPerSecond || 0),
-            freezes: report.freezeCount || 0
+            freezes: report.freezeCount || 0,
+            // What the sharer says it sends us and why, when it is on 1.1.6+
+            sender: this.remoteScreenSendInfo(socketId)
           };
         }
         if (report.type === 'candidate-pair' && report.state === 'succeeded' &&
@@ -1109,9 +1479,19 @@ class WebRTCManager {
           if (r.type === 'inbound-rtp' && r.kind === 'audio') row.audioReceived += r.packetsReceived || 0;
 
           const isScreen = r.kind === 'video' && screenMid !== null && r.mid === screenMid;
-          if (isScreen && r.type === 'outbound-rtp' && r.framesEncoded) {
-            row.screenOut = `${r.framesPerSecond || 0} fps ${r.frameWidth}x${r.frameHeight} ` +
-              `${r.encoderImplementation || ''} limitedBy=${r.qualityLimitationReason}`;
+          // Only while sharing: a finished share leaves stale counters behind
+          if (isScreen && r.type === 'outbound-rtp' && r.framesEncoded && this.localScreenStream) {
+            const adapt = this.screenAdapt.get(socketId);
+            const codec = r.codecId ? byId.get(r.codecId) : null;
+            const sender = channels.screen && channels.screen.sender;
+            const preference = sender ? sender.getParameters().degradationPreference : null;
+            row.screenOut = this.screenPausedBy.has(socketId)
+              ? 'pausada (parou de assistir)'
+              : `${r.framesPerSecond || 0} fps ${r.frameWidth ? `${r.frameWidth}x${r.frameHeight}` : '(sem quadros agora)'} ` +
+                `${codec ? codec.mimeType.replace('video/', '') : ''} ${r.encoderImplementation || ''}` +
+                `${r.powerEfficientEncoder ? ' (placa de vídeo)' : ''} limitedBy=${r.qualityLimitationReason}` +
+                `${preference ? ` prioridade=${preference}` : ''}` +
+                `${adapt && adapt.mode === 'floor' ? ` (segurando ${SCREEN_MIN_HEIGHT}p)` : ''}`;
           }
           if (isScreen && r.type === 'inbound-rtp' && r.framesDecoded) {
             row.screenIn = `${r.framesPerSecond || 0} fps ${r.frameWidth}x${r.frameHeight} ` +
@@ -1145,7 +1525,7 @@ class WebRTCManager {
     if (this.localMicStream) assign('mic', this.localMicStream.getAudioTracks()[0] || null);
     if (this.localCamStream) assign('cam', this.localCamStream.getVideoTracks()[0] || null);
     if (this.localScreenStream) {
-      assign('screen', this.localScreenStream.getVideoTracks()[0] || null);
+      assign('screen', this.screenSendTrack);
       assign('screenAudio', this.localScreenStream.getAudioTracks()[0] || null);
       this.applyScreenEncoding(socketId);
     }
@@ -1166,6 +1546,7 @@ class WebRTCManager {
       screen: pc.addTransceiver('video', { direction: 'sendrecv' }),
       screenAudio: pc.addTransceiver('audio', { direction: 'sendrecv' })
     });
+    preferH264(this.peerChannels.get(socketId).screen);
     this.attachLocalTracks(socketId);
 
     await this.sendOffer(socketId);
@@ -1188,6 +1569,10 @@ class WebRTCManager {
     this.peerChannels.delete(socketId);
     this.peerState.delete(socketId);
     this.pendingCandidates.delete(socketId);
+    this.screenAdapt.delete(socketId);
+    this.screenPausedBy.delete(socketId);
+    this.screenSendStats.delete(socketId);
+    this.remoteScreenSendStats.delete(socketId);
 
     [this.remoteStreams, this.remoteScreenStreams].forEach(streamMap => {
       const stream = streamMap.get(socketId);

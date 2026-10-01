@@ -43,6 +43,13 @@ function sanitizeUsername(name) {
   return cleaned || 'Anônimo';
 }
 
+// The app's own id ('user_xxxx', or 'anon_<socket id>' from the server):
+// plain id characters only, or null
+const USER_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+function sanitizeUserId(id) {
+  return typeof id === 'string' && USER_ID_RE.test(id) ? id : null;
+}
+
 function sanitizeColor(color) {
   return typeof color === 'string' && HEX_COLOR_RE.test(color) ? color : DEFAULT_COLOR;
 }
@@ -87,8 +94,21 @@ const USER_STATE_FIELDS = {
   isSpeaking: (v) => typeof v === 'boolean',
   username: () => true,
   avatar: () => true,
-  status: () => true
+  status: () => true,
+  pcHealth: (v) => !!v && typeof v === 'object'
 };
+
+// How loaded someone's PC is, so the others can tell a struggling PC from a
+// struggling connection: percentages (null when not measured) and which of
+// them are at their limit
+const PC_HEALTH_ISSUES = ['cpu', 'ram', 'gpu'];
+function sanitizePcHealth(health) {
+  const percent = v => (Number.isFinite(v) ? Math.min(100, Math.max(0, Math.round(v))) : null);
+  const issues = Array.isArray(health.issues)
+    ? PC_HEALTH_ISSUES.filter(issue => health.issues.includes(issue))
+    : [];
+  return { cpu: percent(health.cpu), ram: percent(health.ram), gpu: percent(health.gpu), issues };
+}
 
 function sanitizeUserStateUpdate(update) {
   if (!update || typeof update !== 'object') return {};
@@ -99,6 +119,7 @@ function sanitizeUserStateUpdate(update) {
     if (key === 'username') clean.username = sanitizeUsername(update.username);
     else if (key === 'avatar') clean.avatar = sanitizeColor(update.avatar);
     else if (key === 'status') clean.status = sanitizeStatus(update.status);
+    else if (key === 'pcHealth') clean.pcHealth = sanitizePcHealth(update.pcHealth);
     else clean[key] = update[key];
   }
   return clean;
@@ -140,6 +161,7 @@ module.exports = {
   SOUND_MIME_TYPES,
   ALLOWED_REACTIONS,
   sanitizeUsername,
+  sanitizeUserId,
   sanitizeColor,
   sanitizeStatus,
   sanitizeMessageText,

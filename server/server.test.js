@@ -218,6 +218,58 @@ describe('webrtc signalling', () => {
   }, 10000);
 });
 
+describe('screen-watch', () => {
+  test('tells a sharer in the same room that a viewer stopped watching', async () => {
+    const roomId = `room-${Date.now()}-w`;
+    const sharer = await joinAs(roomId, 'watch-a', 'A');
+    const viewer = await joinAs(roomId, 'watch-b', 'B');
+
+    const received = once(sharer.client, 'screen-watch');
+    viewer.client.emit('screen-watch', { targetSocketId: sharer.id, watching: false });
+    expect(await received).toEqual({ senderSocketId: viewer.id, watching: false });
+
+    const resumed = once(sharer.client, 'screen-watch');
+    viewer.client.emit('screen-watch', { targetSocketId: sharer.id, watching: true });
+    expect(await resumed).toEqual({ senderSocketId: viewer.id, watching: true });
+
+    sharer.client.close();
+    viewer.client.close();
+  }, 10000);
+
+  test('relays what a sharer sends a viewer, clamped, and drops unknown causes', async () => {
+    const roomId = `room-${Date.now()}-s`;
+    const sharer = await joinAs(roomId, 'stats-a', 'A');
+    const viewer = await joinAs(roomId, 'stats-b', 'B');
+
+    const received = once(viewer.client, 'screen-stats');
+    sharer.client.emit('screen-stats', { targetSocketId: viewer.id, height: 1080.4, fps: 9999, cause: 'viewer-network' });
+    expect(await received).toEqual({ senderSocketId: sharer.id, height: 1080, fps: 240, cause: 'viewer-network' });
+
+    let relayed = false;
+    viewer.client.on('screen-stats', () => { relayed = true; });
+    sharer.client.emit('screen-stats', { targetSocketId: viewer.id, height: 720, fps: 30, cause: '<b>hack</b>' });
+    await new Promise(r => setTimeout(r, 300));
+    expect(relayed).toBe(false);
+
+    sharer.client.close();
+    viewer.client.close();
+  }, 10000);
+
+  test('is not relayed to someone in another room', async () => {
+    const sharer = await joinAs(`room-${Date.now()}-w1`, 'watch-c', 'C');
+    const outsider = await joinAs(`room-${Date.now()}-w2`, 'watch-d', 'D');
+
+    let relayed = false;
+    sharer.client.on('screen-watch', () => { relayed = true; });
+    outsider.client.emit('screen-watch', { targetSocketId: sharer.id, watching: false });
+    await new Promise(r => setTimeout(r, 300));
+    expect(relayed).toBe(false);
+
+    sharer.client.close();
+    outsider.client.close();
+  }, 10000);
+});
+
 describe('stale sessions', () => {
   test('a user rejoining from a new socket replaces their old session', async () => {
     const roomId = `room-${Date.now()}-f`;
@@ -341,10 +393,13 @@ describe('soundboard', () => {
     const added = once(bob, 'soundboard-library-changed');
     const reply = await alice.emitWithAck('soundboard-upsert', {
       username: 'Alice',
-      entry: { id: clip.id, name: 'Risada', emoji: '\u{1F602}', mime: 'audio/mpeg', addedBy: 'Mallory', addedAt: 1 },
+      userId: 'user_alice',
+      entry: { id: clip.id, name: 'Risada', emoji: '\u{1F602}', mime: 'audio/mpeg', addedBy: 'Mallory', addedById: 'user_mallory', addedAt: 1 },
       data: clip.data
     });
     expect(reply.ok).toBe(true);
+    // The author comes from who is connected, never from the entry itself
+    expect(reply.entry.addedById).toBe('user_alice');
     // The server decides who added it and when
     expect(reply.entry).toMatchObject({ name: 'Risada', addedBy: 'Alice', deleted: false });
     expect(reply.entry.addedAt).toBeGreaterThan(1);
@@ -353,7 +408,7 @@ describe('soundboard', () => {
     // Anyone can rename it
     const renamed = once(alice, 'soundboard-library-changed');
     await bob.emitWithAck('soundboard-upsert', { entry: { ...reply.entry, name: 'Risadona' } });
-    expect((await renamed).entries[0]).toMatchObject({ name: 'Risadona', addedBy: 'Alice' });
+    expect((await renamed).entries[0]).toMatchObject({ name: 'Risadona', addedBy: 'Alice', addedById: 'user_alice' });
 
     // A newcomer gets the whole library on sync
     const carol = await connected();

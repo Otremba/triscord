@@ -14,7 +14,7 @@
  */
 
 const crypto = require('crypto');
-const { sanitizeSoundId, sanitizeSoundMeta, sanitizeSoundData, sanitizeUsername, SOUND_MIME_TYPES } = require('./sanitize');
+const { sanitizeSoundId, sanitizeSoundMeta, sanitizeSoundData, sanitizeUsername, sanitizeUserId, SOUND_MIME_TYPES } = require('./sanitize');
 
 const MAX_ACTIVE_SOUNDS = 200;
 const MAX_TOMBSTONES = 1000;
@@ -52,6 +52,10 @@ class SoundLibrary {
       emoji,
       mime,
       addedBy: sanitizeUsername(raw.addedBy),
+      // Who added it, by user id: the app groups sounds into a folder per
+      // person, which a name alone would split whenever someone renames
+      // themselves. Sounds from before 1.1.6 have none.
+      addedById: sanitizeUserId(raw.addedById),
       addedAt: time(raw.addedAt),
       updatedAt: time(raw.updatedAt),
       deleted
@@ -84,7 +88,13 @@ class SoundLibrary {
 
     // Keep who added it and when, whoever renames it later
     const stored = current
-      ? { ...entry, addedBy: current.addedBy, addedAt: current.addedAt, mime: entry.mime || current.mime }
+      ? {
+        ...entry,
+        addedBy: current.addedBy,
+        addedById: current.addedById,
+        addedAt: current.addedAt,
+        mime: entry.mime || current.mime
+      }
       : entry;
     this.entries.set(entry.id, stored);
 

@@ -5,6 +5,7 @@ const path = require('path');
 const cors = require('cors');
 const {
   sanitizeUsername,
+  sanitizeUserId,
   sanitizeColor,
   sanitizeStatus,
   sanitizeMessageText,
@@ -402,6 +403,29 @@ io.on('connection', (socket) => {
     relaySignal(socket, 'webrtc-ice-candidate', targetSocketId, { candidate, type, session, targetSession });
   });
 
+  // A viewer telling a screen sharer whether it is watching, so the sharer
+  // stops encoding and uploading for someone who is not. Same room only.
+  socket.on('screen-watch', ({ targetSocketId, watching } = {}) => {
+    if (!currentRoomId || typeof targetSocketId !== 'string' || targetSocketId === socket.id) return;
+    const room = rooms.get(currentRoomId);
+    if (!room || !room.users.has(socket.id) || !room.users.has(targetSocketId)) return;
+    io.to(targetSocketId).emit('screen-watch', { senderSocketId: socket.id, watching: watching !== false });
+  });
+
+  // A sharer telling a viewer what its screen share reaches them at and why,
+  // so the viewer can tell their own connection from the sharer's
+  const SCREEN_SEND_CAUSES = ['ok', 'sender-cpu', 'sender-upload', 'viewer-network', 'network'];
+  socket.on('screen-stats', ({ targetSocketId, height, fps, cause } = {}) => {
+    if (!currentRoomId || typeof targetSocketId !== 'string' || targetSocketId === socket.id) return;
+    if (!SCREEN_SEND_CAUSES.includes(cause)) return;
+    const room = rooms.get(currentRoomId);
+    if (!room || !room.users.has(socket.id) || !room.users.has(targetSocketId)) return;
+    const clamp = (value, max) => (Number.isFinite(value) ? Math.min(max, Math.max(0, Math.round(value))) : 0);
+    io.to(targetSocketId).emit('screen-stats', {
+      senderSocketId: socket.id, height: clamp(height, 4320), fps: clamp(fps, 240), cause
+    });
+  });
+
   // User state updates (mute, camera toggle, screenshare toggle, speaking indicator, profile)
   socket.on('user-state-change', (stateUpdate) => {
     if (!currentRoomId || !currentUserData) return;
@@ -493,6 +517,10 @@ io.on('connection', (socket) => {
     return currentUserData ? currentUserData.username : sanitizeUsername(payload && payload.username);
   }
 
+  function soundUserId(payload) {
+    return currentUserData ? sanitizeUserId(currentUserData.userId) : sanitizeUserId(payload && payload.userId);
+  }
+
   function announceLibraryChanges(entries) {
     if (entries.length) socket.broadcast.emit('soundboard-library-changed', { entries });
   }
@@ -546,6 +574,7 @@ io.on('connection', (socket) => {
       if (entry.deleted || !payload.data) return reply({ ok: false, error: 'invalid' });
       entry.addedAt = now;
       entry.addedBy = soundUsername(payload);
+      entry.addedById = soundUserId(payload);
     }
     if (payload.data && !entry.deleted) {
       if (!soundUploadLimiter()) return reply({ ok: false, error: 'rate-limited' });
@@ -589,7 +618,7 @@ io.on('connection', (socket) => {
     if (!soundLibrary.entries.has(soundId)) {
       const now = Date.now();
       const entry = SoundLibrary.sanitizeEntry({
-        ...payload, id: soundId, addedBy: soundUsername(payload), addedAt: now, updatedAt: now
+        ...payload, id: soundId, addedBy: soundUsername(payload), addedById: soundUserId(payload), addedAt: now, updatedAt: now
       }, now);
       const stored = entry && soundLibrary.merge(entry);
       if (stored) announceLibraryChanges([stored]);

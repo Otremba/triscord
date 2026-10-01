@@ -7,6 +7,12 @@ const { spawn } = require('child_process');
 // Disable default menu for a clean look
 Menu.setApplicationMenu(null);
 
+// Windows names a notification's sender by this id: without it Electron's
+// default (electron.app.Electron) shows on every notification. It matches
+// build.appId in package.json, the id the installer gives the Start menu
+// shortcut, so Windows shows "Triscord" and its icon.
+if (process.platform === 'win32') app.setAppUserModelId('com.triscord.app');
+
 // Warnings and errors of the main process (system audio helper, updater...),
 // kept for the diagnostics report in Settings. The renderer cannot see these.
 const MAIN_LOG_LIMIT = 200;
@@ -192,6 +198,126 @@ app.on('will-quit', () => {
 let currentMuteAccelerator = null;
 
 // Environment and live resource use, for the diagnostics report
+// ---- PC health: how loaded this PC is, to tell a struggling PC from a
+// struggling connection when a call or a screen share stutters ----
+
+// The renderer asks every few seconds during a call; with nobody asking for
+// this long, the GPU reader (a PowerShell process) is stopped
+const PC_HEALTH_IDLE_MS = 15000;
+
+// Whole-PC CPU usage between two calls, from the per-core time counters
+let lastCpuTimes = null;
+function systemCpuPercent() {
+  let idle = 0;
+  let total = 0;
+  os.cpus().forEach(({ times }) => {
+    idle += times.idle;
+    total += times.user + times.nice + times.sys + times.idle + times.irq;
+  });
+  const previous = lastCpuTimes;
+  lastCpuTimes = { idle, total };
+  if (!previous || total <= previous.total) return null;
+  return Math.round(100 * (1 - (idle - previous.idle) / (total - previous.total)));
+}
+
+/**
+ * GPU usage, read from Windows' "GPU Engine" performance counters (what Task
+ * Manager shows): per engine, the sum over every process using it; overall,
+ * the busiest engine. The video encoder engine is reported on its own, since
+ * screen shares are encoded there (see gpu-relay.js). Counter instances are
+ * listed again on every read, so a game started mid-call is counted. Each
+ * read costs ~70 ms of CPU; one every ~3 s.
+ */
+const GPU_READER_SCRIPT = `
+$ErrorActionPreference = 'SilentlyContinue'
+$ProgressPreference = 'SilentlyContinue'
+$inv = [Globalization.CultureInfo]::InvariantCulture
+while ($true) {
+  $engines = @{}; $encoders = @{}
+  foreach ($s in (Get-Counter '\\GPU Engine(*)\\Utilization Percentage').CounterSamples) {
+    if ($s.InstanceName -match 'luid_(.+)$') {
+      $key = $matches[1]
+      $engines[$key] += $s.CookedValue
+      if ($key -match 'engtype_videoencode') { $encoders[$key] += $s.CookedValue }
+    }
+  }
+  $gpu = [double](($engines.Values | Measure-Object -Maximum).Maximum)
+  $enc = [double](($encoders.Values | Measure-Object -Maximum).Maximum)
+  [Console]::Out.WriteLine('{"gpu":' + [Math]::Round($gpu, 1).ToString($inv) + ',"encoder":' + [Math]::Round($enc, 1).ToString($inv) + '}')
+  Start-Sleep -Seconds 2
+}`;
+
+const gpuReader = { process: null, latest: null, lastAskedAt: 0, idleTimer: null };
+
+function startGpuReader() {
+  if (process.platform !== 'win32' || gpuReader.process) return;
+  const encoded = Buffer.from(GPU_READER_SCRIPT, 'utf16le').toString('base64');
+  // stderr is discarded: left unread, its pipe would fill and stall the reader
+  const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'ignore']
+  });
+  gpuReader.process = child;
+  try {
+    os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL);
+  } catch (err) {}
+
+  let buffered = '';
+  child.stdout.on('data', (chunk) => {
+    buffered += chunk.toString();
+    const lines = buffered.split(/\r?\n/);
+    buffered = lines.pop();
+    lines.forEach((line) => {
+      try {
+        const { gpu, encoder } = JSON.parse(line);
+        gpuReader.latest = { gpu: Math.min(100, gpu), encoder: Math.min(100, encoder), at: Date.now() };
+      } catch (err) {}
+    });
+  });
+  child.on('error', err => console.warn('[PcHealth] GPU reader failed:', err.message));
+  child.on('exit', () => {
+    if (gpuReader.process === child) gpuReader.process = null;
+  });
+
+  // Stop reading once nobody has asked for a while (the call ended)
+  clearInterval(gpuReader.idleTimer);
+  gpuReader.idleTimer = setInterval(() => {
+    if (Date.now() - gpuReader.lastAskedAt > PC_HEALTH_IDLE_MS) stopGpuReader();
+  }, PC_HEALTH_IDLE_MS);
+}
+
+function stopGpuReader() {
+  clearInterval(gpuReader.idleTimer);
+  gpuReader.idleTimer = null;
+  if (gpuReader.process) gpuReader.process.kill();
+  gpuReader.process = null;
+  gpuReader.latest = null;
+}
+
+app.on('will-quit', stopGpuReader);
+
+ipcMain.handle('get-pc-health', () => {
+  gpuReader.lastAskedAt = Date.now();
+  startGpuReader();
+  const metrics = app.getAppMetrics();
+  const cores = Math.max(1, os.cpus().length);
+  const totalMB = os.totalmem() / 1048576;
+  const freeMB = os.freemem() / 1048576;
+  const gpu = gpuReader.latest && Date.now() - gpuReader.latest.at < 10000 ? gpuReader.latest : null;
+  return {
+    cpu: systemCpuPercent(),
+    ram: Math.round(100 * (1 - freeMB / totalMB)),
+    freeRamMB: Math.round(freeMB),
+    totalRamMB: Math.round(totalMB),
+    gpu: gpu ? Math.round(gpu.gpu) : null,
+    gpuEncoder: gpu ? Math.round(gpu.encoder) : null,
+    // Triscord's own share: Chromium counts CPU per core (one busy core is
+    // 100%), so it is divided by the core count to compare with the PC's
+    appCpu: Math.round(metrics.reduce((sum, m) => sum + (m.cpu ? m.cpu.percentCPUUsage : 0), 0) / cores),
+    appRamMB: Math.round(metrics.reduce((sum, m) => sum + (m.memory ? m.memory.workingSetSize : 0), 0) / 1024)
+  };
+});
+
 ipcMain.handle('get-diagnostics-info', () => {
   const metrics = app.getAppMetrics();
   const cpus = os.cpus();

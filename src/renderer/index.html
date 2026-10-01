@@ -109,6 +109,12 @@
         </div>
 
         <div class="stage-top-actions">
+          <!-- How loaded this PC is during a call (see initPcHealth in app.js) -->
+          <div class="pc-health-badge hidden" id="pcHealthBadge">
+            <i data-lucide="gauge"></i>
+            <span class="pc-health-text"></span>
+          </div>
+
           <div class="connection-status-badge connecting" id="connectionStatusBadge">
             <span class="status-dot"></span>
             <span class="status-text">Conectando...</span>
@@ -186,7 +192,7 @@
             </button>
 
             <button class="btn-voice-control" id="btnCameraEffects" title="Efeitos de câmera">
-              <i data-lucide="sparkles"></i>
+              <i data-lucide="aperture"></i>
               <span class="btn-label">Efeitos</span>
             </button>
 
@@ -267,7 +273,7 @@
 
         <div class="screen-options-row">
           <span class="screen-quality-note">
-            <i data-lucide="sparkles"></i>
+            <i data-lucide="monitor-check"></i>
             Alta qualidade: até 1080p a 60 FPS, ajustada à internet de cada pessoa
           </span>
 
@@ -482,11 +488,6 @@
         <!-- Diagnostics: a report to send to Claude (or whoever maintains the app) -->
         <div class="setting-section">
           <label class="setting-label">Diagnóstico</label>
-          <small class="diagnostics-description">
-            O Triscord registra neste computador as conexões, quedas, erros e a qualidade das chamadas e
-            transmissões. Nada é enviado sozinho: copie o relatório e cole numa conversa com o Claude,
-            contando o que aconteceu.
-          </small>
           <div class="diagnostics-summary" id="diagnosticsSummary"></div>
           <div class="diagnostics-actions">
             <button type="button" class="btn-secondary" id="btnCopyDiagnostics"><i data-lucide="clipboard-copy"></i>Copiar relatório</button>
@@ -533,6 +534,7 @@
   <script src="js/audio.js"></script>
   <script src="js/noise-suppression.js"></script>
   <script src="js/camera-effects.js"></script>
+  <script src="js/gpu-relay.js"></script>
   <script src="js/webrtc.js"></script>
   <script src="js/system-audio.js"></script>
   <script src="js/screen.js"></script>

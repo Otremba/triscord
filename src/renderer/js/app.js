@@ -173,7 +173,14 @@ document.addEventListener('DOMContentLoaded', () => {
     localSpeakingDetector: null,
     remoteSpeakingDetectors: new Map(), // socketId -> SpeakingDetector
     isChatOpen: false,
-    focusedTileId: null, // spotlighted tile key: 'local', 'screen-local', socketId or 'screen-<socketId>'
+    // Spotlighted tile keys, in the order they were picked ('local', 'screen-local',
+    // socketId or 'screen-<socketId>'); they share the big area
+    focusedTileIds: [],
+    focusJustAdded: null, // the one to animate in on the next render
+    // This PC's load (see initPcHealth): the latest reading, and which of
+    // cpu / ram / gpu are at their limit
+    pcHealth: null,
+    pcIssues: [],
     // Per-person playback: { voice: { userId: { volume, muted } }, stream: { ... } }
     audioPrefs: loadAudioPrefs(),
     // Per-person "stop watching screen share": { userId: false } (absent/true = watching)
@@ -220,6 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
     channelNameHeader: document.getElementById('currentChannelHeader'),
     channelTopicHeader: document.getElementById('channelTopicHeader'),
     connectionBadge: document.getElementById('connectionStatusBadge'),
+    pcHealthBadge: document.getElementById('pcHealthBadge'),
     btnToggleChat: document.getElementById('btnToggleChat'),
 
     // Channels Sidebar
@@ -592,6 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPresetBackgroundButtons();
   initNameGate();
   initDiagnostics();
+  initPcHealth();
   initSidebarLayout();
   initSoundboardUI();
 
@@ -637,7 +646,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state.soundboard) state.soundboard.destroy();
       state.soundboard = new window.Soundboard(state.socket, {
         shouldPlay: () => !!state.currentRoomId && !state.user.isDeafened,
-        getUsername: () => state.user.username
+        getUsername: () => state.user.username,
+        getUserId: () => state.user.userId
       });
       state.soundboard.onPlayed = showSoundBadge;
       // Someone else added, renamed or removed a sound
@@ -654,6 +664,19 @@ document.addEventListener('DOMContentLoaded', () => {
         ensureRemoteVoicePlaying(socketId);
       };
 
+      // How our screen share reaches each viewer (see reportScreenSend)
+      state.webrtc.onScreenSendReport = report => updateScreenSendPanel(report);
+
+      // The shared window delivers almost no frames: whoever shares a game is
+      // usually in it, so the advice also goes out as a desktop notification
+      state.webrtc.onScreenCaptureSlow = () => {
+        const advice = 'Sua transmissão está chegando travada: a janela está sendo capturada a poucos quadros por segundo. ' +
+          'Se for um jogo, pare e compartilhe a tela inteira.';
+        diag.log('screen', 'Captura da janela entregando poucos quadros', null, 'warn');
+        showToast(advice, 'error');
+        notify('Triscord', advice);
+      };
+
       // The call's camera switched between raw and effect-processed video
       state.webrtc.onLocalCameraChanged = (stream) => {
         const localVideo = document.getElementById('video-local');
@@ -666,6 +689,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // Handle Remote Stream Added
       state.webrtc.onRemoteStreamAdded = (socketId, stream, isScreen) => {
         console.log(`[App] Remote stream received from ${socketId} (${isScreen ? 'screen' : 'main'})`);
+        // A new connection to them starts with us watching: say if we are not
+        if (isScreen && !isWatchingStream(socketId)) state.webrtc.sendScreenWatch(socketId, false);
         getOrCreateRemoteAudio(socketId, isScreen ? 'stream' : 'voice', stream);
         renderUserTile(socketId, stream, isScreen);
       };
@@ -763,13 +788,6 @@ document.addEventListener('DOMContentLoaded', () => {
         state.roomMembers.set(socketId, userData);
         window.SoundEffects.playJoin();
         updateStageView();
-        addChatMessage({
-          senderName: 'Sistema',
-          text: `<i data-lucide="log-in"></i><strong>${escapeHtml(userData.username)}</strong> entrou no canal de voz.`,
-          timestamp: Date.now(),
-          isSystem: true
-        });
-        notify('Triscord', `${userData.username} entrou no canal #${state.currentRoomName}`);
       });
 
       // The same user joined the room from another window or device
@@ -813,11 +831,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
           Object.assign(user, newState);
 
+          // They started sharing and we had stopped watching them before
+          if (newState.isScreenSharing === true && !isWatchingStream(socketId)) {
+            state.webrtc.sendScreenWatch(socketId, false);
+          }
+
           if (layoutChanged) {
             renderAllVideoTiles();
           } else {
             updateUserTileState(socketId, user);
           }
+          // A viewer's PC reaching (or leaving) its limit shows in our share panel
+          if ('pcHealth' in newState) updateScreenSendPanel();
         }
       });
 
@@ -830,12 +855,6 @@ document.addEventListener('DOMContentLoaded', () => {
         removeRemoteSpeakingDetector(socketId);
         window.SoundEffects.playLeave();
         updateStageView();
-        addChatMessage({
-          senderName: 'Sistema',
-          text: `<i data-lucide="log-out"></i><strong>${escapeHtml(username)}</strong> saiu do canal de voz.`,
-          timestamp: Date.now(),
-          isSystem: true
-        });
       });
 
       // Incoming Chat Message
@@ -1060,6 +1079,11 @@ document.addEventListener('DOMContentLoaded', () => {
       'Sistema': info ? `${info.os} · ${info.cpu}` : navigator.platform,
       'Memória': info ? `${info.totalMemoryMB} MB no total, ${info.freeMemoryMB} MB livres` : '-',
       'Triscord agora': info ? `CPU ${info.appCpuPercent}% · RAM ${info.appMemoryMB} MB` : '-',
+      'PC agora': state.pcHealth
+        ? `CPU ${state.pcHealth.cpu ?? '-'}% · RAM ${state.pcHealth.ram}% · GPU ${state.pcHealth.gpu ?? '-'}% ` +
+          `(codificador ${state.pcHealth.gpuEncoder ?? '-'}%)` +
+          `${state.pcIssues.length ? ` · NO LIMITE: ${describePcIssues(state.pcIssues)}` : ''}`
+        : 'fora de uma chamada',
       'Servidor': `${state.serverUrl} (${state.socket && state.socket.connected ? 'conectado' : 'desconectado'})`,
       'Servidores ICE': describeIceServers(),
       'Você': `${state.user.username || '(sem nome)'} · ${state.socket ? state.socket.id : '-'}`,
@@ -1148,13 +1172,22 @@ document.addEventListener('DOMContentLoaded', () => {
       const resources = info
         ? { appCpuPercent: info.appCpuPercent, appMemoryMB: info.appMemoryMB, freeMemoryMB: info.freeMemoryMB }
         : null;
+      // The whole PC, and what everyone else in the call says about theirs
+      if (resources && state.pcHealth) {
+        const { cpu, ram, gpu, gpuEncoder } = state.pcHealth;
+        resources.pc = { cpu, ram, gpu, gpuEncoder, issues: state.pcIssues };
+      }
+      rows.forEach((row) => {
+        const member = state.roomMembers.get(row.socketId);
+        if (member && member.pcHealth) row.pc = member.pcHealth;
+      });
       diag.recordStats(rows, resources);
     }, statsIntervalMs);
 
     el.btnCopyDiagnostics.addEventListener('click', async () => {
       const report = await buildDiagnosticsReport();
       const ok = await copyText(report);
-      showToast(ok ? 'Relatório copiado. Cole numa conversa com o Claude.' : 'Não foi possível copiar; use "Salvar arquivo".', ok ? 'info' : 'error');
+      showToast(ok ? 'Relatório copiado.' : 'Não foi possível copiar; use "Salvar arquivo".', ok ? 'info' : 'error');
     });
 
     el.btnSaveDiagnostics.addEventListener('click', async () => {
@@ -1175,6 +1208,126 @@ document.addEventListener('DOMContentLoaded', () => {
       el.diagnosticsTestResult.classList.add('hidden');
       updateDiagnosticsSummary();
     });
+  }
+
+  // ---- PC health: is this PC (or someone else's) what holds a call back? ----
+  // Read every few seconds during a call (get-pc-health in main.js), shown in
+  // the badge next to the connection status, and shared with the room through
+  // user state so others can tell a struggling PC from a struggling connection.
+  // Called at startup above this point: no top-level consts here.
+
+  function pcIssueName(issue) {
+    return { cpu: 'processador', ram: 'memória RAM', gpu: 'placa de vídeo' }[issue] || issue;
+  }
+
+  function describePcIssues(issues) {
+    const names = issues.map(pcIssueName);
+    return names.length > 1 ? `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}` : names[0];
+  }
+
+  /**
+   * Which of cpu / ram / gpu are at their limit. Two readings in a row (~6 s)
+   * are needed to raise one, and it clears 5 points below its limit, so a
+   * short spike or a value hovering at the line does not flicker.
+   */
+  function evaluatePcHealth(health) {
+    const limits = { cpu: 90, ram: 90, gpu: 95 };
+    const streak = state.pcHealthStreak || (state.pcHealthStreak = {});
+    Object.keys(limits).forEach((key) => {
+      let value = health[key];
+      // Under 1 GB free is tight whatever the percentage says
+      if (key === 'ram' && health.freeRamMB != null && health.freeRamMB < 1024) value = 100;
+      if (value == null || value < limits[key] - 5) streak[key] = 0;
+      else if (value >= limits[key]) streak[key] = (streak[key] || 0) + 1;
+    });
+    return Object.keys(limits).filter(key => streak[key] >= 2);
+  }
+
+  function renderPcHealthBadge() {
+    const health = state.pcHealth;
+    const badge = el.pcHealthBadge;
+    if (!health || !state.currentRoomId) {
+      badge.classList.add('hidden');
+      return;
+    }
+    const parts = [`CPU ${health.cpu ?? '–'}%`, `RAM ${health.ram}%`];
+    if (health.gpu != null) parts.push(`GPU ${health.gpu}%`);
+    badge.querySelector('.pc-health-text').textContent = state.pcIssues.length
+      ? `Seu PC no limite: ${describePcIssues(state.pcIssues)}`
+      : parts.join(' · ');
+    badge.classList.toggle('warn', state.pcIssues.length > 0);
+
+    const gb = mb => `${(mb / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} GB`;
+    const lines = [
+      `Processador: ${health.cpu ?? '–'}% (Triscord: ${health.appCpu}%)`,
+      `Memória RAM: ${health.ram}% em uso, ${gb(health.freeRamMB)} livres de ${gb(health.totalRamMB)} (Triscord: ${gb(health.appRamMB)})`
+    ];
+    if (health.gpu != null) {
+      lines.push(`Placa de vídeo: ${health.gpu}% (codificador de vídeo: ${health.gpuEncoder}%)`);
+    }
+    if (state.pcIssues.length) {
+      lines.push('', `No limite: ${describePcIssues(state.pcIssues)}. Isso pode travar a chamada e a transmissão; fechar programas pesados ajuda.`);
+    }
+    badge.title = lines.join('\n');
+    badge.classList.remove('hidden');
+  }
+
+  // The room learns of a change at once, and of the numbers every ~15 s
+  function sharePcHealth(force) {
+    if (!state.socket || !state.currentRoomId || !state.pcHealth) return;
+    const key = state.pcIssues.join(',');
+    const now = Date.now();
+    if (!force && key === state.pcHealthSharedKey && now - (state.pcHealthSharedAt || 0) < 15000) return;
+    state.pcHealthSharedKey = key;
+    state.pcHealthSharedAt = now;
+    const { cpu, ram, gpu } = state.pcHealth;
+    state.socket.emit('user-state-change', { pcHealth: { cpu, ram, gpu, issues: state.pcIssues } });
+  }
+
+  async function pollPcHealth() {
+    if (!state.currentRoomId || !window.electronAPI || !window.electronAPI.getPcHealth) {
+      state.pcHealth = null;
+      state.pcIssues = [];
+      state.pcHealthStreak = {};
+      state.pcHealthSharedKey = null;
+      renderPcHealthBadge();
+      return;
+    }
+    let health;
+    try {
+      health = await window.electronAPI.getPcHealth();
+    } catch (err) {
+      return;
+    }
+    const before = state.pcIssues;
+    state.pcHealth = health;
+    state.pcIssues = evaluatePcHealth(health);
+    renderPcHealthBadge();
+
+    const raised = state.pcIssues.filter(issue => !before.includes(issue));
+    if (raised.length) {
+      const message = `Seu PC está no limite: ${describePcIssues(raised)}. Isso pode travar a chamada e a transmissão.`;
+      diag.log('pc', message, health, 'warn');
+      showToast(message, 'error');
+    }
+    if (raised.length || before.length !== state.pcIssues.length) {
+      sharePcHealth(true);
+      // Labels and panels that read these issues
+      updateScreenSendPanel();
+    } else {
+      sharePcHealth(false);
+    }
+  }
+
+  function initPcHealth() {
+    setInterval(pollPcHealth, 3000);
+  }
+
+  // A small warning next to someone's name while their PC is at its limit
+  function pcHealthBadgeHtml(member) {
+    const issues = member.pcHealth && member.pcHealth.issues;
+    if (!issues || !issues.length) return '';
+    return `<span class="status-badge-mini yellow" title="PC no limite: ${escapeHtml(describePcIssues(issues))}"><i data-lucide="gauge"></i></span>`;
   }
 
   // ---- Name gate: nobody enters a call without having picked a name ----
@@ -1369,8 +1522,97 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    sounds.forEach(sound => el.soundboardGrid.appendChild(createSoundTile(sound)));
+    soundFolders(sounds).forEach(folder => el.soundboardGrid.appendChild(createSoundFolder(folder)));
     window.renderIcons(el.soundboardGrid);
+  }
+
+  /**
+   * Group sounds into a folder per person who added them, so everyone can
+   * find their own. Grouped by user id, named after the person's latest name.
+   * Sounds from before 1.1.6 carry only a name: they join the folder of the
+   * id whose person goes by that name, or get one of their own.
+   * Order: yours first, then everyone else by name, unknown authors last.
+   */
+  function soundFolders(sounds) {
+    const byKey = new Map();
+    const add = (key, sound) => {
+      if (!byKey.has(key)) byKey.set(key, { key, name: '', latest: -1, sounds: [] });
+      const folder = byKey.get(key);
+      folder.sounds.push(sound);
+      if (sound.addedBy && (sound.addedAt || 0) >= folder.latest) {
+        folder.latest = sound.addedAt || 0;
+        folder.name = sound.addedBy;
+      }
+    };
+
+    const myKey = `id:${state.user.userId}`;
+    const nameOnly = [];
+    sounds.forEach((sound) => {
+      if (sound.addedById) add(`id:${sound.addedById}`, sound);
+      else nameOnly.push(sound);
+    });
+
+    const normalize = name => (name || '').trim().toLowerCase();
+    nameOnly.forEach((sound) => {
+      const name = normalize(sound.addedBy);
+      if (!name) return add('unknown', sound);
+      if (name === normalize(state.user.username)) return add(myKey, sound);
+      const owner = Array.from(byKey.values()).find(f => f.key.startsWith('id:') && normalize(f.name) === name);
+      add(owner ? owner.key : `name:${name}`, sound);
+    });
+
+    const folders = Array.from(byKey.values());
+    folders.forEach((folder) => {
+      folder.mine = folder.key === myKey;
+      if (folder.key === 'unknown') folder.name = 'Autor desconhecido';
+    });
+    const rank = f => (f.mine ? 0 : f.key === 'unknown' ? 2 : 1);
+    return folders.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
+  }
+
+  function loadCollapsedSoundFolders() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('triscord_soundboard_collapsed'));
+      return new Set(Array.isArray(saved) ? saved : []);
+    } catch (err) {
+      return new Set();
+    }
+  }
+
+  function createSoundFolder(folder) {
+    const collapsed = loadCollapsedSoundFolders();
+    const section = document.createElement('section');
+    section.className = 'sound-folder';
+    section.classList.toggle('collapsed', collapsed.has(folder.key));
+
+    const header = document.createElement('button');
+    header.type = 'button';
+    header.className = 'sound-folder-header';
+    header.setAttribute('aria-expanded', String(!collapsed.has(folder.key)));
+    header.innerHTML = `
+      <i data-lucide="chevron-down" class="sound-folder-chevron"></i>
+      <i data-lucide="${folder.mine ? 'folder-heart' : 'folder'}"></i>
+      <span class="sound-folder-name"></span>
+      <span class="sound-folder-count">${folder.sounds.length}</span>`;
+    header.querySelector('.sound-folder-name').textContent = folder.mine ? 'Meus sons' : folder.name;
+    header.addEventListener('click', () => {
+      const current = loadCollapsedSoundFolders();
+      const nowCollapsed = !section.classList.contains('collapsed');
+      if (nowCollapsed) current.add(folder.key);
+      else current.delete(folder.key);
+      section.classList.toggle('collapsed', nowCollapsed);
+      header.setAttribute('aria-expanded', String(!nowCollapsed));
+      try {
+        localStorage.setItem('triscord_soundboard_collapsed', JSON.stringify(Array.from(current)));
+      } catch (err) {}
+    });
+
+    const grid = document.createElement('div');
+    grid.className = 'sound-folder-grid';
+    folder.sounds.forEach(sound => grid.appendChild(createSoundTile(sound)));
+
+    section.append(header, grid);
+    return section;
   }
 
   function createSoundTile(sound) {
@@ -1614,7 +1856,7 @@ document.addEventListener('DOMContentLoaded', () => {
     state.pttActive = false;
     state.user.isCameraOn = false;
     state.user.isScreenSharing = false;
-    state.focusedTileId = null;
+    state.focusedTileIds = [];
 
     if (state.fullscreenTileKey || document.fullscreenElement) {
       if (document.fullscreenElement) {
@@ -1833,11 +2075,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 3. Spotlight / Focus Button
-    const isFocused = state.focusedTileId === tileKey;
+    const isFocused = state.focusedTileIds.includes(tileKey);
     const btnFocus = document.createElement('button');
     btnFocus.type = 'button';
     btnFocus.className = 'tile-action-btn tile-focus-btn';
-    btnFocus.title = isFocused ? 'Sair do foco (Esc)' : 'Colocar em foco';
+    btnFocus.title = isFocused ? 'Tirar do destaque (Esc tira todos)' : 'Destacar';
     btnFocus.innerHTML = `<i data-lucide="${isFocused ? 'minimize-2' : 'maximize-2'}"></i>`;
     btnFocus.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2101,10 +2343,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // A focused tile can vanish (peer left, stopped sharing) — fall back to the grid
-    if (state.focusedTileId && !tiles.some(t => t.key === state.focusedTileId)) {
-      state.focusedTileId = null;
-    }
+    // A focused tile can vanish (peer left, stopped sharing): the rest keep the
+    // big area, and with none left it falls back to the grid
+    state.focusedTileIds = state.focusedTileIds.filter(id => tiles.some(t => t.key === id));
 
     // Fullscreen tile could have stopped
     if (state.fullscreenTileKey && !tiles.some(t => t.key === state.fullscreenTileKey)) {
@@ -2154,37 +2395,50 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    if (state.focusedTileId) {
+    if (state.focusedTileIds.length) {
       el.videoGrid.className = 'video-grid focus-mode';
 
+      // The focused tiles split the big area in a near-square grid:
+      // 2 side by side, 3–4 in 2×2, 5–6 in 3×2...
+      const count = state.focusedTileIds.length;
+      const cols = Math.ceil(Math.sqrt(count));
       const main = document.createElement('div');
       main.className = 'focus-main';
+      main.style.setProperty('--focus-cols', cols);
+      main.style.setProperty('--focus-rows', Math.ceil(count / cols));
       const strip = document.createElement('div');
       strip.className = 'focus-strip';
 
+      state.focusedTileIds.forEach((id) => {
+        const tile = tiles.find(t => t.key === id);
+        tile.node.classList.add('focused');
+        if (id === state.focusJustAdded) tile.node.classList.add('focus-enter');
+        main.appendChild(tile.node);
+      });
+      state.focusJustAdded = null; // later re-renders shouldn't replay the entrance
       tiles.forEach(({ key, node }) => {
-        if (key === state.focusedTileId) {
-          node.classList.add('focused');
-          main.appendChild(node);
-        } else {
-          strip.appendChild(node);
-        }
+        if (!state.focusedTileIds.includes(key)) strip.appendChild(node);
       });
 
       el.videoGrid.appendChild(main);
       if (strip.children.length) el.videoGrid.appendChild(strip);
       window.renderIcons(el.videoGrid);
+      updateScreenSendPanel();
       return;
     }
 
     tiles.forEach(({ node }) => el.videoGrid.appendChild(node));
     adjustGridColumns();
     window.renderIcons(el.videoGrid);
+    updateScreenSendPanel();
   }
 
-  // Spotlight a stream: clicking it again returns to the grid
+  // Clicking a tile adds it to the big area, next to the ones already there;
+  // clicking it again sends it back to the strip
   function toggleTileFocus(key) {
-    state.focusedTileId = state.focusedTileId === key ? null : key;
+    const ids = state.focusedTileIds;
+    state.focusedTileIds = ids.includes(key) ? ids.filter(id => id !== key) : [...ids, key];
+    state.focusJustAdded = ids.includes(key) ? null : key;
     renderAllVideoTiles();
   }
 
@@ -2252,6 +2506,9 @@ document.addEventListener('DOMContentLoaded', () => {
     else state.watchPrefs[key] = false;
     localStorage.setItem('triscord_watch_prefs', JSON.stringify(state.watchPrefs));
 
+    // The sharer stops (or resumes) encoding and uploading for us
+    if (socketId !== 'local' && state.webrtc) state.webrtc.sendScreenWatch(socketId, watching);
+
     const stream = socketId === 'local'
       ? state.webrtc.localScreenStream
       : state.webrtc.remoteScreenStreams.get(socketId);
@@ -2261,21 +2518,21 @@ document.addEventListener('DOMContentLoaded', () => {
   function applyAudioPref(audioEl, kind, socketId) {
     const pref = getAudioPref(kind, socketId);
     audioEl.volume = pref.volume;
-    audioEl.muted = state.user.isDeafened || pref.muted;
+    // Someone who stopped watching a screen share shouldn't keep hearing it
+    const notWatching = kind === 'stream' && !isWatchingStream(socketId);
+    audioEl.muted = state.user.isDeafened || pref.muted || notWatching;
   }
 
+  // Each person's voice and stream audio play from one element each, kept in
+  // remoteAudioContainer (see getOrCreateRemoteAudio). Tiles have no <audio>:
+  // a second element on the same stream doubled the sound, and kept a stream
+  // audible after "Parar de assistir" muted the tile's copy.
   function applyPeerAudio(socketId) {
-    const voiceEl = document.getElementById(`audio-${socketId}`);
+    const voiceEl = document.getElementById(`remote-audio-voice-${socketId}`);
     if (voiceEl) applyAudioPref(voiceEl, 'voice', socketId);
 
-    const persistentVoice = document.getElementById(`remote-audio-voice-${socketId}`);
-    if (persistentVoice) applyAudioPref(persistentVoice, 'voice', socketId);
-
-    const streamEl = document.getElementById(`audio-screen-${socketId}`);
+    const streamEl = document.getElementById(`remote-audio-stream-${socketId}`);
     if (streamEl) applyAudioPref(streamEl, 'stream', socketId);
-
-    const persistentStream = document.getElementById(`remote-audio-stream-${socketId}`);
-    if (persistentStream) applyAudioPref(persistentStream, 'stream', socketId);
   }
 
   function applyAllPeerAudio() {
@@ -2553,6 +2810,61 @@ document.addEventListener('DOMContentLoaded', () => {
   // Dedicated tile for a screen share, separate from the owner's camera tile
   // "1080p · 60 FPS" on a screen share tile: what this viewer actually gets,
   // which differs per viewer in a mesh (each one has its own connection)
+  // Whose connection or PC holds a screen share back, as each side reads it:
+  // always what (internet or PC), whose (watching or sharing), and what to check
+  const CHECK_DOWNLOADS = 'Veja se algo está baixando ou transmitindo neste PC ou na sua rede: downloads, atualizações, ' +
+    'streaming, outro aparelho usando o Wi-Fi. Cabo de rede ajuda.';
+  const CHECK_UPLOADS = 'Veja se algo está enviando dados neste PC ou na sua rede: backup na nuvem, torrent, outra ' +
+    'transmissão, outro aparelho usando o Wi-Fi. Cabo de rede ajuda.';
+  const SCREEN_CAUSE_FOR_VIEWER = {
+    'viewer-network': {
+      text: 'Limitado pela sua internet (download)',
+      action: 'Veja se algo está baixando no seu PC ou na sua rede.',
+      hint: `O problema está do seu lado. ${CHECK_DOWNLOADS}`
+    },
+    'receive-loss': {
+      text: 'Sua internet está perdendo dados',
+      action: 'Veja se algo está baixando no seu PC ou na sua rede.',
+      hint: `Quem transmite está enviando bem, mas parte não chega até você. ${CHECK_DOWNLOADS}`
+    },
+    'sender-upload': {
+      text: 'Limitado pela internet de quem transmite (upload)',
+      action: 'Não é com você.',
+      hint: 'O problema não é com você: a internet de quem transmite não dá conta de enviar para todos.'
+    },
+    'sender-cpu': {
+      text: 'Limitado pelo PC de quem transmite',
+      action: 'Não é com você.',
+      hint: 'O problema não é com você: o PC de quem transmite está sobrecarregado.'
+    },
+    network: {
+      text: 'Limitado pela internet: seu download ou o upload de quem transmite',
+      action: 'Do seu lado, veja se algo está baixando.',
+      hint: 'Com só uma pessoa assistindo não dá para saber de qual lado é. ' +
+        `Do seu lado: ${CHECK_DOWNLOADS} Quem transmite deve verificar o upload dele.`
+    }
+  };
+  const SCREEN_CAUSE_FOR_SHARER = {
+    ok: 'chegando bem',
+    'viewer-network': 'internet da pessoa limitando',
+    'sender-upload': 'sua internet limitando',
+    'sender-cpu': 'seu PC limitando',
+    network: 'internet limitando (sua ou da pessoa)'
+  };
+
+  /**
+   * Why a share we watch looks the way it does: the sharer tells us what it
+   * sends and why (1.1.6+); if it sends well but far fewer frames arrive,
+   * they are lost on the way to us. null when the sharer has not said.
+   */
+  function viewerScreenCause(screen) {
+    const sender = screen.sender;
+    if (!sender) return null;
+    if (sender.cause !== 'ok') return sender.cause;
+    if (sender.fps >= 20 && screen.fps < sender.fps * 0.6) return 'receive-loss';
+    return 'ok';
+  }
+
   function updateScreenQualityLabel(socketId, screen) {
     const tile = document.getElementById(`tile-screen-${socketId}`);
     const label = tile && tile.querySelector('.screen-quality-label');
@@ -2561,10 +2873,141 @@ document.addEventListener('DOMContentLoaded', () => {
       label.classList.add('hidden');
       return;
     }
-    label.textContent = `${screen.height}p · ${screen.fps} FPS`;
-    label.classList.toggle('degraded', screen.height < 720 || screen.fps < 24);
-    label.title = 'Qualidade que você está recebendo. Ela se ajusta à sua internet e à de quem transmite.';
+    const cause = viewerScreenCause(screen);
+    // Without word from the sharer, fall back to judging the numbers alone
+    let degraded = cause ? cause !== 'ok' : (screen.height < 720 || screen.fps < 24);
+    let reason = degraded ? SCREEN_CAUSE_FOR_VIEWER[cause] : null;
+
+    // A PC at its limit explains a stuttering share better than the network
+    // does: the sharer's first (a game maxing their GPU stalls the capture
+    // even with nothing limiting the encoder), then our own
+    const struggling = degraded || screen.fps < 30;
+    const sharer = state.roomMembers.get(socketId);
+    const sharerIssues = (sharer && sharer.pcHealth && sharer.pcHealth.issues) || [];
+    if (struggling && sharerIssues.length) {
+      reason = {
+        text: `Limitado pelo PC de quem transmite (${describePcIssues(sharerIssues)})`,
+        action: 'Não é com você.',
+        hint: 'O problema não é com você: o PC de quem transmite está sobrecarregado. Fechar programas pesados lá ajuda.'
+      };
+      degraded = true;
+    } else if (struggling && state.pcIssues.length) {
+      reason = {
+        text: `Limitado pelo seu PC (${describePcIssues(state.pcIssues)})`,
+        action: 'Feche programas pesados neste PC.',
+        hint: 'O problema está do seu lado: este PC está sobrecarregado. Feche programas pesados.'
+      };
+      degraded = true;
+    }
+
+    label.textContent = '';
+    const dot = document.createElement('span');
+    dot.className = 'screen-quality-dot';
+    const numbers = document.createElement('span');
+    numbers.textContent = `${screen.height}p · ${screen.fps} FPS`;
+    label.append(dot, numbers);
+    if (degraded && reason) {
+      const why = document.createElement('span');
+      why.className = 'screen-quality-cause';
+      why.textContent = reason.text;
+      const action = document.createElement('span');
+      action.className = 'screen-quality-action';
+      action.textContent = reason.action;
+      label.append(why, action);
+    }
+    label.classList.toggle('degraded', degraded);
+    label.title = degraded && reason
+      ? `Qualidade que você está recebendo. ${reason.hint}`
+      : cause === 'ok'
+        ? 'Qualidade que você está recebendo: chegando bem, sem limite da sua internet nem da de quem transmite.'
+        : 'Qualidade que você está recebendo. Ela se ajusta à sua internet e à de quem transmite.';
     label.classList.remove('hidden');
+  }
+
+  /**
+   * The sharer's panel on their own screen tile: how the share reaches each
+   * viewer, and whether their own internet or PC is what holds it back.
+   */
+  function updateScreenSendPanel(report = state.screenSendReport) {
+    state.screenSendReport = report;
+    const panel = document.querySelector('#tile-screen-local .screen-send-panel');
+    if (!panel) return;
+    if (!state.user.isScreenSharing || !report || !report.length) {
+      panel.classList.add('hidden');
+      return;
+    }
+
+    const measured = report.filter(r => r.cause);
+    const nameOf = r => (state.roomMembers.get(r.socketId) || {}).username || 'alguém';
+    const namesWith = cause => measured.filter(r => r.cause === cause).map(nameOf);
+    const withPcIssues = report.filter((r) => {
+      const member = state.roomMembers.get(r.socketId);
+      return !r.paused && member && member.pcHealth && member.pcHealth.issues.length;
+    }).map(nameOf);
+    const list = names => (names.length > 1 ? `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}` : names[0]);
+
+    // What is limiting, whose it is, and what to check
+    let summary = { level: 'good', text: 'Chegando bem para todos' };
+    if (state.pcIssues.length) {
+      summary = { level: 'bad', text: `Limitado pelo seu PC (${describePcIssues(state.pcIssues)})`, hint: 'Feche programas pesados neste PC.' };
+    } else if (namesWith('sender-cpu').length) {
+      summary = { level: 'bad', text: 'Limitado pelo seu PC (processador)', hint: 'Feche programas pesados neste PC.' };
+    } else if (namesWith('sender-upload').length) {
+      summary = { level: 'bad', text: 'Limitado pela sua internet (upload)', hint: CHECK_UPLOADS };
+    } else if (namesWith('network').length) {
+      summary = {
+        level: 'warn',
+        text: `Limitado pela internet: seu upload ou o download de ${list(namesWith('network'))}`,
+        hint: `Com uma pessoa só não dá para saber de qual lado é. Do seu lado: ${CHECK_UPLOADS}`
+      };
+    } else if (namesWith('viewer-network').length) {
+      summary = {
+        level: 'warn',
+        text: `Sua internet está boa; a de ${list(namesWith('viewer-network'))} está limitando`,
+        hint: 'O problema está do lado de quem assiste: a pessoa deve ver se algo está baixando.'
+      };
+    } else if (withPcIssues.length) {
+      summary = { level: 'warn', text: `Sua transmissão está boa; o PC de ${list(withPcIssues)} está no limite` };
+    } else if (!measured.length) {
+      summary = { level: 'idle', text: report.every(r => r.paused) ? 'Ninguém assistindo agora' : 'Medindo…' };
+    }
+
+    panel.textContent = '';
+    panel.dataset.level = summary.level;
+    const head = document.createElement('div');
+    head.className = 'screen-send-summary';
+    head.textContent = summary.text;
+    panel.appendChild(head);
+    if (summary.hint) {
+      const hint = document.createElement('div');
+      hint.className = 'screen-send-hint';
+      hint.textContent = summary.hint;
+      panel.appendChild(hint);
+    }
+
+    report.forEach((row) => {
+      const member = state.roomMembers.get(row.socketId);
+      const viewerIssues = (member && member.pcHealth && member.pcHealth.issues) || [];
+      const line = document.createElement('div');
+      line.className = `screen-send-row ${(row.cause && row.cause !== 'ok') || viewerIssues.length ? 'limited' : ''}`;
+      const name = document.createElement('span');
+      name.className = 'screen-send-name';
+      name.textContent = member ? member.username : '?';
+      const detail = document.createElement('span');
+      detail.className = 'screen-send-detail';
+      detail.textContent = row.paused
+        ? 'parou de assistir'
+        : row.pending
+          ? 'medindo…'
+          : `${row.height}p · ${row.fps} FPS · ${SCREEN_CAUSE_FOR_SHARER[row.cause]}`;
+      // Their PC at its limit can make the share stutter on their side alone
+      if (viewerIssues.length && !row.paused) {
+        detail.textContent += ` · PC da pessoa no limite (${describePcIssues(viewerIssues)})`;
+      }
+      line.append(name, detail);
+      panel.appendChild(line);
+    });
+    panel.classList.remove('hidden');
   }
 
   function createScreenTile(id, label, stream, isLocal) {
@@ -2576,9 +3019,8 @@ document.addEventListener('DOMContentLoaded', () => {
     tile.innerHTML = `
       <div class="tile-content">
         <video id="video-screen-${id}" autoplay playsinline muted></video>
-        ${isLocal ? '' : `<audio id="audio-screen-${id}" autoplay></audio>`}
         <div class="live-tag">${isLocal ? 'TRANSMITINDO TELA' : 'AO VIVO'}</div>
-        ${isLocal ? '' : '<div class="screen-quality-label hidden"></div>'}
+        ${isLocal ? '<div class="screen-send-panel hidden"></div>' : '<div class="screen-quality-label hidden"></div>'}
         ${isLocal ? '' : `
         <div class="watch-paused-view hidden">
           <i data-lucide="eye-off"></i>
@@ -2604,44 +3046,41 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    if (stream) {
-      const audioEl = tile.querySelector('audio');
-      if (audioEl) applyAudioPref(audioEl, 'stream', id);
-    }
-
     applyScreenTileWatchState(id, stream, tile);
 
     return tile;
   }
 
-  // Shows/hides the video for a screen share tile based on the viewer's own
-  // "watching" preference. Client-side only: the broadcaster keeps sending regardless.
+  // Shows/hides a screen share's video and plays/mutes its audio based on the
+  // viewer's own "watching" preference. Client-side only: the broadcaster keeps sending regardless.
   function applyScreenTileWatchState(socketId, stream, tile) {
+    const watching = socketId === 'local' || isWatchingStream(socketId);
+
+    // The audio first: it plays even while the tile isn't rendered
+    if (socketId !== 'local') {
+      const audioEl = document.getElementById(`remote-audio-stream-${socketId}`);
+      if (audioEl) applyAudioPref(audioEl, 'stream', socketId);
+      else if (watching && stream) getOrCreateRemoteAudio(socketId, 'stream', stream);
+    }
+
     tile = tile || document.getElementById(`tile-screen-${socketId}`);
     if (!tile) return;
 
     const videoEl = tile.querySelector('video');
-    const audioEl = tile.querySelector('audio');
     const pausedView = tile.querySelector('.watch-paused-view');
     if (!videoEl) return;
 
-    const watching = socketId === 'local' || isWatchingStream(socketId);
     const videoTrack = stream && stream.getVideoTracks()[0];
 
     if (watching) {
       if (videoTrack) videoTrack.enabled = true;
       if (videoEl.srcObject !== stream) videoEl.srcObject = stream || null;
       videoEl.classList.remove('hidden');
-      if (audioEl) {
-        if (audioEl.srcObject !== stream) audioEl.srcObject = stream || null;
-        applyAudioPref(audioEl, 'stream', socketId);
-      }
       if (pausedView) pausedView.classList.add('hidden');
     } else {
       if (videoTrack) videoTrack.enabled = false;
       videoEl.srcObject = null;
       videoEl.classList.add('hidden');
-      if (audioEl) audioEl.srcObject = null;
       if (pausedView) pausedView.classList.remove('hidden');
     }
   }
@@ -2703,7 +3142,6 @@ document.addEventListener('DOMContentLoaded', () => {
     tile.innerHTML = `
       <div class="tile-content">
         <video id="video-${socketId}" autoplay playsinline muted class="${hasVideo ? '' : 'hidden'}"></video>
-        <audio id="audio-${socketId}" autoplay></audio>
         <div class="avatar-view ${hasVideo ? 'hidden' : ''}">
           <div class="tile-avatar" style="background-color: ${safeColor(member.avatar)}">
             ${escapeHtml(member.username).charAt(0).toUpperCase()}
@@ -2716,6 +3154,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>${escapeHtml(member.username)}</span>
             ${member.isMuted ? '<span class="status-badge-mini red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
             ${member.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
+            ${pcHealthBadgeHtml(member)}
           </div>
           ${member.status ? `<div class="tile-user-status">${escapeHtml(member.status)}</div>` : ''}
         </div>
@@ -2723,12 +3162,9 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     const videoEl = tile.querySelector(`#video-${socketId}`);
-    const audioEl = tile.querySelector(`#audio-${socketId}`);
 
     if (stream) {
       videoEl.srcObject = stream;
-      audioEl.srcObject = stream;
-      applyAudioPref(audioEl, 'voice', socketId);
 
       // Attach speaking detector to remote stream
       setupRemoteSpeakingDetector(socketId, stream);
@@ -2762,15 +3198,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const videoEl = existingTile.querySelector(`#video-${socketId}`);
-    const audioEl = existingTile.querySelector(`#audio-${socketId}`);
     const avatarView = existingTile.querySelector('.avatar-view');
 
     if (videoEl && videoEl.srcObject !== stream) videoEl.srcObject = stream;
-
-    if (audioEl && audioEl.srcObject !== stream) {
-      audioEl.srcObject = stream;
-      applyAudioPref(audioEl, 'voice', socketId);
-    }
 
     if (member.isCameraOn) {
       videoEl.classList.remove('hidden');
@@ -2800,6 +3230,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <span>${escapeHtml(member.username)}</span>
         ${member.isMuted ? '<span class="status-badge-mini red" title="Mutado"><i data-lucide="mic-off"></i></span>' : ''}
         ${member.isDeafened ? '<span class="status-badge-mini red" title="Ensurdecido"><i data-lucide="headphone-off"></i></span>' : ''}
+        ${pcHealthBadgeHtml(member)}
       `;
       window.renderIcons(usernameSpan);
     }
@@ -2987,6 +3418,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.user.isScreenSharing) {
       diag.log('screen', 'Parou de transmitir a tela');
       state.user.isScreenSharing = false;
+      state.screenSendReport = null;
       state.webrtc.stopScreenShare();
       state.screenPicker.releaseSystemAudio();
       updateActionButtonsState();
@@ -3002,7 +3434,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const captured = stream.getVideoTracks()[0];
       diag.log('screen', 'Começou a transmitir a tela', {
         capture: captured ? captured.getSettings() : null,
-        systemAudio: stream.getAudioTracks().length > 0
+        systemAudio: stream.getAudioTracks().length > 0,
+        // Whether frames go through the GPU relay (see gpu-relay.js)
+        gpuRelay: !!state.webrtc.screenRelay
       });
       state.user.isScreenSharing = true;
 
@@ -3455,7 +3889,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.fullscreenTileKey) return state.fullscreenTileKey;
     const hoveredTile = document.querySelector('.video-tile:hover');
     if (hoveredTile && hoveredTile.dataset.tileKey) return hoveredTile.dataset.tileKey;
-    if (state.focusedTileId) return state.focusedTileId;
+    if (state.focusedTileIds.length) return state.focusedTileIds[state.focusedTileIds.length - 1];
     const screenTile = document.querySelector('.video-tile.screen-tile');
     if (screenTile && screenTile.dataset.tileKey) return screenTile.dataset.tileKey;
     return null;
@@ -3490,8 +3924,8 @@ document.addEventListener('DOMContentLoaded', () => {
         closeSoundboard();
       } else if (state.volumePopover) {
         closeVolumePopover();
-      } else if (state.focusedTileId) {
-        state.focusedTileId = null;
+      } else if (state.focusedTileIds.length) {
+        state.focusedTileIds = [];
         renderAllVideoTiles();
       }
       return;
