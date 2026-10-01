@@ -32,8 +32,11 @@ class GpuScreenRelay {
     const processor = new MediaStreamTrackProcessor({ track: this.source });
     this.track = new MediaStreamTrackGenerator({ kind: 'video' });
     this.worker = new Worker('js/gpu-relay-worker.js');
+    // Once a second: how much the picture moves and how many frames came in
+    this.onStats = null;
     this.worker.onmessage = ({ data }) => {
       if (data && data.error) console.warn('[GpuRelay] Frame copy stopped:', data.error);
+      if (data && data.stats && this.onStats) this.onStats(data.stats);
     };
     this.worker.onerror = (e) => console.warn('[GpuRelay] Worker error:', e.message);
     this.worker.postMessage(

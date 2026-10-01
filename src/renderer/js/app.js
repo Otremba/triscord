@@ -1316,6 +1316,8 @@ document.addEventListener('DOMContentLoaded', () => {
     state.pcHealth = health;
     state.pcIssues = evaluatePcHealth(health);
     renderPcHealthBadge();
+    // A CPU or GPU at its limit makes our screen share capture lighter
+    if (state.webrtc) state.webrtc.setPcPressure(state.pcIssues.includes('cpu') || state.pcIssues.includes('gpu'));
 
     const raised = state.pcIssues.filter(issue => !before.includes(issue));
     if (raised.length) {
@@ -3019,6 +3021,22 @@ document.addEventListener('DOMContentLoaded', () => {
       hint.className = 'screen-send-hint';
       hint.textContent = summary.hint;
       details.appendChild(hint);
+    }
+    // How the capture itself runs (see nextCaptureAdapt in webrtc.js)
+    // What comes first for what is being shared, and how the capture runs
+    const capture = state.webrtc ? state.webrtc.captureLevelInfo() : null;
+    const captureText = !capture ? '' : capture.content === 'detail'
+      ? 'Pouco movimento (código, texto): resolução máxima, nitidez primeiro.'
+      : capture.level === 1
+        ? 'Muito movimento: captura em 720p para manter 60 FPS (em resolução cheia os quadros não chegavam).'
+        : capture.level === 2
+          ? 'Muito movimento, mas seu PC está no limite: 720p a 30 FPS, estáveis, travam menos.'
+          : capture.content === 'motion' ? 'Muito movimento: fluidez primeiro.' : '';
+    if (captureText) {
+      const line = document.createElement('div');
+      line.className = 'screen-send-hint';
+      line.textContent = captureText;
+      details.appendChild(line);
     }
     const summaryKey = summary.level === 'warn' || summary.level === 'bad' ? summary.text : '';
     if (summaryKey && summaryKey !== state.screenSendSummaryKey) flashPopover(panel);

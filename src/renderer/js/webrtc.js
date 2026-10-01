@@ -90,6 +90,9 @@ const SCREEN_ENCODING = {
   contentHint: 'motion',
   degradationPreference: 'maintain-resolution',
   maxBitrate: 15000000,
+  // 720p60 needs far less; a lower cap leaves upload for the other viewers
+  // (a share to 3 viewers at ~7 Mbps each saw 12-20% retransmission)
+  maxBitrate720: 8000000,
   maxFramerate: 60
 };
 // A little extra buffering on the receiving side of a screen share absorbs
@@ -197,6 +200,183 @@ const SCREEN_SEND_STATS_TTL_MS = 10000;
 
 function initialScreenAdapt() {
   return { mode: 'auto', low: 0, retryAt: 0, retryMs: SCREEN_ADAPT.retryMs, trialUntil: 0 };
+}
+
+/*
+ * The capture itself, for every viewer at once. With a game in front the
+ * capture can deliver far fewer than 60 frames while nothing limits the
+ * encoders: Valorant shared at 1080p arrived at ~25 fps with the encoder
+ * "limited by nothing" the whole time, and a laptop at 100% CPU and 99% GPU
+ * delivered 14 fps. 720p at 60 fps reads better than 1080p at 30 for a game,
+ * so the capture steps down when its frame rate gives way:
+ *   level 0: full resolution, 60 fps
+ *   level 1: 720p, 60 fps  (kept only if it actually raised the frame rate;
+ *            a 30 fps video stays 30 at any size and goes back to full)
+ *   level 2: 720p, 30 fps  (only when this PC is at its limit: an even 30
+ *            beats a stuttering 14, and frees the GPU and CPU for the game)
+ */
+const CAPTURE_LEVELS = [
+  { name: 'cheia', maxWidth: 1920, maxHeight: 1080, fps: 60 },
+  { name: '720p60', maxWidth: 1280, maxHeight: 720, fps: 60 },
+  { name: '720p30', maxWidth: 1280, maxHeight: 720, fps: 30 }
+];
+const CAPTURE_ADAPT = {
+  // Under this, a moving full-resolution capture is struggling
+  minFps: 48,
+  // Over this, the screen is moving (a still screen sends a few frames)
+  movingFps: 10,
+  // At 720p with the PC at its limit, under this goes to 30 fps
+  ecoMaxFps: 45,
+  // Struggling samples (~3 s each) before stepping down
+  lowSamples: 2,
+  // After stepping down, how long before judging whether it helped: the rate
+  // must have risen by this share and by at least helpFps (fluidity first:
+  // 25 -> 30 fps is worth 1080p -> 720p)
+  trialMs: 9000,
+  // Readings in the first seconds after the change are skipped (the encoder
+  // and the bandwidth estimate are still adjusting)
+  settleMs: 3000,
+  helpRatio: 1.15,
+  helpFps: 4,
+  // How long before trying full resolution again; doubled after an attempt
+  // that drops right back (within probeMs), up to the max
+  retryMs: 60000,
+  probeMs: 15000,
+  maxRetryMs: 15 * 60000,
+  // After 720p did not help, full resolution stays at least this long
+  blockMs: 2 * 60000,
+  // Time with the PC no longer at its limit before leaving 30 fps
+  relaxMs: 30000
+};
+
+/*
+ * What is being shared decides what comes first. Games and video: fluidity,
+ * through the capture levels above and the per-viewer 720p floor. Code,
+ * text and documents: sharpness, so the share stays at full resolution and a
+ * slow frame rate (a still IDE sends few frames) is not read as a problem.
+ * The GPU relay measures the motion (share of a 64x36 thumbnail that changes,
+ * see gpu-relay-worker.js). Measured: still or typed code 0, IDE scrolling
+ * ~0.008, a video in part of the screen ~0.06, a game 0.09-0.4.
+ */
+const CONTENT_ADAPT = {
+  motionAt: 0.04,
+  stillUnder: 0.02,
+  // Seconds in a row (one sample per second) to change mode: quick to see a
+  // game start, slow to give up on it, and a scroll never counts as a game
+  toMotion: 3,
+  toDetail: 8
+};
+
+function initialContentAdapt() {
+  return { mode: 'detail', high: 0, low: 0 };
+}
+
+/** One second of motion measured; returns { adapt, changed }. Pure. */
+function nextContentAdapt(adapt, motion) {
+  const next = { ...adapt };
+  if (next.mode === 'detail') {
+    next.high = motion >= CONTENT_ADAPT.motionAt ? next.high + 1 : 0;
+    if (next.high < CONTENT_ADAPT.toMotion) return { adapt: next, changed: false };
+    return { adapt: { mode: 'motion', high: 0, low: 0 }, changed: true };
+  }
+  next.low = motion < CONTENT_ADAPT.stillUnder ? next.low + 1 : 0;
+  if (next.low < CONTENT_ADAPT.toDetail) return { adapt: next, changed: false };
+  return { adapt: { mode: 'detail', high: 0, low: 0 }, changed: true };
+}
+
+function initialCaptureAdapt() {
+  return {
+    level: 0, low: 0, ecoLow: 0, calmSince: null, trial: null,
+    retryAt: 0, retryMs: CAPTURE_ADAPT.retryMs, probeUntil: 0,
+    blockedUntil: 0, blockMs: CAPTURE_ADAPT.blockMs
+  };
+}
+
+/**
+ * One step of the capture level. Pure, so it can be tested without a share.
+ * @param adapt see initialCaptureAdapt
+ * @param sample { fps: frames per second reaching the encoders (the best
+ *   viewer), pressure: this PC's CPU or GPU at its limit, nativeHeight: the
+ *   capture's height at full resolution }
+ * @returns { adapt, changed, reason }
+ */
+function nextCaptureAdapt(adapt, sample, now) {
+  const next = { ...adapt };
+  const { fps, pressure } = sample;
+  const canShrink = !(sample.nativeHeight > 0 && sample.nativeHeight <= 720);
+  const step = (level, reason) => {
+    next.level = level;
+    next.low = 0;
+    next.ecoLow = 0;
+    next.calmSince = null;
+    return { adapt: next, changed: true, reason };
+  };
+
+  // A step down to 720p is judged once it settled: if the frame rate did not
+  // rise (and the PC is not what forced it), full resolution comes back and
+  // stays a while
+  if (next.trial) {
+    // Judged on the average after the change settled: one reading jumps around
+    const trial = { ...next.trial };
+    if (now >= trial.settleAt) {
+      trial.sum += fps;
+      trial.count += 1;
+    }
+    next.trial = trial;
+    if (now < trial.until) return { adapt: next, changed: false };
+    const reached = trial.count ? trial.sum / trial.count : fps;
+    const before = trial.fpsBefore;
+    const helped = pressure || reached >= CAPTURE_ADAPT.minFps ||
+      (reached >= before * CAPTURE_ADAPT.helpRatio && reached >= before + CAPTURE_ADAPT.helpFps);
+    next.trial = null;
+    if (!helped) {
+      next.blockedUntil = now + next.blockMs;
+      next.blockMs = Math.min(next.blockMs * 2, CAPTURE_ADAPT.maxRetryMs);
+      return step(0, 'did-not-help');
+    }
+  }
+
+  // Full resolution (or a capture already at 720p or less, which works like 720p)
+  if (next.level === 0 && canShrink) {
+    const moving = fps >= CAPTURE_ADAPT.movingFps;
+    const struggling = pressure || (moving && fps < CAPTURE_ADAPT.minFps && now >= next.blockedUntil);
+    next.low = struggling ? next.low + 1 : 0;
+    if (next.low < CAPTURE_ADAPT.lowSamples) return { adapt: next, changed: false };
+    // Dropping right back from an attempt at full resolution waits longer
+    next.retryMs = now < next.probeUntil ? Math.min(next.retryMs * 2, CAPTURE_ADAPT.maxRetryMs) : CAPTURE_ADAPT.retryMs;
+    next.retryAt = now + next.retryMs;
+    next.trial = pressure ? null : {
+      fpsBefore: fps,
+      settleAt: now + CAPTURE_ADAPT.settleMs,
+      until: now + CAPTURE_ADAPT.trialMs,
+      sum: 0,
+      count: 0
+    };
+    return step(1, pressure ? 'pc' : 'fps');
+  }
+
+  if (next.level <= 1) {
+    // The PC at its limit and 60 fps not holding even at 720p: 30 fps
+    const eco = pressure && fps < CAPTURE_ADAPT.ecoMaxFps;
+    next.ecoLow = eco ? next.ecoLow + 1 : 0;
+    if (next.ecoLow >= CAPTURE_ADAPT.lowSamples) return step(2, 'pc');
+    // Try full resolution again from time to time
+    if (next.level === 1 && !pressure && now >= next.retryAt) {
+      next.probeUntil = now + CAPTURE_ADAPT.probeMs;
+      return step(0, 'retry');
+    }
+    return { adapt: next, changed: false };
+  }
+
+  // 30 fps: back to 60 once the PC has been off its limit for a while
+  if (pressure) {
+    next.calmSince = null;
+    return { adapt: next, changed: false };
+  }
+  if (next.calmSince === null) next.calmSince = now;
+  if (now - next.calmSince < CAPTURE_ADAPT.relaxMs) return { adapt: next, changed: false };
+  next.retryAt = now + next.retryMs;
+  return step(canShrink ? 1 : 0, 'pc-calm');
 }
 
 /**
@@ -797,6 +977,8 @@ class WebRTCManager {
   setScreenStream(screenStream) {
     this.localScreenStream = screenStream;
     if (!screenStream) {
+      this.stopCaptureAdapt();
+      this.captureAdapt = null;
       this.applyTrackToPeers('screen', null);
       this.applyTrackToPeers('screenAudio', null);
       return;
@@ -824,9 +1006,126 @@ class WebRTCManager {
     this.screenSendStats.clear();
     this.slowCaptureSince = null;
     this.slowCaptureReported = false;
+    this.captureAdapt = initialCaptureAdapt();
+    this.captureNativeHeight = screenTrack ? screenTrack.getSettings().height || 0 : 0;
+    // Without the relay there is no motion measure: fluidity rules as before
+    this.contentAdapt = this.screenRelay ? initialContentAdapt() : null;
+    this.captureStats = null;
+    if (this.screenRelay) this.screenRelay.onStats = stats => this.onCaptureStats(stats);
+    this.startCaptureAdapt();
     this.applyTrackToPeers('screen', this.screenSendTrack);
     this.applyTrackToPeers('screenAudio', screenStream.getAudioTracks()[0] || null);
     this.peerChannels.forEach((_, socketId) => this.applyScreenEncoding(socketId));
+  }
+
+  /** 'motion' (fluidity first) or 'detail' (sharpness first); null if unknown. */
+  contentMode() {
+    return this.contentAdapt ? this.contentAdapt.mode : null;
+  }
+
+  /**
+   * Once a second from the GPU relay: motion and capture frame rate. Text
+   * puts everything back to full resolution, at once, for every viewer.
+   */
+  onCaptureStats(stats) {
+    this.captureStats = { ...stats, at: Date.now() };
+    if (!this.contentAdapt) return;
+    const { adapt, changed } = nextContentAdapt(this.contentAdapt, stats.motion);
+    this.contentAdapt = adapt;
+    if (!changed) return;
+
+    console.log(`[WebRTC] Screen content: ${adapt.mode === 'motion'
+      ? 'muito movimento, fluidez primeiro'
+      : 'pouco movimento (texto, código), nitidez primeiro'} (movimento ${stats.motion})`);
+    if (adapt.mode === 'detail') {
+      const reduced = this.captureAdapt && this.captureAdapt.level > 0;
+      this.captureAdapt = initialCaptureAdapt();
+      this.screenAdapt.clear();
+      if (reduced) this.applyCaptureLevel();
+      else this.peerChannels.forEach((_, socketId) => this.applyScreenEncoding(socketId));
+    }
+  }
+
+  /** This PC's CPU or GPU at its limit (from the app's PC health reading). */
+  setPcPressure(pressure) {
+    this.pcPressure = !!pressure;
+  }
+
+  startCaptureAdapt() {
+    clearInterval(this.captureAdaptTimer);
+    this.captureAdaptTimer = setInterval(() => this.adaptCapture(), QUALITY_POLL_MS);
+  }
+
+  stopCaptureAdapt() {
+    clearInterval(this.captureAdaptTimer);
+    this.captureAdaptTimer = null;
+  }
+
+  /**
+   * Every few seconds while sharing: move the capture between full
+   * resolution, 720p60 and 720p30 (see nextCaptureAdapt), judging by the
+   * frame rate reaching the best viewer's encoder.
+   */
+  adaptCapture() {
+    if (!this.localScreenStream || !this.captureAdapt) return;
+    // Text and code keep full resolution: few frames is normal there
+    if (this.contentMode() === 'detail') return;
+    const now = Date.now();
+    const rates = Array.from(this.screenSendStats.entries())
+      .filter(([id, s]) => this.peers.has(id) && !this.screenPausedBy.has(id) && now - s.at < SCREEN_SEND_STATS_TTL_MS)
+      .map(([, s]) => s.fps);
+    if (!rates.length) return;
+
+    const fps = Math.max(...rates);
+    const before = this.captureAdapt.level;
+    const { adapt, changed, reason } = nextCaptureAdapt(this.captureAdapt, {
+      fps,
+      pressure: !!this.pcPressure,
+      nativeHeight: this.captureNativeHeight
+    }, now);
+    this.captureAdapt = adapt;
+    if (!changed || adapt.level === before) return;
+
+    const why = {
+      fps: `a captura só entregava ${fps} fps em resolução cheia`,
+      pc: 'o PC está no limite (processador ou placa de vídeo)',
+      'did-not-help': '720p não aumentou os fps (o próprio conteúdo é que tem poucos quadros)',
+      retry: 'tentando a resolução cheia de novo',
+      'pc-calm': 'o PC saiu do limite'
+    }[reason] || reason;
+    console.log(`[WebRTC] Screen capture: ${CAPTURE_LEVELS[before].name} -> ${CAPTURE_LEVELS[adapt.level].name} (${why})`);
+    this.applyCaptureLevel();
+  }
+
+  /** Put the current capture level on the capture and on every encoder. */
+  async applyCaptureLevel() {
+    const level = CAPTURE_LEVELS[this.captureAdapt ? this.captureAdapt.level : 0];
+    const constraints = {
+      width: { max: level.maxWidth },
+      height: { max: level.maxHeight },
+      frameRate: { max: level.fps }
+    };
+    // The relay works on its own clone of the capture: both are changed
+    const tracks = [this.localScreenStream && this.localScreenStream.getVideoTracks()[0], this.screenRelay && this.screenRelay.source];
+    await Promise.all(tracks.filter(Boolean).map(track => track.applyConstraints(constraints).catch((err) => {
+      console.warn('[WebRTC] Could not change the screen capture:', err);
+    })));
+    // A new capture size changes what the 720p floor and bitrate caps mean
+    this.screenAdapt.clear();
+    this.peerChannels.forEach((_, socketId) => this.applyScreenEncoding(socketId));
+  }
+
+  /** The capture level, for the sharer's panel and diagnostics. */
+  captureLevelInfo() {
+    const level = this.captureAdapt ? this.captureAdapt.level : 0;
+    return {
+      level,
+      name: CAPTURE_LEVELS[level].name,
+      fps: CAPTURE_LEVELS[level].fps,
+      content: this.contentMode(),
+      motion: this.captureStats ? this.captureStats.motion : null,
+      captureFps: this.captureStats ? this.captureStats.fps : null
+    };
   }
 
   stopScreenRelay() {
@@ -890,7 +1189,6 @@ class WebRTCManager {
     const params = sender.getParameters();
     if (!params.encodings || !params.encodings.length) return;
 
-    const { maxBitrate, maxFramerate } = SCREEN_ENCODING;
     // Always the resolution we choose (see SCREEN_ENCODING): full, or the floor
     const { degradationPreference } = SCREEN_ENCODING;
     let scaleResolutionDownBy = 1;
@@ -901,6 +1199,13 @@ class WebRTCManager {
       // A capture already at or under the floor (a small window) is kept as is
       scaleResolutionDownBy = Math.max(1, sourceHeight / SCREEN_MIN_HEIGHT);
     }
+    // The capture level sets the frame rate (see nextCaptureAdapt); 720p and
+    // under need less bitrate, and capping it leaves upload for other viewers
+    const maxFramerate = this.captureLevelInfo().fps;
+    const encodedHeight = sourceHeight / scaleResolutionDownBy;
+    const maxBitrate = encodedHeight > 0 && encodedHeight <= SCREEN_MIN_HEIGHT + 10
+      ? SCREEN_ENCODING.maxBitrate720
+      : SCREEN_ENCODING.maxBitrate;
 
     const encoding = params.encodings[0];
     if (encoding.maxBitrate === maxBitrate && encoding.maxFramerate === maxFramerate &&
@@ -938,6 +1243,8 @@ class WebRTCManager {
     this.applyTrackToPeers('screen', null);
     this.applyTrackToPeers('screenAudio', null);
     this.stopScreenRelay();
+    this.stopCaptureAdapt();
+    this.captureAdapt = null;
     this.screenSendTrack = null;
     this.screenSendStats.clear();
 
@@ -1329,7 +1636,12 @@ class WebRTCManager {
       limitedBy: outbound.qualityLimitationReason,
       availableKbps
     };
-    const { adapt, changed } = nextScreenAdapt(this.screenAdapt.get(socketId) || initialScreenAdapt(), sample, Date.now());
+    const current = this.screenAdapt.get(socketId) || initialScreenAdapt();
+    // Text and code keep full resolution for every viewer: a tight link costs
+    // them frame rate, which a still screen hardly shows, not legibility
+    const { adapt, changed } = this.contentMode() === 'detail'
+      ? { adapt: current, changed: false }
+      : nextScreenAdapt(current, sample, Date.now());
     this.screenAdapt.set(socketId, adapt);
     this.screenSendStats.set(socketId, {
       height: sample.height,
@@ -1529,9 +1841,18 @@ class WebRTCManager {
                 `${codec ? codec.mimeType.replace('video/', '') : ''} ${r.encoderImplementation || ''}` +
                 `${r.powerEfficientEncoder ? ' (placa de vídeo)' : ''} limitedBy=${r.qualityLimitationReason}` +
                 `${preference ? ` prioridade=${preference}` : ''}` +
-                `${adapt && adapt.mode === 'floor' ? ` (segurando ${SCREEN_MIN_HEIGHT}p)` : ''}`;
+                `${adapt && adapt.mode === 'floor' ? ` (segurando ${SCREEN_MIN_HEIGHT}p)` : ''}` +
+                ` captura=${this.captureLevelInfo().name}` +
+                `${this.contentMode() ? ` conteúdo=${this.contentMode() === 'motion' ? 'movimento' : 'texto'}` : ''}`;
             metrics.screenOut = {
               paused: this.screenPausedBy.has(socketId),
+              // The capture level for everyone (0 full, 1 720p60, 2 720p30)
+              captureLevel: this.captureLevelInfo().level,
+              // 'motion' (fluidity first) or 'detail' (sharpness first), and the
+              // measured motion and capture frame rate behind it
+              content: this.contentMode(),
+              motion: this.captureStats ? this.captureStats.motion : null,
+              captureFps: this.captureStats ? this.captureStats.fps : null,
               fps: r.framesPerSecond || 0,
               height: r.frameHeight || 0,
               codec: codec ? codec.mimeType.replace('video/', '') : null,
