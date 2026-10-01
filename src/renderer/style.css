@@ -1864,60 +1864,136 @@ body {
   color: var(--accent-blurple);
 }
 
-/* What this viewer actually receives, under the AO VIVO tag (the top-right
-   corner belongs to the tile's hover actions) */
-.screen-quality-label {
+/* A share's quality as a dot over it, under the AO VIVO tag (the top-right
+   corner belongs to the tile's hover actions): the viewer's label and the
+   sharer's panel. Hovering the dot opens the details, and so does a change
+   in what limits the share (.flash, a few seconds); then they fade back. */
+.screen-quality-label,
+.screen-send-panel {
   position: absolute;
   top: 40px;
   left: 12px;
   z-index: 4;
-  padding: 3px 8px;
-  border-radius: var(--radius-full);
-  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: min(400px, calc(100% - 24px));
+  padding: 6px;
+  border-radius: 14px;
+  background-color: rgba(0, 0, 0, 0.5);
   color: #fff;
   font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   pointer-events: auto;
+  cursor: default;
+  transition:
+    background-color var(--dur-slow) var(--ease-out),
+    color var(--dur-slow) var(--ease-out),
+    padding var(--dur-slow) var(--ease-out);
 }
 
-.screen-quality-label.degraded {
-  background-color: rgba(240, 178, 50, 0.9);
-  color: #1e1f22;
-}
-
-.screen-quality-label {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px 6px;
-  max-width: calc(100% - 24px);
-  border-radius: var(--radius-md);
-}
-
-.screen-quality-label.hidden {
+.screen-quality-label.hidden,
+.screen-send-panel.hidden {
   display: none;
 }
 
-/* Green when the share arrives well, dark on the yellow of a degraded one */
-.screen-quality-dot {
-  width: 7px;
-  height: 7px;
+.screen-quality-label:hover,
+.screen-quality-label.flash,
+.screen-send-panel:hover,
+.screen-send-panel.flash {
+  padding: 7px 11px 8px 8px;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.screen-quality-label.degraded:hover,
+.screen-quality-label.degraded.flash {
+  background-color: rgba(240, 178, 50, 0.95);
+  color: #1e1f22;
+}
+
+/* Green when it arrives well; yellow (red: the sharer's own limit) pulses so
+   it is noticed even folded */
+.screen-quality-dot,
+.screen-send-dot {
+  width: 10px;
+  height: 10px;
+  margin: 1px;
   border-radius: 50%;
-  background-color: var(--accent-green);
   flex-shrink: 0;
+  background-color: var(--accent-green);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25);
 }
 
-.screen-quality-label.degraded .screen-quality-dot {
+.screen-quality-label.degraded .screen-quality-dot,
+.screen-send-panel[data-level="warn"] .screen-send-dot {
+  background-color: var(--accent-yellow);
+}
+
+.screen-send-panel[data-level="bad"] .screen-send-dot {
+  background-color: var(--accent-red);
+}
+
+.screen-send-panel[data-level="idle"] .screen-send-dot {
+  background-color: var(--text-muted);
+}
+
+.screen-quality-label.degraded .screen-quality-dot,
+.screen-send-panel[data-level="warn"] .screen-send-dot,
+.screen-send-panel[data-level="bad"] .screen-send-dot {
+  animation: qualityDotPulse 1.6s ease-in-out infinite;
+}
+
+/* On the yellow of an open degraded label the dot turns dark */
+.screen-quality-label.degraded:hover .screen-quality-dot,
+.screen-quality-label.degraded.flash .screen-quality-dot {
   background-color: #1e1f22;
+  animation: none;
 }
 
-/* What limits the share, and what to do, each on a line of its own */
-.screen-quality-cause,
-.screen-quality-action {
-  flex-basis: 100%;
+@keyframes qualityDotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .screen-quality-dot,
+  .screen-send-dot {
+    animation: none !important;
+  }
+}
+
+/* Folded: only the dot */
+.screen-quality-details,
+.screen-send-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 0;
+  max-height: 12px;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    opacity var(--dur-slow) var(--ease-out),
+    max-width var(--dur-slow) var(--ease-out),
+    max-height var(--dur-slow) var(--ease-out);
+}
+
+.screen-quality-label:hover .screen-quality-details,
+.screen-quality-label.flash .screen-quality-details,
+.screen-send-panel:hover .screen-send-details,
+.screen-send-panel.flash .screen-send-details {
+  max-width: 370px;
+  max-height: 260px;
+  opacity: 1;
+  white-space: normal;
+}
+
+/* Viewer: quality, then what limits it and what to do */
 .screen-quality-cause {
   font-weight: 700;
 }
@@ -1927,62 +2003,22 @@ body {
   opacity: 0.9;
 }
 
-/* The sharer's panel: how the share reaches each viewer */
-.screen-send-panel {
-  position: absolute;
-  top: 40px;
-  left: 12px;
-  z-index: 4;
-  display: flex;
-  flex-direction: column;
+/* Sharer: summary, what to check, then a line per viewer */
+.screen-send-details {
   gap: 3px;
-  max-width: min(380px, calc(100% - 24px));
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
-  background-color: rgba(0, 0, 0, 0.66);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #fff;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
 }
 
 .screen-send-summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   font-size: 12px;
   font-weight: 700;
 }
 
-.screen-send-summary::before {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background-color: var(--accent-green);
-}
-
-.screen-send-panel[data-level="warn"] .screen-send-summary::before {
-  background-color: var(--accent-yellow);
-}
-
-.screen-send-panel[data-level="bad"] .screen-send-summary::before {
-  background-color: var(--accent-red);
-}
-
-.screen-send-panel[data-level="idle"] .screen-send-summary::before {
-  background-color: var(--text-muted);
-}
-
-/* What to check, under the summary when something is limiting */
 .screen-send-hint {
   font-size: 11px;
+  font-weight: 500;
   line-height: 1.4;
   opacity: 0.85;
   margin-bottom: 2px;
-  white-space: normal;
 }
 
 .screen-send-row {
@@ -2002,25 +2038,18 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
 }
 
 .screen-send-detail {
   flex-shrink: 0;
+  font-weight: 500;
 }
 
-/* Small tiles (the strip under a focused one) keep only the summary */
+/* Small tiles (the strip under focused ones) */
+.focus-strip .screen-quality-label,
 .focus-strip .screen-send-panel {
   top: 26px;
   left: 6px;
-  padding: 4px 7px;
-}
-
-.focus-strip .screen-send-row,
-.focus-strip .screen-send-hint,
-.focus-strip .screen-quality-cause,
-.focus-strip .screen-quality-action {
-  display: none;
 }
 
 .option-group {
@@ -2038,11 +2067,9 @@ body {
 }
 
 .setting-label {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text-muted);
-  letter-spacing: 0.04em;
 }
 
 .setting-input, .setting-select {
@@ -3831,3 +3858,52 @@ input[type="radio"]:disabled {
   }
 }
 
+/* Sliders: a dark track and a blurple knob, instead of Chromium's white track */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border: none;
+  border-radius: 50%;
+  background-color: var(--accent-blurple);
+  box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.25);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+input[type="range"]:focus-visible {
+  outline: none;
+}
+
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: var(--focus-ring);
+}
+
+input[type="range"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* A light theme needs a visible track too */
+:root[data-theme="light"] input[type="range"]::-webkit-slider-runnable-track {
+  background-color: rgba(0, 0, 0, 0.16);
+}

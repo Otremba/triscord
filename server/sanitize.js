@@ -95,7 +95,9 @@ const USER_STATE_FIELDS = {
   username: () => true,
   avatar: () => true,
   status: () => true,
-  pcHealth: (v) => !!v && typeof v === 'object'
+  pcHealth: (v) => !!v && typeof v === 'object',
+  // Which Triscord someone runs ('1.1.7', 'web'), for diagnostics reports
+  appVersion: (v) => typeof v === 'string' && /^[0-9A-Za-z.-]{1,24}$/.test(v)
 };
 
 // How loaded someone's PC is, so the others can tell a struggling PC from a

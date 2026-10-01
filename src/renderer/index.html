@@ -365,17 +365,17 @@
       <div class="modal-body">
         <!-- User Profile Settings -->
         <div class="setting-section">
-          <label class="setting-label">Seu Nome de Usuário</label>
+          <label class="setting-label">Seu nome de usuário</label>
           <input type="text" id="settingsUsername" class="setting-input" maxlength="32" placeholder="Ex: Lucas_Gamer" />
         </div>
 
         <div class="setting-section">
-          <label class="setting-label">Status Personalizado</label>
+          <label class="setting-label">Status personalizado</label>
           <input type="text" id="settingsStatus" class="setting-input" maxlength="64" placeholder="Ex: Jogando algo, De boa..." />
         </div>
 
         <div class="setting-section">
-          <label class="setting-label">Cor do Avatar</label>
+          <label class="setting-label">Cor do avatar</label>
           <div class="avatar-color-picker">
             <div class="avatar-color-option selected" style="background-color: #5865F2;" data-color="#5865F2"></div>
             <div class="avatar-color-option" style="background-color: #57F287;" data-color="#57F287"></div>
@@ -389,7 +389,7 @@
 
         <!-- Server Connection URL -->
         <div class="setting-section">
-          <label class="setting-label">URL / IP do Servidor</label>
+          <label class="setting-label">URL / IP do servidor</label>
           <input type="text" id="settingsServerUrl" class="setting-input" placeholder="http://localhost:3000 ou IP do seu amigo" />
           <small style="color: var(--text-muted); font-size: 11px;">
             Para jogar com amigos: use o IP local (ex: <code>http://192.168.1.50:3000</code>) ou URL pública / Ngrok / Radmin VPN.
@@ -398,23 +398,23 @@
 
         <!-- Audio Device Settings -->
         <div class="setting-section">
-          <label class="setting-label">Dispositivo de Microfone (Entrada)</label>
+          <label class="setting-label">Dispositivo de microfone (entrada)</label>
           <select id="settingsAudioInput" class="setting-select"></select>
         </div>
 
         <div class="setting-section">
-          <label class="setting-label">Dispositivo de Áudio (Saída)</label>
+          <label class="setting-label">Dispositivo de áudio (saída)</label>
           <select id="settingsAudioOutput" class="setting-select"></select>
         </div>
 
         <div class="setting-section">
-          <label class="setting-label">Câmera de Vídeo</label>
+          <label class="setting-label">Câmera de vídeo</label>
           <select id="settingsVideoInput" class="setting-select"></select>
         </div>
 
         <!-- Mic Test & Sensitivity -->
         <div class="setting-section">
-          <label class="setting-label">Teste de Microfone & Sensibilidade de Voz</label>
+          <label class="setting-label">Teste de microfone e sensibilidade de voz</label>
           <label class="setting-checkbox">
             <input type="checkbox" id="settingsNoiseSuppression" />
             <span>Supressão de ruído por IA (RNNoise)</span>
@@ -444,7 +444,7 @@
 
         <!-- Push-to-talk -->
         <div class="setting-section">
-          <label class="setting-label">Modo de Transmissão de Voz</label>
+          <label class="setting-label">Modo de transmissão de voz</label>
           <label class="setting-checkbox">
             <input type="radio" name="voiceMode" id="settingsModeVAD" value="vad" checked />
             <span>Detecção automática por voz</span>
@@ -470,13 +470,13 @@
 
         <!-- Global shortcut (Electron only) -->
         <div class="setting-section hidden" id="globalShortcutSection">
-          <label class="setting-label">Atalho Global para Mutar (funciona com o app em segundo plano)</label>
+          <label class="setting-label">Atalho global para mutar (funciona com o app em segundo plano)</label>
           <input type="text" id="settingsGlobalShortcut" class="setting-input" placeholder="CommandOrControl+Shift+M" />
         </div>
 
         <!-- TURN server -->
         <div class="setting-section">
-          <label class="setting-label">Servidor TURN Personalizado (opcional)</label>
+          <label class="setting-label">Servidor TURN personalizado (opcional)</label>
           <small style="color: var(--text-muted); font-size: 11px; display:block; margin-bottom: 6px;">
             Melhora a conexão atrás de redes restritas/CGNAT. Sem isso, um relay público de testes é usado como reserva.
           </small>

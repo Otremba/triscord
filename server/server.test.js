@@ -218,6 +218,23 @@ describe('webrtc signalling', () => {
   }, 10000);
 });
 
+describe('user state for newcomers', () => {
+  test('someone joining later gets the PC health and app version already shared', async () => {
+    const roomId = `room-${Date.now()}-v`;
+    const first = await joinAs(roomId, 'state-a', 'A');
+    const shared = seen(first.client, 'user-state-updated', first.id);
+    first.client.emit('user-state-change', { appVersion: '1.1.7', pcHealth: { cpu: 50, ram: 40, gpu: 99, issues: ['gpu'] } });
+    await shared;
+
+    const later = await joinAs(roomId, 'state-b', 'B');
+    const existing = later.joined.existingUsers.find(u => u.socketId === first.id);
+    expect(existing).toMatchObject({ appVersion: '1.1.7', pcHealth: { cpu: 50, ram: 40, gpu: 99, issues: ['gpu'] } });
+
+    first.client.close();
+    later.client.close();
+  }, 10000);
+});
+
 describe('screen-watch', () => {
   test('tells a sharer in the same room that a viewer stopped watching', async () => {
     const roomId = `room-${Date.now()}-w`;

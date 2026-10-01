@@ -76,16 +76,19 @@ const QUALITY_POLL_MS = 3000;
 // - 'balanced' gave up frame rate to stay sharp;
 // - 8 Mbps was not enough for heavy motion at 1080p60 (held at 720p); 15 Mbps
 //   was.
-// Smooth motion comes first for games, so it is 'maintain-framerate': under
-// pressure the resolution drops and 60 fps stay. The fall to 480x270 is
-// stopped by the resolution floor below (SCREEN_MIN_HEIGHT), and only once a
-// viewer is held at that floor does the frame rate give way.
+// WebRTC's own resolution choice is not used at all: even with a floor
+// reacting within seconds, 'maintain-framerate' spent ~13% of a test share
+// below 720p, and nobody should ever watch 540p. The encoder is told to keep
+// the resolution it is given ('maintain-resolution'), and this app picks it:
+// full resolution while it holds ~60 fps, 720p (SCREEN_MIN_HEIGHT) when the
+// frame rate starts to give way (see nextScreenAdapt). Only at 720p does the
+// frame rate drop further.
 // The cap is per viewer: in a mesh every viewer is a separate encode and
 // upload, and bandwidth estimation still keeps each one within what its
 // connection can carry.
 const SCREEN_ENCODING = {
   contentHint: 'motion',
-  degradationPreference: 'maintain-framerate',
+  degradationPreference: 'maintain-resolution',
   maxBitrate: 15000000,
   maxFramerate: 60
 };
@@ -99,16 +102,16 @@ const SCREEN_JITTER_BUFFER_MS = 100;
 const VIDEO_START_BITRATE_KBPS = 2500;
 
 // The screen share never goes below this height for any viewer: below it
-// text and detail stop being readable. With 'maintain-framerate', WebRTC
-// lowers the resolution when a viewer's bandwidth or our CPU runs short; once
-// it goes under this height we pin that viewer's encode at it with
-// 'maintain-resolution', so only then does the frame rate give way, and from
-// time to time try full resolution again.
+// text and detail stop being readable. A viewer whose encode at full
+// resolution loses frame rate to their bandwidth or our CPU is moved to this
+// height, where 60 fps costs less than half as much, and from time to time
+// tried at full resolution again.
 const SCREEN_MIN_HEIGHT = 720;
 const SCREEN_ADAPT = {
-  // Quality polls below the floor before holding it (~3 s): 'maintain-
-  // framerate' can drop far below it at once, so the floor steps in at the
-  // first sample
+  // Frame rate under which full resolution counts as struggling (when the
+  // encoder says something limits it; a still screen also sends few frames)
+  minFullFps: 50,
+  // Struggling polls before moving to the floor (~3 s)
   lowSamples: 1,
   // When to try full resolution again; doubled after each attempt that
   // drops right back, up to the max
@@ -121,10 +124,11 @@ const SCREEN_ADAPT = {
 };
 
 /**
- * One step of the screen share resolution floor for one viewer. Pure, so it
- * can be reasoned about (and tested) without a connection.
+ * One step of the screen share resolution choice for one viewer: full
+ * resolution ('auto') or the 720p floor. Pure, so it can be reasoned about
+ * (and tested) without a connection.
  * @param adapt { mode: 'auto'|'floor', low, retryAt, retryMs, trialUntil }
- * @param sample { height, sourceHeight, limitedBy, availableKbps } from getStats()
+ * @param sample { height, fps, sourceHeight, limitedBy, availableKbps } from getStats()
  * @returns the new adapt state (a copy) and whether the mode changed
  */
 function nextScreenAdapt(adapt, sample, now) {
@@ -132,8 +136,15 @@ function nextScreenAdapt(adapt, sample, now) {
   const floor = Math.min(SCREEN_MIN_HEIGHT, sample.sourceHeight || SCREEN_MIN_HEIGHT);
 
   if (next.mode === 'auto') {
-    const below = sample.height > 0 && sample.height < floor && sample.limitedBy && sample.limitedBy !== 'none';
-    next.low = below ? next.low + 1 : 0;
+    // Full resolution struggles when something limits the encoder and it
+    // pays with frame rate (or, before 1.1.7's fixed resolution, with height).
+    // A capture already at or under the floor has nowhere to go.
+    const limited = !!sample.limitedBy && sample.limitedBy !== 'none';
+    const roomToDrop = !(sample.sourceHeight > 0 && sample.sourceHeight <= SCREEN_MIN_HEIGHT);
+    const losingFps = Number.isFinite(sample.fps) && sample.fps < SCREEN_ADAPT.minFullFps;
+    const losingHeight = sample.height > 0 && sample.height < floor;
+    const struggling = limited && roomToDrop && (losingFps || losingHeight);
+    next.low = struggling ? next.low + 1 : 0;
     if (next.low < SCREEN_ADAPT.lowSamples) return { adapt: next, changed: false };
 
     // A full-resolution attempt that failed quickly waits longer next time
@@ -880,13 +891,13 @@ class WebRTCManager {
     if (!params.encodings || !params.encodings.length) return;
 
     const { maxBitrate, maxFramerate } = SCREEN_ENCODING;
-    let degradationPreference = SCREEN_ENCODING.degradationPreference;
+    // Always the resolution we choose (see SCREEN_ENCODING): full, or the floor
+    const { degradationPreference } = SCREEN_ENCODING;
     let scaleResolutionDownBy = 1;
     const adapt = this.screenAdapt.get(socketId);
     const track = this.localScreenStream.getVideoTracks()[0];
     const sourceHeight = track ? track.getSettings().height : 0;
     if (adapt && adapt.mode === 'floor') {
-      degradationPreference = 'maintain-resolution';
       // A capture already at or under the floor (a small window) is kept as is
       scaleResolutionDownBy = Math.max(1, sourceHeight / SCREEN_MIN_HEIGHT);
     }
@@ -1313,6 +1324,7 @@ class WebRTCManager {
 
     const sample = {
       height: outbound.frameHeight || 0,
+      fps: outbound.framesPerSecond || 0,
       sourceHeight: track.getSettings().height || 0,
       limitedBy: outbound.qualityLimitationReason,
       availableKbps
@@ -1455,10 +1467,16 @@ class WebRTCManager {
         screenIn: null
       };
 
+      // Raw numbers for the diagnostics report (see diagnostics.js): cumulative
+      // counters it compares between samples, and the current values
+      const metrics = { screenOut: null, screenIn: null, voiceIn: null };
+      row.metrics = metrics;
+
       try {
         const stats = await pc.getStats();
         const byId = new Map();
         const screenMid = channels.screen ? channels.screen.mid : null;
+        const micMid = channels.mic ? channels.mic.mid : null;
         let received = 0;
         let lost = 0;
         stats.forEach(r => byId.set(r.id, r));
@@ -1470,6 +1488,26 @@ class WebRTCManager {
             if (local && remote) row.path = `${local.candidateType} -> ${remote.candidateType}`;
             if (pair && typeof pair.currentRoundTripTime === 'number') row.rttMs = Math.round(pair.currentRoundTripTime * 1000);
             if (pair && pair.availableOutgoingBitrate) row.uploadEstimateKbps = Math.round(pair.availableOutgoingBitrate / 1000);
+            metrics.rttMs = row.rttMs;
+            metrics.uploadKbps = row.uploadEstimateKbps;
+            metrics.path = local && remote ? {
+              local: local.candidateType,
+              remote: remote.candidateType,
+              protocol: local.protocol,
+              relayProtocol: local.relayProtocol || null
+            } : null;
+          }
+          if (r.type === 'inbound-rtp' && r.kind === 'audio' && micMid !== null && r.mid === micMid) {
+            metrics.voiceIn = {
+              packetsReceived: r.packetsReceived || 0,
+              packetsLost: Math.max(0, r.packetsLost || 0),
+              jitterMs: Math.round((r.jitter || 0) * 1000),
+              // Samples the decoder had to invent to cover missing audio: the
+              // share of these is how often a voice breaks up
+              concealedSamples: r.concealedSamples || 0,
+              totalSamplesReceived: r.totalSamplesReceived || 0,
+              concealmentEvents: r.concealmentEvents || 0
+            };
           }
           if (r.type === 'inbound-rtp') {
             received += r.packetsReceived || 0;
@@ -1492,10 +1530,49 @@ class WebRTCManager {
                 `${r.powerEfficientEncoder ? ' (placa de vídeo)' : ''} limitedBy=${r.qualityLimitationReason}` +
                 `${preference ? ` prioridade=${preference}` : ''}` +
                 `${adapt && adapt.mode === 'floor' ? ` (segurando ${SCREEN_MIN_HEIGHT}p)` : ''}`;
+            metrics.screenOut = {
+              paused: this.screenPausedBy.has(socketId),
+              fps: r.framesPerSecond || 0,
+              height: r.frameHeight || 0,
+              codec: codec ? codec.mimeType.replace('video/', '') : null,
+              encoder: r.encoderImplementation || null,
+              gpu: !!r.powerEfficientEncoder,
+              gpuRelay: !!this.screenRelay,
+              limitedBy: r.qualityLimitationReason || null,
+              // Seconds spent limited by each reason since the encode started
+              limitDurations: r.qualityLimitationDurations || null,
+              floor: !!(adapt && adapt.mode === 'floor'),
+              preference,
+              framesEncoded: r.framesEncoded || 0,
+              keyFramesEncoded: r.keyFramesEncoded || 0,
+              totalEncodeTime: r.totalEncodeTime || 0,
+              bytesSent: r.bytesSent || 0,
+              retransmittedBytesSent: r.retransmittedBytesSent || 0,
+              nackCount: r.nackCount || 0,
+              pliCount: r.pliCount || 0
+            };
           }
           if (isScreen && r.type === 'inbound-rtp' && r.framesDecoded) {
             row.screenIn = `${r.framesPerSecond || 0} fps ${r.frameWidth}x${r.frameHeight} ` +
               `dropped=${r.framesDropped || 0} freezes=${r.freezeCount || 0}`;
+            metrics.screenIn = {
+              fps: r.framesPerSecond || 0,
+              height: r.frameHeight || 0,
+              decoder: r.decoderImplementation || null,
+              framesDecoded: r.framesDecoded || 0,
+              framesDropped: r.framesDropped || 0,
+              freezeCount: r.freezeCount || 0,
+              totalFreezesDuration: r.totalFreezesDuration || 0,
+              packetsReceived: r.packetsReceived || 0,
+              packetsLost: Math.max(0, r.packetsLost || 0),
+              bytesReceived: r.bytesReceived || 0,
+              jitterMs: Math.round((r.jitter || 0) * 1000),
+              pliCount: r.pliCount || 0,
+              jitterBufferDelay: r.jitterBufferDelay || 0,
+              jitterBufferEmittedCount: r.jitterBufferEmittedCount || 0,
+              // What the sharer says it sends us and why (1.1.6+)
+              sender: this.remoteScreenSendInfo(socketId)
+            };
           }
         });
         if (received + lost > 0) row.lossPct = Math.round((lost / (received + lost)) * 1000) / 10;

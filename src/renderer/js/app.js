@@ -181,6 +181,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // cpu / ram / gpu are at their limit
     pcHealth: null,
     pcIssues: [],
+    // Last reason shown for each share we watch, and for our own share's
+    // panel: the details open by themselves only when it changes
+    screenQualityReasons: new Map(),
+    screenSendSummaryKey: '',
     // Per-person playback: { voice: { userId: { volume, muted } }, stream: { ... } }
     audioPrefs: loadAudioPrefs(),
     // Per-person "stop watching screen share": { userId: false } (absent/true = watching)
@@ -744,7 +748,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Successfully joined room
       state.socket.on('room-joined', ({ roomId, existingUsers, chatHistory, isOwner, locked, maxUsers }) => {
-        diag.log('app', `Entrou na sala ${roomId}`, { others: existingUsers.map(u => `${u.username} (${u.socketId})`) });
+        diag.log('app', `Entrou na sala ${roomId}`, { others: existingUsers.map(u => `${u.username} (${u.socketId})${u.appVersion ? ` v${u.appVersion}` : ''}`) });
+        // Everyone's diagnostics report says which version each person runs
+        if (state.appVersion) state.socket.emit('user-state-change', { appVersion: state.appVersion });
         state.currentRoomId = roomId;
         state.roomMembers.clear();
         state.isRoomOwner = !!isOwner;
@@ -1061,6 +1067,9 @@ document.addEventListener('DOMContentLoaded', () => {
     rows.forEach((row) => {
       const member = state.roomMembers.get(row.socketId);
       row.user = member ? member.username : row.socketId;
+      // Their app version (1.1.6+ says it) and how loaded their PC is
+      row.version = member && member.appVersion ? member.appVersion : null;
+      if (member && member.pcHealth) row.pc = member.pcHealth;
     });
     return rows;
   }
@@ -1093,8 +1102,15 @@ document.addEventListener('DOMContentLoaded', () => {
           `${state.user.isScreenSharing ? ' · transmitindo tela' : ''}`
         : 'fora de uma chamada',
       'Microfone': state.webrtc && state.webrtc.localMicStream
-        ? `supressão de ruído: ${state.webrtc.noiseSuppressionMode}`
-        : 'desligado'
+        ? `supressão de ruído: ${state.webrtc.noiseSuppressionMode} · ` +
+          (state.pttMode === 'ptt'
+            ? `aperte para falar (${describeKeyCode(state.pttKey)})`
+            : `detecção de voz (sensibilidade ${state.micSensitivity})`)
+        : 'desligado',
+      'Transmissão de tela': state.user.isScreenSharing && state.webrtc
+        ? `${state.webrtc.screenRelay ? 'pela placa de vídeo (relay)' : 'direto da captura'} · ` +
+          `${state.webrtc.screenPausedBy.size} pessoa(s) pararam de assistir`
+        : 'não está transmitindo'
     };
     return diag.buildReport({
       environment,
@@ -1107,7 +1123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const s = diag.summary();
     const since = s.since ? new Date(s.since).toLocaleString('pt-BR') : '-';
     el.diagnosticsSummary.textContent =
-      `${s.events} eventos desde ${since} · ${s.serverDisconnects} queda(s) do servidor · ` +
+      `${s.events} eventos desde ${since} · ${s.samples} amostras de qualidade · ${s.serverDisconnects} queda(s) do servidor · ` +
       `${s.peerDrops} queda(s) de conexão · ${s.errors} erro(s) · ${s.warnings} aviso(s)`;
   }
 
@@ -1160,6 +1176,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function initDiagnostics() {
     window.renderIcons(el.btnCopyDiagnostics.parentElement);
+    systemInfo().then((info) => { state.appVersion = info ? info.appVersion : 'web'; });
     // Console access for whoever is debugging: await triscordReport()
     window.triscordReport = buildDiagnosticsReport;
 
@@ -1177,10 +1194,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const { cpu, ram, gpu, gpuEncoder } = state.pcHealth;
         resources.pc = { cpu, ram, gpu, gpuEncoder, issues: state.pcIssues };
       }
-      rows.forEach((row) => {
-        const member = state.roomMembers.get(row.socketId);
-        if (member && member.pcHealth) row.pc = member.pcHealth;
-      });
       diag.recordStats(rows, resources);
     }, statsIntervalMs);
 
@@ -2900,12 +2913,16 @@ document.addEventListener('DOMContentLoaded', () => {
       degraded = true;
     }
 
+    // A dot over the share; the details show on hover, and on their own for
+    // a few seconds whenever the reason for a poor share changes
     label.textContent = '';
     const dot = document.createElement('span');
     dot.className = 'screen-quality-dot';
+    const details = document.createElement('span');
+    details.className = 'screen-quality-details';
     const numbers = document.createElement('span');
     numbers.textContent = `${screen.height}p · ${screen.fps} FPS`;
-    label.append(dot, numbers);
+    details.appendChild(numbers);
     if (degraded && reason) {
       const why = document.createElement('span');
       why.className = 'screen-quality-cause';
@@ -2913,15 +2930,27 @@ document.addEventListener('DOMContentLoaded', () => {
       const action = document.createElement('span');
       action.className = 'screen-quality-action';
       action.textContent = reason.action;
-      label.append(why, action);
+      details.append(why, action);
     }
+    label.append(dot, details);
     label.classList.toggle('degraded', degraded);
+
+    const reasonKey = degraded && reason ? reason.text : '';
+    if (reasonKey && reasonKey !== state.screenQualityReasons.get(socketId)) flashPopover(label);
+    state.screenQualityReasons.set(socketId, reasonKey);
     label.title = degraded && reason
       ? `Qualidade que você está recebendo. ${reason.hint}`
       : cause === 'ok'
         ? 'Qualidade que você está recebendo: chegando bem, sem limite da sua internet nem da de quem transmite.'
         : 'Qualidade que você está recebendo. Ela se ajusta à sua internet e à de quem transmite.';
     label.classList.remove('hidden');
+  }
+
+  // Open a dot's details by itself for a moment, then let them fade back
+  function flashPopover(element) {
+    element.classList.add('flash');
+    clearTimeout(element.flashTimer);
+    element.flashTimer = setTimeout(() => element.classList.remove('flash'), 6000);
   }
 
   /**
@@ -2972,18 +3001,28 @@ document.addEventListener('DOMContentLoaded', () => {
       summary = { level: 'idle', text: report.every(r => r.paused) ? 'Ninguém assistindo agora' : 'Medindo…' };
     }
 
+    // A dot colored by the summary; the details show on hover, and on their
+    // own for a few seconds when something starts limiting the share
     panel.textContent = '';
     panel.dataset.level = summary.level;
+    const dot = document.createElement('span');
+    dot.className = 'screen-send-dot';
+    const details = document.createElement('div');
+    details.className = 'screen-send-details';
+    panel.append(dot, details);
     const head = document.createElement('div');
     head.className = 'screen-send-summary';
     head.textContent = summary.text;
-    panel.appendChild(head);
+    details.appendChild(head);
     if (summary.hint) {
       const hint = document.createElement('div');
       hint.className = 'screen-send-hint';
       hint.textContent = summary.hint;
-      panel.appendChild(hint);
+      details.appendChild(hint);
     }
+    const summaryKey = summary.level === 'warn' || summary.level === 'bad' ? summary.text : '';
+    if (summaryKey && summaryKey !== state.screenSendSummaryKey) flashPopover(panel);
+    state.screenSendSummaryKey = summaryKey;
 
     report.forEach((row) => {
       const member = state.roomMembers.get(row.socketId);
@@ -3005,7 +3044,7 @@ document.addEventListener('DOMContentLoaded', () => {
         detail.textContent += ` · PC da pessoa no limite (${describePcIssues(viewerIssues)})`;
       }
       line.append(name, detail);
-      panel.appendChild(line);
+      details.appendChild(line);
     });
     panel.classList.remove('hidden');
   }
@@ -3419,6 +3458,7 @@ document.addEventListener('DOMContentLoaded', () => {
       diag.log('screen', 'Parou de transmitir a tela');
       state.user.isScreenSharing = false;
       state.screenSendReport = null;
+      state.screenSendSummaryKey = '';
       state.webrtc.stopScreenShare();
       state.screenPicker.releaseSystemAudio();
       updateActionButtonsState();

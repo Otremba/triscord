@@ -223,7 +223,8 @@ function systemCpuPercent() {
 /**
  * GPU usage, read from Windows' "GPU Engine" performance counters (what Task
  * Manager shows): per engine, the sum over every process using it; overall,
- * the busiest engine. The video encoder engine is reported on its own, since
+ * the busiest engine. The video encoder engine (on AMD, the video codec
+ * engine, which also decodes) is reported on its own, since
  * screen shares are encoded there (see gpu-relay.js). Counter instances are
  * listed again on every read, so a game started mid-call is counted. Each
  * read costs ~70 ms of CPU; one every ~3 s.
@@ -233,12 +234,15 @@ $ErrorActionPreference = 'SilentlyContinue'
 $ProgressPreference = 'SilentlyContinue'
 $inv = [Globalization.CultureInfo]::InvariantCulture
 while ($true) {
+  # Leave with Triscord, even when it crashed and never asked us to stop
+  if (-not (Get-Process -Id __PARENT_PID__ -ErrorAction SilentlyContinue)) { exit }
   $engines = @{}; $encoders = @{}
   foreach ($s in (Get-Counter '\\GPU Engine(*)\\Utilization Percentage').CounterSamples) {
     if ($s.InstanceName -match 'luid_(.+)$') {
       $key = $matches[1]
       $engines[$key] += $s.CookedValue
-      if ($key -match 'engtype_videoencode') { $encoders[$key] += $s.CookedValue }
+      # NVIDIA and Intel name it VideoEncode; AMD's "Video Codec" engine encodes and decodes
+      if ($key -match 'engtype_video ?(encode|codec)') { $encoders[$key] += $s.CookedValue }
     }
   }
   $gpu = [double](($engines.Values | Measure-Object -Maximum).Maximum)
@@ -251,7 +255,8 @@ const gpuReader = { process: null, latest: null, lastAskedAt: 0, idleTimer: null
 
 function startGpuReader() {
   if (process.platform !== 'win32' || gpuReader.process) return;
-  const encoded = Buffer.from(GPU_READER_SCRIPT, 'utf16le').toString('base64');
+  const script = GPU_READER_SCRIPT.replace('__PARENT_PID__', String(process.pid));
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
   // stderr is discarded: left unread, its pipe would fill and stall the reader
   const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
     windowsHide: true,

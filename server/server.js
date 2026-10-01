@@ -193,7 +193,10 @@ function publicUser(u, sockId) {
     isDeafened: u.isDeafened || false,
     isCameraOn: u.isCameraOn || false,
     isScreenSharing: u.isScreenSharing || false,
-    isSpeaking: u.isSpeaking || false
+    isSpeaking: u.isSpeaking || false,
+    // Sent through user-state-change; someone joining later needs them too
+    pcHealth: u.pcHealth || null,
+    appVersion: u.appVersion || null
   };
 }
 
@@ -445,8 +448,11 @@ io.on('connection', (socket) => {
         state: clean
       });
 
-      // Update global room lists if mute/camera/screen changed
-      io.emit('rooms-update', getRoomsSummary());
+      // Update global room lists if mute/camera/screen changed (PC health
+      // and app version, sent every few seconds, never show there)
+      if (Object.keys(clean).some(key => key !== 'pcHealth' && key !== 'appVersion')) {
+        io.emit('rooms-update', getRoomsSummary());
+      }
     }
   });
 
