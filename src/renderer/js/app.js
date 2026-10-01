@@ -626,9 +626,15 @@ document.addEventListener('DOMContentLoaded', () => {
       // Soundboard clips travel over this socket; a new socket needs a new one
       if (state.soundboard) state.soundboard.destroy();
       state.soundboard = new window.Soundboard(state.socket, {
-        shouldPlay: () => !!state.currentRoomId && !state.user.isDeafened
+        shouldPlay: () => !!state.currentRoomId && !state.user.isDeafened,
+        getUsername: () => state.user.username
       });
       state.soundboard.onPlayed = showSoundBadge;
+      // Someone else added, renamed or removed a sound
+      state.soundboard.onLibraryChanged = () => {
+        // Not while a name is being edited: the field would vanish mid-typing
+        if (isSoundboardOpen() && !el.soundboardGrid.querySelector('.sound-tile.editing')) renderSoundboard();
+      };
 
       state.webrtc.onConnectionQualityChanged = (socketId, quality) => {
         updateConnectionQualityIndicator(socketId, quality);
@@ -1187,7 +1193,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!sounds.length) {
       const empty = document.createElement('div');
       empty.className = 'soundboard-empty';
-      empty.textContent = 'Nenhum som ainda. Clique em + ou arraste arquivos de áudio para cá.';
+      empty.textContent = 'Nenhum som ainda. Os sons que alguém adicionar aparecem aqui para todo mundo.';
       el.soundboardGrid.appendChild(empty);
       return;
     }
@@ -1201,7 +1207,10 @@ document.addEventListener('DOMContentLoaded', () => {
     tile.className = 'sound-tile';
     tile.tabIndex = 0;
     tile.setAttribute('role', 'button');
-    tile.title = `Tocar "${sound.name}" para todos`;
+    const author = sound.addedBy ? ` · adicionado por ${sound.addedBy}` : '';
+    tile.title = `Tocar "${sound.name}" para todos${author}`;
+    // Still downloading this sound's audio from the shared library
+    if (!sound.data) tile.classList.add('downloading');
 
     const emoji = document.createElement('span');
     emoji.className = 'sound-tile-emoji';
@@ -1310,7 +1319,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function removeSound(sound) {
-    if (!confirm(`Remover "${sound.name}" do seu soundboard?`)) return;
+    if (!confirm(`Remover "${sound.name}" do soundboard de todo mundo?`)) return;
     await state.soundboard.deleteSound(sound);
     renderSoundboard();
   }

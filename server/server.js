@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const crypto = require('crypto');
 const cors = require('cors');
 const {
   sanitizeUsername,
@@ -14,9 +13,9 @@ const {
   sanitizeUserStateUpdate,
   sanitizeSoundId,
   sanitizeSoundMeta,
-  sanitizeSoundData,
   ALLOWED_REACTIONS
 } = require('./sanitize');
+const { SoundLibrary } = require('./sound-library');
 
 const app = express();
 app.use(cors());
@@ -141,7 +140,7 @@ const io = new Server(server, {
 const MAX_CHAT_HISTORY = 200;
 
 // Rooms state: roomId -> { id, name, category, users: Map(socketId -> userData),
-//   messages: [], ownerUserId, locked, maxUsers, sounds: Map(soundId -> clip), soundBytes }
+//   messages: [], ownerUserId, locked, maxUsers }
 const defaultRooms = [
   { id: 'geral', name: 'Geral', category: 'Canais de Voz', type: 'voice' },
   { id: 'jogos', name: 'Jogos & Gameplay', category: 'Canais de Voz', type: 'voice' },
@@ -153,34 +152,21 @@ const defaultRooms = [
 const rooms = new Map();
 defaultRooms.forEach(r => {
   // Default rooms have no owner: nobody can lock them or kick from them
-  rooms.set(r.id, {
-    ...r, users: new Map(), messages: [], ownerUserId: null, locked: false, maxUsers: null,
-    sounds: new Map(), soundBytes: 0
-  });
+  rooms.set(r.id, { ...r, users: new Map(), messages: [], ownerUserId: null, locked: false, maxUsers: null });
 });
 
-// Soundboard clips live in memory per room, only while someone is in it.
-// Bounded so a room cannot grow without limit on a small server.
-const MAX_ROOM_SOUNDS = 30;
-const MAX_ROOM_SOUND_BYTES = 15 * 1024 * 1024;
+// The soundboard library is shared by everyone on the server (see
+// sound-library.js); the clients keep it, the server merges and relays it.
+const soundLibrary = new SoundLibrary();
+// soundId -> when the apps were last asked to resend its audio
+const soundDataRequests = new Map();
+const SOUND_DATA_REQUEST_INTERVAL_MS = 5000;
 
-function storeRoomSound(room, clip) {
-  if (room.sounds.has(clip.id)) return;
-  room.sounds.set(clip.id, clip);
-  room.soundBytes += clip.data.length;
-
-  // Map order is insertion order, and plays re-insert, so the first entry is
-  // the least recently played
-  while (room.sounds.size > MAX_ROOM_SOUNDS || room.soundBytes > MAX_ROOM_SOUND_BYTES) {
-    const [oldestId, oldest] = room.sounds.entries().next().value;
-    room.sounds.delete(oldestId);
-    room.soundBytes -= oldest.data.length;
-  }
-}
-
-function touchRoomSound(room, clip) {
-  room.sounds.delete(clip.id);
-  room.sounds.set(clip.id, clip);
+function requestClipFromClients(soundId) {
+  const last = soundDataRequests.get(soundId) || 0;
+  if (Date.now() - last < SOUND_DATA_REQUEST_INTERVAL_MS) return;
+  soundDataRequests.set(soundId, Date.now());
+  io.emit('soundboard-need-data', { soundId });
 }
 
 // A tiny sliding-window limiter so one client can't flood the room with chat
@@ -275,8 +261,12 @@ io.on('connection', (socket) => {
   const chatLimiter = makeRateLimiter(6, 4000);
   const reactionLimiter = makeRateLimiter(20, 4000);
   const soundPlayLimiter = makeRateLimiter(2, 3000);
-  const soundUploadLimiter = makeRateLimiter(10, 60000);
-  const soundFetchLimiter = makeRateLimiter(40, 60000);
+  // Generous: after a server restart one app may resend the whole library,
+  // and a new app downloads all of it
+  const soundUploadLimiter = makeRateLimiter(120, 60000);
+  const soundFetchLimiter = makeRateLimiter(240, 60000);
+  const soundSyncLimiter = makeRateLimiter(5, 60000);
+  const soundEditLimiter = makeRateLimiter(30, 60000);
 
   function isOwner(room) {
     return !!room && !!room.ownerUserId && !!currentUserData && room.ownerUserId === currentUserData.userId;
@@ -307,9 +297,7 @@ io.on('connection', (socket) => {
         // The first person to create a custom room owns it (kick/mute/lock rights)
         ownerUserId: (userData && userData.userId) || null,
         locked: false,
-        maxUsers: null,
-        sounds: new Map(),
-        soundBytes: 0
+        maxUsers: null
       });
     }
 
@@ -491,12 +479,22 @@ io.on('connection', (socket) => {
   });
 
   // Soundboard ---------------------------------------------------------
-  // A clip is identified by the SHA-256 of its bytes. Playing sends only that
-  // id; the bytes are uploaded once per room (when the server answers
-  // needData) and each listener fetches them once, then plays from its cache.
+  // One library for everyone, kept by the apps and merged here (see
+  // sound-library.js). A clip is identified by the SHA-256 of its bytes:
+  // playing sends only that id, and the bytes travel once to the server and
+  // once to each app.
 
   function currentRoomForSound() {
     return currentRoomId && currentUserData ? rooms.get(currentRoomId) : null;
+  }
+
+  // Before joining a room the app has no user data yet, so it says who it is
+  function soundUsername(payload) {
+    return currentUserData ? currentUserData.username : sanitizeUsername(payload && payload.username);
+  }
+
+  function announceLibraryChanges(entries) {
+    if (entries.length) socket.broadcast.emit('soundboard-library-changed', { entries });
   }
 
   function broadcastSound(room, soundId, meta) {
@@ -510,40 +508,96 @@ io.on('connection', (socket) => {
     });
   }
 
+  // An app connecting sends everything it knows and gets the merged library
+  // back, plus the audio the server is missing and the app can resend
+  socket.on('soundboard-sync', (payload, ack) => {
+    const reply = typeof ack === 'function' ? ack : () => {};
+    if (!soundSyncLimiter()) return reply({ ok: false, error: 'rate-limited' });
+
+    const raw = payload && Array.isArray(payload.entries) ? payload.entries.slice(0, 2000) : [];
+    const changed = [];
+    const withData = [];
+    raw.forEach((item) => {
+      const entry = SoundLibrary.sanitizeEntry(item);
+      if (!entry) return;
+      if (item.hasData === true) withData.push(entry.id);
+      const stored = soundLibrary.merge(entry);
+      if (stored) changed.push(stored);
+    });
+
+    announceLibraryChanges(changed);
+    reply({ ok: true, entries: soundLibrary.snapshot(), missing: soundLibrary.missingClips(withData) });
+  });
+
+  // Add, rename or delete a sound for everyone
+  socket.on('soundboard-upsert', (payload, ack) => {
+    const reply = typeof ack === 'function' ? ack : () => {};
+    if (!payload || typeof payload !== 'object') return reply({ ok: false, error: 'invalid' });
+    if (!soundEditLimiter()) return reply({ ok: false, error: 'rate-limited' });
+
+    // The server's clock decides which edit is the latest
+    const now = Date.now();
+    const entry = SoundLibrary.sanitizeEntry({ ...payload.entry, updatedAt: now }, now);
+    if (!entry) return reply({ ok: false, error: 'invalid' });
+
+    const isNew = !soundLibrary.entries.has(entry.id);
+    if (isNew) {
+      // Nobody can add a sound the server cannot serve
+      if (entry.deleted || !payload.data) return reply({ ok: false, error: 'invalid' });
+      entry.addedAt = now;
+      entry.addedBy = soundUsername(payload);
+    }
+    if (payload.data && !entry.deleted) {
+      if (!soundUploadLimiter()) return reply({ ok: false, error: 'rate-limited' });
+      const error = soundLibrary.storeClip(entry.id, entry.mime, payload.data);
+      if (error) return reply({ ok: false, error });
+    }
+
+    const stored = soundLibrary.merge(entry);
+    if (!stored) return reply({ ok: false, error: isNew ? 'library-full' : 'stale' });
+    announceLibraryChanges([stored]);
+    reply({ ok: true, entry: stored });
+  });
+
   socket.on('soundboard-play', (payload, ack) => {
     const reply = typeof ack === 'function' ? ack : () => {};
     const room = currentRoomForSound();
     const soundId = sanitizeSoundId(payload && payload.soundId);
     if (!room || !soundId) return reply({ ok: false, error: 'invalid' });
 
-    const clip = room.sounds.get(soundId);
     // Asking for the upload does not count against the play limit
-    if (!clip) return reply({ ok: false, needData: true });
+    if (!soundLibrary.getClip(soundId)) return reply({ ok: false, needData: true });
     if (!soundPlayLimiter()) return reply({ ok: false, error: 'rate-limited' });
 
-    touchRoomSound(room, clip);
     broadcastSound(room, soundId, payload);
     reply({ ok: true });
   });
 
+  // Audio for a sound: answering needData before a play, or resending what
+  // the server lost (play: false). Version 1.1.4 apps only ever send this,
+  // so a sound they play joins the shared library here.
   socket.on('soundboard-upload', (payload, ack) => {
     const reply = typeof ack === 'function' ? ack : () => {};
-    const room = currentRoomForSound();
     const soundId = sanitizeSoundId(payload && payload.soundId);
-    if (!room || !soundId) return reply({ ok: false, error: 'invalid' });
-
-    const data = sanitizeSoundData(payload.data, payload.mime);
-    if (!data) return reply({ ok: false, error: 'invalid-sound' });
-    // Limited before hashing, which is the expensive part
+    if (!soundId) return reply({ ok: false, error: 'invalid' });
     if (!soundUploadLimiter()) return reply({ ok: false, error: 'rate-limited' });
-    // The id must really be the hash of these bytes, or one client could
-    // plant different audio under an id another client will play
-    if (crypto.createHash('sha256').update(data).digest('hex') !== soundId) {
-      return reply({ ok: false, error: 'hash-mismatch' });
+
+    const error = soundLibrary.storeClip(soundId, payload.mime, payload.data);
+    if (error) return reply({ ok: false, error });
+    soundDataRequests.delete(soundId);
+
+    if (!soundLibrary.entries.has(soundId)) {
+      const now = Date.now();
+      const entry = SoundLibrary.sanitizeEntry({
+        ...payload, id: soundId, addedBy: soundUsername(payload), addedAt: now, updatedAt: now
+      }, now);
+      const stored = entry && soundLibrary.merge(entry);
+      if (stored) announceLibraryChanges([stored]);
     }
 
-    // Kept even when this play is over the limit, so a later one needs no upload
-    storeRoomSound(room, { id: soundId, mime: payload.mime, data });
+    if (payload.play === false) return reply({ ok: true });
+    const room = currentRoomForSound();
+    if (!room) return reply({ ok: false, error: 'invalid' });
     if (!soundPlayLimiter()) return reply({ ok: false, error: 'rate-limited' });
     broadcastSound(room, soundId, payload);
     reply({ ok: true });
@@ -551,12 +605,18 @@ io.on('connection', (socket) => {
 
   socket.on('soundboard-fetch', (payload, ack) => {
     if (typeof ack !== 'function') return;
-    const room = currentRoomForSound();
     const soundId = sanitizeSoundId(payload && payload.soundId);
-    const clip = room && soundId && room.sounds.get(soundId);
-    if (!clip) return ack({ ok: false, error: 'not-found' });
+    if (!soundId) return ack({ ok: false, error: 'not-found' });
     if (!soundFetchLimiter()) return ack({ ok: false, error: 'rate-limited' });
-    ack({ ok: true, mime: clip.mime, data: clip.data });
+
+    const clip = soundLibrary.getClip(soundId);
+    if (clip) return ack({ ok: true, mime: clip.mime, data: clip.data });
+    // Lost on a restart or evicted: some app still has it
+    if (soundLibrary.isActive(soundId)) {
+      requestClipFromClients(soundId);
+      return ack({ ok: false, error: 'pending' });
+    }
+    ack({ ok: false, error: 'not-found' });
   });
 
   // Room owner controls -------------------------------------------------
@@ -619,12 +679,6 @@ io.on('connection', (socket) => {
       room.users.delete(socket.id);
       socket.leave(currentRoomId);
 
-      // Nobody left to play them to
-      if (room.users.size === 0) {
-        room.sounds.clear();
-        room.soundBytes = 0;
-      }
-
       socket.to(currentRoomId).emit('user-left', {
         socketId: socket.id,
         username: currentUserData ? currentUserData.username : 'Usuário'
@@ -653,4 +707,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, server, io, rooms, getRoomsSummary, MAX_ROOM_SOUNDS, MAX_ROOM_SOUND_BYTES, getConfiguredTurnServers, getIceTransportPolicy, getBaseIceServers };
+module.exports = { app, server, io, rooms, getRoomsSummary, soundLibrary, getConfiguredTurnServers, getIceTransportPolicy, getBaseIceServers };

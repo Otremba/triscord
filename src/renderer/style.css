@@ -2415,6 +2415,10 @@ body {
   100% { box-shadow: 0 0 0 10px rgba(88, 101, 242, 0); }
 }
 
+.sound-tile.downloading {
+  opacity: 0.55;
+}
+
 .sound-tile-emoji {
   font-size: 18px;
   line-height: 1;
