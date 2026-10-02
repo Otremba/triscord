@@ -272,10 +272,24 @@
         </div>
 
         <div class="screen-options-row">
-          <span class="screen-quality-note">
-            <i data-lucide="monitor-check"></i>
-            Alta qualidade: até 1080p a 60 FPS, ajustada à internet de cada pessoa
-          </span>
+          <div class="screen-mode-choice" role="radiogroup" aria-label="Tipo de transmissão">
+            <label class="screen-mode-option">
+              <input type="radio" name="screenMode" value="game" />
+              <i data-lucide="gamepad-2"></i>
+              <span class="screen-mode-text">
+                <strong>Jogo</strong>
+                <span>720p · 60 FPS, mais fluido</span>
+              </span>
+            </label>
+            <label class="screen-mode-option">
+              <input type="radio" name="screenMode" value="everyday" checked />
+              <i data-lucide="monitor"></i>
+              <span class="screen-mode-text">
+                <strong>Dia a dia</strong>
+                <span>1080p · 30 FPS, mais nítido</span>
+              </span>
+            </label>
+          </div>
 
           <div class="option-group">
             <input type="checkbox" id="screenAudioCheckbox" checked />

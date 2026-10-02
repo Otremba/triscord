@@ -1848,26 +1848,77 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.screen-quality-note {
-  display: inline-flex;
+/* The kind of share: a game (720p60) or everyday use (1080p30) */
+.screen-mode-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.screen-mode-option {
+  position: relative;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
-  font-size: 13px;
+  gap: 10px;
+  padding: 8px 14px 8px 12px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  background-color: var(--bg-tertiary);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--dur-fast) ease;
+}
+
+.screen-mode-option:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* The radio itself stays reachable by keyboard, but the card shows the choice */
+.screen-mode-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.screen-mode-option:has(input:checked) {
+  border-color: var(--accent-blurple);
+}
+
+.screen-mode-option:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+
+.screen-mode-option .lucide {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
   color: var(--text-muted);
 }
 
-.screen-quality-note .lucide {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
+.screen-mode-option:has(input:checked) .lucide {
   color: var(--accent-blurple);
+}
+
+.screen-mode-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.screen-mode-text strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.screen-mode-text span {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 /* A share's quality as a dot over it, under the AO VIVO tag (the top-right
    corner belongs to the tile's hover actions): the viewer's label and the
-   sharer's panel. Hovering the dot opens the details, and so does a change
-   in what limits the share (.flash, a few seconds); then they fade back. */
+   sharer's panel. Only hovering the dot opens the details. */
 .screen-quality-label,
 .screen-send-panel {
   position: absolute;
@@ -1899,17 +1950,14 @@ body {
 }
 
 .screen-quality-label:hover,
-.screen-quality-label.flash,
-.screen-send-panel:hover,
-.screen-send-panel.flash {
+.screen-send-panel:hover {
   padding: 7px 11px 8px 8px;
   background-color: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
 
-.screen-quality-label.degraded:hover,
-.screen-quality-label.degraded.flash {
+.screen-quality-label.degraded:hover {
   background-color: rgba(240, 178, 50, 0.95);
   color: #1e1f22;
 }
@@ -1947,8 +1995,7 @@ body {
 }
 
 /* On the yellow of an open degraded label the dot turns dark */
-.screen-quality-label.degraded:hover .screen-quality-dot,
-.screen-quality-label.degraded.flash .screen-quality-dot {
+.screen-quality-label.degraded:hover .screen-quality-dot {
   background-color: #1e1f22;
   animation: none;
 }
@@ -1984,9 +2031,7 @@ body {
 }
 
 .screen-quality-label:hover .screen-quality-details,
-.screen-quality-label.flash .screen-quality-details,
-.screen-send-panel:hover .screen-send-details,
-.screen-send-panel.flash .screen-send-details {
+.screen-send-panel:hover .screen-send-details {
   max-width: 370px;
   max-height: 260px;
   opacity: 1;

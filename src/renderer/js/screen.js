@@ -2,6 +2,8 @@
  * Screen Share Modal & Desktop Capturer Handler
  */
 
+const SCREEN_MODE_KEY = 'triscord_screen_mode';
+
 class ScreenSharePicker {
   constructor(options = {}) {
     this.modalEl = document.getElementById('screenShareModal');
@@ -10,6 +12,7 @@ class ScreenSharePicker {
     this.audioCheckbox = document.getElementById('screenAudioCheckbox');
     this.btnCancel = document.getElementById('screenShareCancel');
     this.btnConfirm = document.getElementById('screenShareConfirm');
+    this.modeInputs = Array.from(document.querySelectorAll('input[name="screenMode"]'));
 
     this.activeTab = 'screens'; // 'screens' or 'windows'
     this.selectedSourceId = null;
@@ -20,9 +23,25 @@ class ScreenSharePicker {
     this.initEvents();
   }
 
+  /**
+   * The kind of share picked: 'game' (720p60) or 'everyday' (1080p30).
+   * The last choice is the next default.
+   */
+  get mode() {
+    const checked = this.modeInputs.find(input => input.checked);
+    return checked ? checked.value : 'everyday';
+  }
+
   initEvents() {
     if (!this.modalEl) return;
 
+    let saved = null;
+    try { saved = localStorage.getItem(SCREEN_MODE_KEY); } catch (err) { /* storage unavailable */ }
+    const savedInput = this.modeInputs.find(input => input.value === saved);
+    if (savedInput) savedInput.checked = true;
+    this.modeInputs.forEach(input => input.addEventListener('change', () => {
+      try { localStorage.setItem(SCREEN_MODE_KEY, this.mode); } catch (err) { /* storage unavailable */ }
+    }));
 
     // Tab buttons
     document.querySelectorAll('.screen-tab-btn').forEach(btn => {
@@ -154,8 +173,8 @@ class ScreenSharePicker {
   async startCapture() {
     if (!this.selectedSourceId) return null;
 
-    // One setting for everyone: capture up to 1080p60 and let the encoder
-    // adapt to each viewer (see SCREEN_ENCODING in webrtc.js)
+    // Capture up to 1080p60; the share then sets 720p60 for a game or 1080p30
+    // for everyday use, as picked (see CAPTURE_LEVELS in webrtc.js)
     const width = 1920;
     const height = 1080;
     const frameRate = 60;

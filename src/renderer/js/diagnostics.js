@@ -274,7 +274,7 @@ class Diagnostics {
         people.set(key, {
           name: key,
           versions: new Set(),
-          out: { activeSec: 0, pausedSec: 0, floorSec: 0, captureSec: [0, 0, 0], motionSec: 0, detailSec: 0, motionFps: [], fps: [], heights: [], limits: {}, bytes: 0, retransmitted: 0, keyFrames: 0, plis: 0, encodeTime: 0, frames: 0, codecs: new Set(), encoders: new Set(), gpuSec: 0, relaySec: 0 },
+          out: { activeSec: 0, pausedSec: 0, captureSec: [0, 0, 0], motionSec: 0, detailSec: 0, motionFps: [], fps: [], heights: [], limits: {}, bytes: 0, retransmitted: 0, keyFrames: 0, plis: 0, encodeTime: 0, frames: 0, codecs: new Set(), encoders: new Set(), gpuSec: 0, relaySec: 0 },
           in: { activeSec: 0, fps: [], heights: [], freezes: 0, freezeSec: 0, decoded: 0, dropped: 0, received: 0, lost: 0, bytes: 0, plis: 0, jitter: [], bufferDelay: 0, bufferEmitted: 0, decoders: new Set(), causes: {} },
           voice: { received: 0, lost: 0, concealed: 0, samples: 0, events: 0, sec: 0, jitter: [] },
           net: { rtt: [], upload: [], paths: new Set() },
@@ -317,16 +317,14 @@ class Diagnostics {
           o.frames += frames;
           o.fps.push(b.screenOut.fps);
           o.heights.push(b.screenOut.height);
-          if (b.screenOut.floor) o.floorSec += dt;
           const level = b.screenOut.captureLevel || 0;
           o.captureSec[level] = (o.captureSec[level] || 0) + dt;
-          // Text and code send few frames by nature: only moving content
-          // says whether the frame rate held
-          if (b.screenOut.content === 'detail') o.detailSec += dt;
-          else {
+          // Everyday use runs at 30 fps and a still screen sends few frames:
+          // only a game says whether the frame rate held
+          if (b.screenOut.mode === 'game') {
             o.motionSec += dt;
             o.motionFps.push(b.screenOut.fps);
-          }
+          } else o.detailSec += dt;
           if (b.screenOut.gpu) o.gpuSec += dt;
           if (b.screenOut.gpuRelay) o.relaySec += dt;
           if (b.screenOut.codec) o.codecs.add(b.screenOut.codec);
@@ -452,10 +450,10 @@ class Diagnostics {
         const fpsAvg = diagAverage(o.motionFps);
         const freePct = diagPct(o.limits.none || 0, limitTotal);
         if (o.motionSec >= 30 && fpsAvg !== null && fpsAvg < 40 && freePct >= 80) {
-          const reduced = diagPct(o.captureSec[1] + o.captureSec[2], o.activeSec, 0);
-          add('atenção', `Sua tela foi para ${p.name} a ${diagRound(fpsAvg)} FPS em média com nada limitando o encoder: ` +
+          const eco = diagPct(o.captureSec[2], o.activeSec, 0);
+          add('atenção', `Sua tela foi para ${p.name} a ${diagRound(fpsAvg)} FPS em média num jogo, com nada limitando o encoder: ` +
             'quem não entregou quadros foi a captura (um jogo pesando no PC, ou uma janela capturada devagar)' +
-            `${reduced ? `; a captura ficou reduzida em ${reduced}% do tempo para compensar` : ''}.`);
+            `${eco ? `; a captura ficou em 720p30 em ${eco}% do tempo para compensar` : ''}.`);
         }
         if (o.codecs.has('VP8') || o.codecs.has('VP9')) {
           add('atenção', `Sua tela foi para ${p.name} em ${Array.from(o.codecs).join('/')}, pela CPU: ${p.name} provavelmente estava numa versão antiga (versão: ${Array.from(p.versions).join(', ') || 'desconhecida'}).`);
@@ -541,7 +539,7 @@ class Diagnostics {
     if (sent.length) {
       lines.push('### Sua tela, enviada para cada pessoa');
       table(
-        ['Pessoa', 'Tempo', 'FPS médio / pior 10%', 'Resolução', 'Limitado por (tempo)', 'Segurando 720p', 'Conteúdo (movimento · texto)', 'Captura (cheia · 720p60 · 720p30)', 'Codec · encoder', 'Placa de vídeo', 'Taxa média', 'Reenviado', 'Pedidos de quadro-chave', 'Codificação', 'Pausado'],
+        ['Pessoa', 'Tempo', 'FPS médio / pior 10%', 'Resolução', 'Limitado por (tempo)', 'Tipo (jogo · dia a dia)', 'Captura (1080p30 · 720p60 · 720p30)', 'Codec · encoder', 'Placa de vídeo', 'Taxa média', 'Reenviado', 'Pedidos de quadro-chave', 'Codificação', 'Pausado'],
         sent.map((p) => {
           const o = p.out;
           const total = Object.values(o.limits).reduce((a, b) => a + b, 0);
@@ -551,7 +549,7 @@ class Diagnostics {
             : '-';
           return [
             p.name, minutes(o.activeSec), `${fmt(diagRound(diagAverage(o.fps)))} / ${fmt(diagPercentile(o.fps, 10))}`,
-            diagHeightShare(o.heights), limits, `${fmt(diagPct(o.floorSec, o.activeSec, 0), '%')}`,
+            diagHeightShare(o.heights), limits,
             `${diagPct(o.motionSec, o.activeSec, 0) || 0}% · ${diagPct(o.detailSec, o.activeSec, 0) || 0}%`,
             o.captureSec.map(sec => `${diagPct(sec, o.activeSec, 0) || 0}%`).join(' · '),
             `${Array.from(o.codecs).join('/') || '-'} · ${Array.from(o.encoders).join('/') || '-'}`,
@@ -675,7 +673,7 @@ class Diagnostics {
         const peerText = sample.peers.map((peer) => {
           const m = peer.m || {};
           const parts = [`${peer.user}: ${peer.connection}`, `rtt ${fmt(m.rttMs)}`];
-          if (m.screenOut) parts.push(m.screenOut.paused ? 'envio pausado' : `envio ${m.screenOut.height}p@${m.screenOut.fps} ${m.screenOut.limitedBy}${m.screenOut.floor ? ' piso' : ''}`);
+          if (m.screenOut) parts.push(m.screenOut.paused ? 'envio pausado' : `envio ${m.screenOut.height}p@${m.screenOut.fps} ${m.screenOut.limitedBy}`);
           if (m.screenIn) parts.push(`recebe ${m.screenIn.height}p@${m.screenIn.fps} travadas ${m.screenIn.freezeCount}`);
           return parts.join(' ');
         }).join(' | ');

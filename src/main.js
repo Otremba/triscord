@@ -13,6 +13,14 @@ Menu.setApplicationMenu(null);
 // shortcut, so Windows shows "Triscord" and its icon.
 if (process.platform === 'win32') app.setAppUserModelId('com.triscord.app');
 
+// WebRTC drops frames whenever an encoder overshoots its bitrate, and the GPU
+// encoder (Media Foundation, AMD at least) overshoots at 60 fps: a game shared
+// at 720p60 arrived at ~25 fps, "limited by nothing", the moment the bitrate
+// reached its cap. Without the dropper it holds ~53 fps; the overshoot is
+// left to the bitrate caps (see SCREEN_ENCODING in webrtc.js) and to
+// bandwidth estimation.
+app.commandLine.appendSwitch('force-fieldtrials', 'WebRTC-FrameDropper/Disabled/');
+
 // Warnings and errors of the main process (system audio helper, updater...),
 // kept for the diagnostics report in Settings. The renderer cannot see these.
 const MAIN_LOG_LIMIT = 200;

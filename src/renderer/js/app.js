@@ -181,10 +181,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // cpu / ram / gpu are at their limit
     pcHealth: null,
     pcIssues: [],
-    // Last reason shown for each share we watch, and for our own share's
-    // panel: the details open by themselves only when it changes
-    screenQualityReasons: new Map(),
-    screenSendSummaryKey: '',
     // Per-person playback: { voice: { userId: { volume, muted } }, stream: { ... } }
     audioPrefs: loadAudioPrefs(),
     // Per-person "stop watching screen share": { userId: false } (absent/true = watching)
@@ -1108,7 +1104,8 @@ document.addEventListener('DOMContentLoaded', () => {
             : `detecção de voz (sensibilidade ${state.micSensitivity})`)
         : 'desligado',
       'Transmissão de tela': state.user.isScreenSharing && state.webrtc
-        ? `${state.webrtc.screenRelay ? 'pela placa de vídeo (relay)' : 'direto da captura'} · ` +
+        ? `${state.webrtc.screenMode === 'game' ? 'jogo' : 'dia a dia'} · ` +
+          `${state.webrtc.screenRelay ? 'pela placa de vídeo (relay)' : 'direto da captura'} · ` +
           `${state.webrtc.screenPausedBy.size} pessoa(s) pararam de assistir`
         : 'não está transmitindo'
     };
@@ -2915,8 +2912,7 @@ document.addEventListener('DOMContentLoaded', () => {
       degraded = true;
     }
 
-    // A dot over the share; the details show on hover, and on their own for
-    // a few seconds whenever the reason for a poor share changes
+    // A dot over the share; the details show only on hover
     label.textContent = '';
     const dot = document.createElement('span');
     dot.className = 'screen-quality-dot';
@@ -2936,23 +2932,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     label.append(dot, details);
     label.classList.toggle('degraded', degraded);
-
-    const reasonKey = degraded && reason ? reason.text : '';
-    if (reasonKey && reasonKey !== state.screenQualityReasons.get(socketId)) flashPopover(label);
-    state.screenQualityReasons.set(socketId, reasonKey);
     label.title = degraded && reason
       ? `Qualidade que você está recebendo. ${reason.hint}`
       : cause === 'ok'
         ? 'Qualidade que você está recebendo: chegando bem, sem limite da sua internet nem da de quem transmite.'
         : 'Qualidade que você está recebendo. Ela se ajusta à sua internet e à de quem transmite.';
     label.classList.remove('hidden');
-  }
-
-  // Open a dot's details by itself for a moment, then let them fade back
-  function flashPopover(element) {
-    element.classList.add('flash');
-    clearTimeout(element.flashTimer);
-    element.flashTimer = setTimeout(() => element.classList.remove('flash'), 6000);
   }
 
   /**
@@ -3003,8 +2988,7 @@ document.addEventListener('DOMContentLoaded', () => {
       summary = { level: 'idle', text: report.every(r => r.paused) ? 'Ninguém assistindo agora' : 'Medindo…' };
     }
 
-    // A dot colored by the summary; the details show on hover, and on their
-    // own for a few seconds when something starts limiting the share
+    // A dot colored by the summary; the details show only on hover
     panel.textContent = '';
     panel.dataset.level = summary.level;
     const dot = document.createElement('span');
@@ -3022,25 +3006,19 @@ document.addEventListener('DOMContentLoaded', () => {
       hint.textContent = summary.hint;
       details.appendChild(hint);
     }
-    // How the capture itself runs (see nextCaptureAdapt in webrtc.js)
-    // What comes first for what is being shared, and how the capture runs
+    // What is being shared decides how it is captured (see CAPTURE_LEVELS in webrtc.js)
     const capture = state.webrtc ? state.webrtc.captureLevelInfo() : null;
-    const captureText = !capture ? '' : capture.content === 'detail'
-      ? 'Pouco movimento (código, texto): resolução máxima, nitidez primeiro.'
-      : capture.level === 1
-        ? 'Muito movimento: captura em 720p para manter 60 FPS (em resolução cheia os quadros não chegavam).'
-        : capture.level === 2
-          ? 'Muito movimento, mas seu PC está no limite: 720p a 30 FPS, estáveis, travam menos.'
-          : capture.content === 'motion' ? 'Muito movimento: fluidez primeiro.' : '';
+    const captureText = !capture ? '' : [
+      'Dia a dia: 1080p a 30 FPS, nitidez primeiro.',
+      'Jogo: 720p a 60 FPS, fluidez primeiro.',
+      'Jogo, mas seu PC está no limite: 720p a 30 FPS, estáveis, travam menos.'
+    ][capture.level] || '';
     if (captureText) {
       const line = document.createElement('div');
       line.className = 'screen-send-hint';
       line.textContent = captureText;
       details.appendChild(line);
     }
-    const summaryKey = summary.level === 'warn' || summary.level === 'bad' ? summary.text : '';
-    if (summaryKey && summaryKey !== state.screenSendSummaryKey) flashPopover(panel);
-    state.screenSendSummaryKey = summaryKey;
 
     report.forEach((row) => {
       const member = state.roomMembers.get(row.socketId);
@@ -3476,7 +3454,6 @@ document.addEventListener('DOMContentLoaded', () => {
       diag.log('screen', 'Parou de transmitir a tela');
       state.user.isScreenSharing = false;
       state.screenSendReport = null;
-      state.screenSendSummaryKey = '';
       state.webrtc.stopScreenShare();
       state.screenPicker.releaseSystemAudio();
       updateActionButtonsState();
@@ -3488,9 +3465,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const stream = await state.screenPicker.open();
       if (!stream) return; // cancelled
 
-      state.webrtc.setScreenStream(stream);
+      state.webrtc.setScreenStream(stream, { mode: state.screenPicker.mode });
       const captured = stream.getVideoTracks()[0];
       diag.log('screen', 'Começou a transmitir a tela', {
+        mode: state.screenPicker.mode,
         capture: captured ? captured.getSettings() : null,
         systemAudio: stream.getAudioTracks().length > 0,
         // Whether frames go through the GPU relay (see gpu-relay.js)
