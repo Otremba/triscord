@@ -59,6 +59,14 @@ private:
     qint64 lastChange_ = -1, lastCongestion_ = -1;
     std::deque<qint64> requests_;
 };
+// Each viewer gets its own copy of the shared screen (peer to peer, no media server), so the sender uploads the
+// bitrate once per viewer. Up to this total the preset is kept; beyond it every copy gets an equal share, never less
+// than the floor. Before 0.9.36 the total was the preset alone (four viewers of 1080p60 got 2 Mbps each); 0.9.36
+// removed the limit and three viewers asked for 24 Mbps of upload. Congestion feedback still lowers it further.
+constexpr int kScreenUploadBudget = 16000000;
+inline int screenBitrateCeiling(int preset, int viewers) {
+    return std::max(ScreenBitrateControl::floor(preset), std::min(preset, kScreenUploadBudget / std::max(1, viewers)));
+}
 inline VideoConfig screenPreset(int height, int fps) {
     if ((height != 480 && height != 720 && height != 1080) || (fps != 15 && fps != 30 && fps != 60))
         throw std::invalid_argument("Unsupported screen preset");

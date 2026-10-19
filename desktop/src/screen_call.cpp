@@ -40,9 +40,8 @@ void ScreenCall::adaptBitrate(BitrateSignal signal) {
         const auto member = members_.find(id);
         if (session->peer->connected() && member != members_.end() && member->second.watching) ++viewers;
     }
-    // The preset is a per-viewer encoding target, not an aggregate upload quota.
-    // A new viewer alone does not prove congestion; react to actual feedback.
-    const int ceiling = config_.bitrate;
+    // Every viewer is a separate upload of the same stream: share a total budget among them (screen_quality.h).
+    const int ceiling = screenBitrateCeiling(config_.bitrate, viewers);
     if (!bitrateClock_.isValid()) bitrateClock_.start();
     const auto now = bitrateClock_.elapsed();
     const int target = signal == BitrateSignal::Congested ? bitrate_.congested(now, config_.bitrate, ceiling)

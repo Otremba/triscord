@@ -80,6 +80,17 @@ private slots:
         QVERIFY_EXCEPTION_THROWN(screenPreset(2160, 60), std::invalid_argument);
         QVERIFY_EXCEPTION_THROWN(screenPreset(720, 0), std::invalid_argument);
     }
+    // The total upload is shared among viewers: the preset up to the budget, an equal share past it, never below the floor.
+    void bitrateCeilingSharesTheUploadBudget() {
+        const int preset = screenPreset(1080, 60).bitrate;   // 8 Mbps
+        QCOMPARE(screenBitrateCeiling(preset, 0), preset);
+        QCOMPARE(screenBitrateCeiling(preset, 1), preset);
+        QCOMPARE(screenBitrateCeiling(preset, 2), preset);
+        QCOMPARE(screenBitrateCeiling(preset, 3), kScreenUploadBudget / 3);
+        QCOMPARE(screenBitrateCeiling(preset, 4), 4000000);
+        QCOMPARE(screenBitrateCeiling(preset, 100), ScreenBitrateControl::floor(preset));
+        QCOMPARE(screenBitrateCeiling(screenPreset(720, 30).bitrate, 4), screenPreset(720, 30).bitrate);   // small presets fit whole
+    }
     // 19/10: one keyframe request no longer cuts the stream, cuts stop at an eighth of the preset, and a calm link
     // climbs back from the floor to the preset in about a minute instead of several.
     void bitrateCutsOnlyOnRealCongestionAndRecoversFast() {
