@@ -52,9 +52,31 @@ void ScreenAudio::receive(const QString& peer, const QByteArray& packet, uint32_
     peers_.at(peer)->push(timestamp, packet); if (!timer_.isActive()) timer_.start();
 }
 void ScreenAudio::tick() {
-    if (sink_ && sink_->error() != QtAudio::NoError) {
+    // An empty playback buffer can resume on the next write; it is not a
+    // disconnected device and must not trigger a two-second recovery pause.
+    if (sink_ && sink_->error() != QtAudio::NoError && sink_->error() != QtAudio::UnderrunError) {
         failOutput("a saída de áudio da tela parou. tentando reconectar o dispositivo."); return;
     }
+    auto flush = [this] {
+        if (pending_.isEmpty()) return true;
+        const auto written = writer_->write(pending_);
+        if (written < 0) {
+            failOutput("a saída de áudio da tela parou. tentando reconectar o dispositivo."); return false;
+        }
+        pending_.remove(0, written);
+        return pending_.isEmpty();
+    };
+    int frames = 1; // Injected mode decodes without opening hardware.
+    if (playback_) {
+        if (peers_.empty() && pending_.isEmpty()) return;
+        if (!openOutput()) { failOutput("não foi possível reproduzir o áudio da tela. tentando reconectar a saída de áudio."); return; }
+        if (!flush()) return;
+        const auto frameBytes = format_.bytesForFrames((format_.sampleRate() + 49) / 50);
+        frames = playbackFramesNeeded(sink_->bufferSize(), sink_->bytesFree(), frameBytes);
+    }
+    // Consume RTP only when the output can retain the resulting PCM. Refill
+    // after a delayed tick instead of permanently losing device-buffer headroom.
+    for (int n = 0; n < frames; ++n) {
     VoiceFrame mixed{}; bool received = false;
     for (auto& [id, jitter] : peers_) {
         try { if (const auto frame = jitter->pop()) {
@@ -66,16 +88,11 @@ void ScreenAudio::tick() {
             emit decoded(id, adjusted);
         } } catch (const std::exception&) { /* Malformed packets never stop other streams. */ }
     }
-    if (!playback_ || (!received && pending_.isEmpty())) return;
-    if (!openOutput()) { failOutput("não foi possível reproduzir o áudio da tela. tentando reconectar a saída de áudio."); return; }
-    if (!pending_.isEmpty()) {
-        const auto written = writer_->write(pending_);
-        if (written < 0) { failOutput("a saída de áudio da tela parou. tentando reconectar o dispositivo."); return; }
-        pending_.remove(0, written); if (!pending_.isEmpty()) return;
-    }
-    if (!received || sink_->bytesFree() < format_.bytesForFrames(format_.sampleRate() / 50)) return;
+    if (!playback_ || !received) return;
     for (auto& sample : mixed) sample = std::clamp(sample, -1.f, 1.f);
     try { pending_ = encodeMono(resampler_->process(mixed), format_); }
-    catch (const std::exception&) { failOutput("não foi possível reproduzir o áudio da tela. tentando novamente."); }
+    catch (const std::exception&) { failOutput("não foi possível reproduzir o áudio da tela. tentando novamente."); return; }
+    if (!flush()) return;
+    }
 }
 }
