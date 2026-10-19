@@ -1,7 +1,7 @@
 # Estado atual do Triscord
 
 - Cliente principal: `desktop/src` (C++20/Qt) e `desktop/web` (Preact/WebView2).
-- Branch principal: `main`. A versão nativa publicada é `desktop-v0.9.35`.
+- Branch principal: `main`. A versão nativa publicada é `desktop-v0.9.36`.
 - Download: https://triscord.pages.dev . Releases nativas e Electron antigo têm canais separados; a ponte de migração ainda não foi implementada.
 - Servidor Node em `server/` é mantido por compatibilidade e por ferramentas/testes locais. Os serviços do cliente distribuído ficam em `cloudflare/` e `cloudflare-auth/`.
 - Não executar E2E sem nova instrução do usuário. A CI padrão não os executa. Compilações/testes Qt e empacotamento devem ser sequenciais.
@@ -9,6 +9,8 @@
 - Não versionar credenciais, SDKs, caches ou binários de build. Não usar produtos pagos.
 
 [Guia do projeto](README.md) · [Cliente](desktop/README.md) · [Histórico](docs/history/README.md)
+
+**Publicação atual (19/10): versão 0.9.36 disponível**, commit `3172188`, release `desktop-v0.9.36` (`make_latest: false`). Inclui correções de qualidade da imagem e buffer de áudio. Compilação e empacotamento autorizados; nenhum teste, aplicativo ou instalador executado (`runtimeVerified=false`). Site publicado em `6124981e.triscord.pages.dev`, com alias `triscord.pages.dev`; `/download` entrega a 0.9.36. Download público conferido por SHA-256. Wrangler deslogado ao terminar. As entradas abaixo são históricas; a pendência de deploy da 0.9.35 foi resolvida.
 
 **Claude Code (19/10, tarde): histórico resetado e versão 0.9.35 publicada**, a pedido do usuário.
 - **Histórico:** a `main` agora é a única branch e tem 1 commit inicial (só o usuário como autor), mais o bump de versão. Todas as outras branches e as 16 tags foram apagadas, local e remotamente, e os 16 releases antigos também. O histórico antigo só existe no backup `DocumentsGitHub	riscord-backup-all-refs-20261019all-refs.bundle` e nos objetos locais não alcançáveis. Os worktrees do Codex estão em HEAD solto: `native-desktop` no commit novo (arquivos idênticos); `backend-media` continua em `e189dad` (427 arquivos diferentes, não mexi). Os 3 commits de `feat/backend-media` e o de `fix/sfu` só estão no backup.

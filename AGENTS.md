@@ -8,7 +8,7 @@
 - Sem escopo, corpo, trailers, coautoria ou atribuições a assistentes. Não colocar versão na mensagem; tags nativas usam `desktop-vX.Y.Z`.
 - Não reescrever histórico, apagar releases/deployments nem repetir o reset sem nova instrução explícita.
 - Push, publicação de release e deploy precisam estar autorizados pelo pedido. Não inferir publicação de uma simples revisão.
-- Na revisão atual, o usuário proibiu testes no computador. Não executar testes, E2E ou o aplicativo para validar. Compilação e empacotamento permanecem pendentes de pedido explícito.
+- Na revisão atual, o usuário proibiu testes no computador. Não executar testes, E2E ou o aplicativo para validar. O pedido posterior autorizou compilar, empacotar e publicar a 0.9.36, sem testes nem execução do aplicativo/instalador.
 - Não interromper o aplicativo instalado ou chamadas. Não versionar credenciais, SDKs, caches ou binários.
 - Após um deploy autorizado, fazer logout do Wrangler, conforme pedido do usuário de 19/10/2026. Não afirmar revogação no servidor sem confirmação.
 
@@ -16,10 +16,10 @@
 
 - Repositório: Otremba/triscord. Checkout principal: `C:/Users/camargo/Documents/GitHub/triscord`.
 - O usuário resetou o histórico com o Claude; baseline `4116561`, bump `3905156`, docs `b029938`. Não reaplicar a história antiga.
-- Release publicada: `desktop-v0.9.35`, com instalador e SHA-256, `make_latest: false`. Pacote sem validação em execução (`runtimeVerified=false`).
+- Release publicada: `desktop-v0.9.36` (commit `3172188`), com instalador e SHA-256, `make_latest: false`. Pacote sem validação em execução (`runtimeVerified=false`).
 - O site é Cloudflare Pages, projeto `triscord`, branch de produção `main`, domínio `triscord.pages.dev`; upload direto, independente do push Git.
-- Deploy de correção do site: `e4606892.triscord.pages.dev`. `/download` chega ao instalador com HTTP 200; o caminho removido da 0.9.32 responde 404, sem Content-Disposition de instalador. SHA-256 da 0.9.35: `1d4fde55eef0afb192b631be9612207edce96db54e429a3f3f39d511c52ff58a`. Wrangler foi deslogado e `whoami` confirmou ausência de autenticação.
-- Em seguida foram incorporadas as correções locais de imagem e áudio (`5fed5cb`, `9e6f780`) e de links (`f24f745`). Elas ainda não estão no instalador publicado.
+- Deploy atual: `6124981e.triscord.pages.dev`. `/download` entrega o instalador 0.9.36 com HTTP 200; o arquivo baixado e o checksum público correspondem ao pacote. SHA-256: `01b3d5b8cf31c67e333547bb62819aaf9c2bfb8a7c80f227fab788b623f521ef` (43.623.900 bytes). Wrangler foi deslogado e `whoami` confirmou ausência de autenticação.
+- As correções de imagem e áudio (`5fed5cb`, `9e6f780`) e de links (`f24f745`) estão publicadas. Compilação/empacotamento concluídos com `-SkipRuntimeVerification`, sem testes ou execução do app/instalador. O atualizador nativo consulta a lista pública de releases ao iniciar; a 0.9.36 está disponível com instalador e checksum. Electron antigo continua sem ponte automática de migração.
 - A qualidade da prévia acompanha a resolução escolhida; bitrate não é dividido automaticamente por espectadores. A recuperação de áudio evita consumir PCM sem espaço na saída.
 - Preferências individuais de áudio são locais por identidade de conta. Não afirmar sincronização entre computadores.
 - Worktrees `native-desktop` e `backend-media` podem estar em commits antigos. Conferir status e preservar alterações antes de atualizar. A toolchain existente está em `C:/Users/camargo/.codex/worktrees/native-desktop/triscord/.toolchain`.
