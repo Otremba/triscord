@@ -32,7 +32,7 @@ private:
 };
 // Hands RTP packets to the assembler in sequence order. Before it, any lost packet froze the picture until a new
 // keyframe and cut the sender's bitrate (19/10: streams "sometimes bad" over a TURN relay). Now a gap is NACKed at
-// once (the sender keeps its last 256 packets, video_peer.cpp) and the packets behind it wait up to 150 ms for the
+// once (the sender keeps its last 2048 packets, video_peer.cpp) and the packets behind it wait up to 150 ms for the
 // retransmission; only then is the gap let through and the assembler asks for a keyframe as before.
 class VideoRtpReorder final {
 public:

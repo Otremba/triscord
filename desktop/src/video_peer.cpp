@@ -172,7 +172,8 @@ VideoPeer::VideoPeer(const rtc::Configuration& config, QObject* parent, bool wit
     auto packetizer = std::make_shared<rtc::H264RtpPacketizer>(rtc::NalUnit::Separator::StartSequence, configRtp, 1100);
     packetizer->addToChain(std::make_shared<rtc::RtcpSrReporter>(configRtp));
     packetizer->addToChain(std::make_shared<rtc::PliHandler>([dispatch] { dispatch->pli(); }));
-    packetizer->addToChain(std::make_shared<rtc::RtcpNackResponder>(256));
+    // Room for a whole 1080p keyframe (about 1100 bytes per packet), so a packet lost early in it can still be resent.
+    packetizer->addToChain(std::make_shared<rtc::RtcpNackResponder>(2048));
     auto depacketizer = std::make_shared<BoundedH264>();
     depacketizer->recovery = [dispatch] { dispatch->recover(); };
     depacketizer->addToChain(std::make_shared<rtc::RtcpReceivingSession>());
