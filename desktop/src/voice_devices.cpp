@@ -1,4 +1,5 @@
 #include "voice_devices.h"
+#include "com_apartment.h"
 #include "voice_mix.h"
 #include <QMediaDevices>
 #include <cmath>
@@ -38,6 +39,7 @@ VoiceDevices::VoiceDevices(QObject* parent) : QObject(parent), processing_(std::
     processingWorker_ = new QObject;
     processingWorker_->moveToThread(&processingThread_);
     connect(&processingThread_, &QThread::finished, processingWorker_, &QObject::deleteLater);
+    joinMultithreadedApartment(processingThread_);
     processingThread_.setObjectName("TriscordVoiceProcessing"); processingThread_.start(QThread::HighestPriority);
     playback_.setParent(this);
     refresh_.setParent(this);

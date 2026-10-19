@@ -3,6 +3,7 @@
 #include "camera_encoder.h"
 #include "camera_mask.h"
 #include "camera_composite.h"
+#include "com_apartment.h"
 #include <QAbstractVideoBuffer>
 #include <QtTest>
 #include <QImage>
@@ -283,6 +284,27 @@ private slots:
         require(repeated && negative, "Camera accepted invalid timestamps");
         });
         try { result.get(); } catch (const std::exception& error) { QFAIL(error.what()); }
+    }
+    void codecsWorkOnAThreadQtPutInTheSingleThreadedApartment() {
+        // 19/10: Qt Multimedia makes a thread that plays audio single-threaded (STA) for good; the decoder then failed
+        // with RPC_E_CHANGED_MODE on every frame and no stream was ever shown.
+        auto result = std::async(std::launch::async, [] {
+            const auto sta = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+            { VideoConfig config{{640,360}, 30, 1000000}; VideoDecoder decoder(config); CameraEncoder encoder(config, EncoderPreference::SoftwareOnly); }
+            if (SUCCEEDED(sta)) CoUninitialize();
+        });
+        try { result.get(); } catch (const std::exception& error) { QFAIL(error.what()); }
+    }
+    void mediaThreadJoinsTheMultithreadedApartmentBeforeQt() {
+        QThread thread; joinMultithreadedApartment(thread); thread.start();
+        HRESULT qtAsks = S_OK;
+        QObject probe; probe.moveToThread(&thread);
+        QMetaObject::invokeMethod(&probe, [&] {
+            qtAsks = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+            if (SUCCEEDED(qtAsks)) CoUninitialize();
+        }, Qt::BlockingQueuedConnection);
+        thread.quit(); thread.wait();
+        QCOMPARE(qtAsks, RPC_E_CHANGED_MODE);
     }
     void shortCameraPlaneIsRejectedBeforeReadingIt() {
         auto result = std::async(std::launch::async, [] {

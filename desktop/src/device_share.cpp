@@ -1,4 +1,5 @@
 #include "device_share.h"
+#include "com_apartment.h"
 #include "screen_service.h"
 #include <QSignalBlocker>
 namespace triscord {
@@ -52,6 +53,7 @@ DeviceShare::DeviceShare(ScreenService* screen, QObject* parent)
     });
     connect(screen_, &ScreenService::keyframeRequested, worker_, [worker = worker_] { worker->requestKeyframe(); });
     connect(screen_, &ScreenService::bitrateRequested, worker_, [worker = worker_](int bitrate) { worker->setBitrate(bitrate); });
+    joinMultithreadedApartment(thread_);
     thread_.setObjectName("triscordDeviceShare"); thread_.start();
 }
 DeviceShare::~DeviceShare() {

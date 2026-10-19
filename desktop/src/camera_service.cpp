@@ -1,4 +1,5 @@
 #include "camera_service.h"
+#include "com_apartment.h"
 #include <QSignalBlocker>
 namespace triscord {
 CameraWorker::CameraWorker(std::shared_ptr<std::atomic<quint64>> wanted) : wanted_(std::move(wanted)) {}
@@ -23,6 +24,7 @@ void CameraWorker::stop(quint64 generation) {
     generation_ = generation;
 }
 CameraService::CameraService(QObject* parent) : QObject(parent) {
+    joinMultithreadedApartment(thread_);
     thread_.setParent(this); thread_.setObjectName("triscordCameraMedia");
     qRegisterMetaType<QList<QCameraDevice>>(); qRegisterMetaType<QVideoFrame>();
 }

@@ -1,4 +1,5 @@
 #include "system_audio.h"
+#include "com_apartment.h"
 #include <windows.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
@@ -54,7 +55,7 @@ struct SystemAudio::State {
     ComPtr<IAudioClient> client;
     ComPtr<IAudioCaptureClient> capture;
     std::deque<float> samples;
-    State() { check(CoInitializeEx(nullptr, COINIT_MULTITHREADED)); apartment = true; }
+    State() { check(enterComApartment(apartment)); }
     ~State() { if (client) client->Stop(); capture.Reset(); client.Reset(); if (apartment) CoUninitialize(); }
 };
 SystemAudio::SystemAudio(QObject* parent) : QObject(parent) {

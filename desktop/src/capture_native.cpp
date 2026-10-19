@@ -1,4 +1,5 @@
 #include "capture_native.h"
+#include "com_apartment.h"
 #include "capture_gpu.h"
 #include "wgc_abi.h"
 #include <roapi.h>
@@ -22,8 +23,10 @@ void check(HRESULT hr) {
 }
 class Apartment {
 public:
-    Apartment() { check(RoInitialize(RO_INIT_MULTITHREADED)); }
-    ~Apartment() { RoUninitialize(); }
+    // An apartment the thread already has is used as it is (com_apartment.h).
+    Apartment() { const auto hr = RoInitialize(RO_INIT_MULTITHREADED); entered = SUCCEEDED(hr); if (hr != RPC_E_CHANGED_MODE) check(hr); }
+    ~Apartment() { if (entered) RoUninitialize(); }
+    bool entered = false;
 };
 class String {
 public:

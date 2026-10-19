@@ -1,4 +1,5 @@
 #include "camera_publisher.h"
+#include "com_apartment.h"
 #include <QSignalBlocker>
 namespace triscord {
 CameraPublishWorker::CameraPublishWorker(Signaling* signaling, ScreenCall::SourceMode mode)
@@ -85,6 +86,7 @@ CameraPublisher::CameraPublisher(Signaling* signaling, QObject* parent, ScreenCa
         QMetaObject::invokeMethod(this, [this, render] { for (const auto& frame : render->take()) emit this->image(frame.id, frame.image); }, Qt::QueuedConnection);
     });
     connect(worker_, &CameraPublishWorker::removed, this, &CameraPublisher::removed);
+    joinMultithreadedApartment(thread_);
     thread_.setObjectName("triscordCameraPublisher"); thread_.start();
 }
 CameraPublisher::~CameraPublisher() {

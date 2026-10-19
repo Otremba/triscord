@@ -1,4 +1,5 @@
 #include "voice_service.h"
+#include "com_apartment.h"
 
 namespace triscord {
 VoiceService::VoiceService(Signaling* signaling, QObject* parent, VoiceCall::AudioMode mode)
@@ -14,6 +15,7 @@ VoiceService::VoiceService(Signaling* signaling, QObject* parent, VoiceCall::Aud
     if (mode == VoiceCall::AudioMode::Injected)
         connect(call_, &VoiceCall::remoteAudio, this, &VoiceService::remoteAudio);
     connect(&thread_, &QThread::finished, call_, &QObject::deleteLater);
+    joinMultithreadedApartment(thread_);
     thread_.setObjectName("TriscordMedia");
     thread_.start(QThread::HighestPriority);   // playback and jitter ticks must not wait behind a game's threads
 }

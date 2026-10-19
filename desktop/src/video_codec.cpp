@@ -1,4 +1,5 @@
 #include "video_codec.h"
+#include "com_apartment.h"
 #include <windows.h>
 #include <mfapi.h>
 #include <mfidl.h>
@@ -22,11 +23,13 @@ void check(HRESULT hr, const char* operation) {
 class Runtime final {
 public:
     Runtime() {
-        check(CoInitializeEx(nullptr, COINIT_MULTITHREADED), "COM video initialization");
+        check(enterComApartment(com_), "COM video initialization");
         const auto hr = MFStartup(MF_VERSION, MFSTARTUP_FULL);
-        if (FAILED(hr)) { CoUninitialize(); check(hr, "Media Foundation initialization"); }
+        if (FAILED(hr)) { if (com_) CoUninitialize(); check(hr, "Media Foundation initialization"); }
     }
-    ~Runtime() { MFShutdown(); CoUninitialize(); }
+    ~Runtime() { MFShutdown(); if (com_) CoUninitialize(); }
+private:
+    bool com_ = false;
 };
 struct Activations {
     IMFActivate** items = nullptr;

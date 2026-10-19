@@ -1,4 +1,5 @@
 #include "capture_service.h"
+#include "com_apartment.h"
 #include <windows.h>
 
 namespace triscord {
@@ -60,6 +61,7 @@ CaptureService::CaptureService(QObject* parent) : QObject(parent), worker_(new C
         if (generation == generation_) emit this->message(message);
     });
     connect(&thread_, &QThread::finished, worker_, &QObject::deleteLater);
+    joinMultithreadedApartment(thread_);
     thread_.setObjectName("TriscordCapture"); thread_.start();
 }
 CaptureService::~CaptureService() {

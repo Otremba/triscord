@@ -1,4 +1,5 @@
 #include "screen_service.h"
+#include "com_apartment.h"
 
 namespace triscord {
 ScreenService::ScreenService(Signaling* signaling, QObject* parent, ScreenCall::SourceMode mode, VideoConfig config, ScreenCall::MediaKind media)
@@ -22,6 +23,7 @@ ScreenService::ScreenService(Signaling* signaling, QObject* parent, ScreenCall::
         }, Qt::QueuedConnection);
     });
     connect(&thread_, &QThread::finished, call_, &QObject::deleteLater);
+    joinMultithreadedApartment(thread_);
     thread_.setObjectName("TriscordScreenMedia"); thread_.start();
 }
 ScreenService::~ScreenService() {
