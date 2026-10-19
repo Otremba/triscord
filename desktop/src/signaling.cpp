@@ -2,8 +2,14 @@
 #include <QJsonDocument>
 #include <QUrlQuery>
 #include <algorithm>
+#include <cstdio>
 
 namespace triscord {
+namespace {
+// For the log a user can send: why the server connection dropped (19/10: a friend's call rejoined ten times in a row and
+// the log could not say why). Never the URL, which carries the session token.
+void note(const QString& text) { std::printf("signaling: %s\n", text.toUtf8().constData()); std::fflush(stdout); }
+}
 Signaling::Signaling(QObject* parent) : QObject(parent) {
     socket_.setMaxAllowedIncomingMessageSize(4 * 1024 * 1024);
     socket_.setMaxAllowedIncomingFrameSize(4 * 1024 * 1024);
@@ -13,18 +19,25 @@ Signaling::Signaling(QObject* parent) : QObject(parent) {
         if (wanted_) { opened_ = false; socket_.open(url_); watchdog_.start(15000); }
     });
     connect(&watchdog_, &QTimer::timeout, this, [this] {
+        note(opened_ ? QString("no heartbeat from the server for %1 s, reconnecting").arg(heartbeatMs_ / 1000)
+                     : QStringLiteral("the server did not answer within 15 s, retrying"));
         emit statusChanged(QStringLiteral("Conexão expirou; reconectando"));
         socket_.abort();
         scheduleRetry();
     });
     connect(&socket_, &QWebSocket::textMessageReceived, this, &Signaling::receive);
     connect(&socket_, &QWebSocket::disconnected, this, [this] {
+        if (wanted_ && ready_) {
+            const auto reason = socket_.closeReason().left(120);
+            note(QString("connection closed (code %1%2)").arg(int(socket_.closeCode())).arg(reason.isEmpty() ? QString() : ", " + reason));
+        }
         watchdog_.stop();
         opened_ = false;
         if (ready_) { ready_ = false; emit disconnected(); }
         scheduleRetry();
     });
-    connect(&socket_, &QWebSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
+    connect(&socket_, &QWebSocket::errorOccurred, this, [this](QAbstractSocket::SocketError error) {
+        if (wanted_) note(QString("network error %1: %2").arg(int(error)).arg(socket_.errorString().left(120)));
         emit statusChanged("Não foi possível conectar. Tentando novamente.");
         scheduleRetry();
     });
@@ -128,6 +141,7 @@ void Signaling::receive(const QString& packet) {
         disconnectFromServer();
         emit protocolError("Código do grupo inválido ou acesso recusado.");
     } else if (packet == "41" || packet == "1") {
+        note(QStringLiteral("the server ended the session, reconnecting"));
         socket_.abort();
         scheduleRetry();
     } else {
