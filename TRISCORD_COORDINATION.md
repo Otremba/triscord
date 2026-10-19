@@ -1,7 +1,7 @@
 # Estado atual do Triscord
 
 - Cliente principal: `desktop/src` (C++20/Qt) e `desktop/web` (Preact/WebView2).
-- Branch principal: `main`. A versão nativa publicada é `desktop-v0.9.34`.
+- Branch principal: `main`. A versão nativa publicada é `desktop-v0.9.35`.
 - Download: https://triscord.pages.dev . Releases nativas e Electron antigo têm canais separados; a ponte de migração ainda não foi implementada.
 - Servidor Node em `server/` é mantido por compatibilidade e por ferramentas/testes locais. Os serviços do cliente distribuído ficam em `cloudflare/` e `cloudflare-auth/`.
 - Não executar E2E sem nova instrução do usuário. A CI padrão não os executa. Compilações/testes Qt e empacotamento devem ser sequenciais.
@@ -9,6 +9,13 @@
 - Não versionar credenciais, SDKs, caches ou binários de build. Não usar produtos pagos.
 
 [Guia do projeto](README.md) · [Cliente](desktop/README.md) · [Histórico](docs/history/README.md)
+
+**Claude Code (19/10, tarde): histórico resetado e versão 0.9.35 publicada**, a pedido do usuário.
+- **Histórico:** a `main` agora é a única branch e tem 1 commit inicial (só o usuário como autor), mais o bump de versão. Todas as outras branches e as 16 tags foram apagadas, local e remotamente, e os 16 releases antigos também. O histórico antigo só existe no backup `DocumentsGitHub	riscord-backup-all-refs-20261019all-refs.bundle` e nos objetos locais não alcançáveis. Os worktrees do Codex estão em HEAD solto: `native-desktop` no commit novo (arquivos idênticos); `backend-media` continua em `e189dad` (427 arquivos diferentes, não mexi). Os 3 commits de `feat/backend-media` e o de `fix/sfu` só estão no backup.
+- **Padrão de commit:** uma linha `tipo: resumo`, em inglês, sem escopo, sem corpo, sem trailers, sem versão no commit (a versão fica na tag). Tipos: feat, fix, docs, chore, refactor, test, perf, build, ci. Commits direto na `main`.
+- **Release `desktop-v0.9.35`** (`make_latest: false`), compilado do commit `3905156` com `portable-web.ps1 -SkipRuntimeVerification` (`runtimeVerified=false`; o usuário podia estar em chamada). Instalador 43.619.795 bytes, SHA-256 `1d4fde55…ff58a`, conferido baixando pelo link público. Sem E2E. A lógica do atualizador (`update_splash.cpp`) foi reproduzida contra a API: 0.9.34 e anteriores baixam a 0.9.35; a 0.9.35 não atualiza. O app instalado não foi aberto.
+- **Site:** o botão de download do site ao vivo aponta para a 0.9.32, que deixou de existir (404). O site foi montado de novo (`node site/stage.mjs`, aponta para a 0.9.35), mas **não foi publicado**: falta o OK do usuário para o `wrangler pages deploy`.
+- **Render:** cada push na `main` cria um deployment "main - triscord" (Render, `triscord.onrender.com`).
 
 **Claude Code (19/10): bandeja, abrir no login e instância única** (branch `feat/native-window-lifecycle`, a partir de `76c2b9b`; não mexe no worktree do Codex). Sem versão, sem publicação, sem E2E. Build `out/build-lifecycle` OK, CTest 12/12 (`native-core` 17 testes, 6 novos).
 - **Instância única** (`SingleInstance`, `window_lifecycle.*`): mutex `Local\TriscordWeb-<hash do TRISCORD_SETTINGS_PATH>` + socket local só do usuário. Uma segunda execução traz a primeira à frente e sai, antes de abrir o log (senão rotacionaria o log da primeira). Cada E2E, com seu `TRISCORD_SETTINGS_PATH`, tem a própria instância.
