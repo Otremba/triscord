@@ -243,7 +243,10 @@ void ScreenCall::receive(const QString& id, const QString& local, const QByteArr
         // Frames released together after a retransmission can find the decoder full: drain it once before giving up.
         if (!session.decoder->submit(sample)) { render(); if (!session.decoder->submit(sample)) throw std::runtime_error("Video decoder busy"); }
         render();
-    } catch (const std::exception&) { session.decoder.reset(); session.clock = {}; session.peer->requestKeyframe(); }
+    } catch (const std::exception& error) {
+        session.peer->noteKeyframeReason(QStringLiteral("decoder: ") + QString::fromUtf8(error.what()));
+        session.decoder.reset(); session.clock = {}; session.peer->requestKeyframe();
+    }
 }
 void ScreenCall::signal(const QString& name, const QJsonObject& payload) {
     if (payload.value("type").toString() != wireType()) return;

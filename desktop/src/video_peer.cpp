@@ -3,6 +3,7 @@
 #include <QMutexLocker>
 #include <QPointer>
 #include <QRandomGenerator>
+#include <QStringList>
 #include <rtc/plihandler.hpp>
 #include <stdexcept>
 #include <mutex>
@@ -97,13 +98,15 @@ void VideoPeer::Dispatch::schedule() {
         std::deque<ReceivedVideo> values;
         QPointer<VideoPeer> target;
         bool reset = false, request = false;
+        QString reason;
         {
             QMutexLocker lock(&dispatch->mutex);
             target = dispatch->owner; values.swap(dispatch->frames);
-            reset = dispatch->reset; request = dispatch->request;
+            reset = dispatch->reset; request = dispatch->request; reason.swap(dispatch->reason);
             dispatch->reset = dispatch->request = dispatch->scheduled = false;
         }
         if (!target) return;
+        if (request && !reason.isEmpty()) target->noteKeyframeReason(reason);
         if (request) target->requestKeyframe();
         if (reset && target) emit target->recoveryNeeded();
         for (const auto& value : values) {
@@ -116,7 +119,7 @@ void VideoPeer::Dispatch::frame(ReceivedVideo value) {
     QMutexLocker lock(&mutex);
     if (!owner) return;
     // A retransmission releases the frames held behind it at once: only a real backlog (200 ms at 60 fps) is overload.
-    if (frames.size() >= 12) { frames.clear(); waiting = reset = request = true; }
+    if (frames.size() >= 12) { frames.clear(); waiting = reset = request = true; reason = QStringLiteral("frame backlog"); }
     if (waiting && !value.keyframe) { request = true; schedule(); return; }
     if (value.keyframe) waiting = false;
     frames.push_back(std::move(value)); schedule();
@@ -125,7 +128,7 @@ void VideoPeer::Dispatch::recover() {
     QMutexLocker lock(&mutex);
     if (!owner) return;
     frames.clear();
-    if (!waiting) reset = true;
+    if (!waiting) { reset = true; reason = QStringLiteral("incomplete frame"); }
     waiting = request = true; schedule();
 }
 void VideoPeer::Dispatch::pli() {
@@ -238,6 +241,15 @@ bool VideoPeer::sendVideo(const EncodedVideo& frame) {
     video_->sendFrame(reinterpret_cast<const rtc::byte*>(frame.annexB.constData()), size_t(frame.annexB.size()), rtc::FrameInfo(timestamp));
     lastSent_ = frame.time100ns; sendWaitingForIdr_ = false;
     return true;
+}
+void VideoPeer::noteKeyframeReason(const QString& reason) {
+    ++keyframeReasons_[reason.left(80)];
+    if (keyframeReported_.isValid() && keyframeReported_.elapsed() < 10000) return;
+    QStringList parts;
+    for (auto it = keyframeReasons_.cbegin(); it != keyframeReasons_.cend(); ++it) parts << QString("%1 x%2").arg(it.key()).arg(it.value());
+    std::printf("video: asked the sender for a keyframe: %s\n", parts.join(", ").toUtf8().constData());
+    std::fflush(stdout);
+    keyframeReasons_.clear(); keyframeReported_.start();
 }
 bool VideoPeer::requestKeyframe() {
     if (!connected() || (lastPli_.isValid() && lastPli_.elapsed() < 250)) return false;

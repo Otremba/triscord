@@ -4,6 +4,8 @@
 #include <QObject>
 #include <QMutex>
 #include <QElapsedTimer>
+#include <QMap>
+#include <QString>
 #include <rtc/rtc.hpp>
 #include <deque>
 
@@ -22,6 +24,9 @@ public:
     bool sendVideo(const EncodedVideo& frame);
     bool sendAudio(const QByteArray& opus);
     bool requestKeyframe();
+    // Why this side asked the sender for a new keyframe, for the log a user can send: the first time at once, then a
+    // summary at most every 10 s ("video: asked the sender for a keyframe: frame backlog x3, ...").
+    void noteKeyframeReason(const QString& reason);
 signals:
     void localDescription(const QString& sdp, const QString& type);
     void localCandidate(const QString& candidate, const QString& mid);
@@ -42,6 +47,7 @@ private:
         bool audioScheduled = false;
         void audioFrame(QByteArray packet, uint32_t timestamp);
         bool scheduled = false, reset = false, request = false, waiting = false, pliScheduled = false;
+        QString reason; // why `request` was set, when it is a cause rather than waiting for the keyframe
         void post(std::function<void(VideoPeer*)> callback);
         void frame(ReceivedVideo value);
         void recover();
@@ -53,7 +59,8 @@ private:
     std::shared_ptr<rtc::Track> video_;
     std::shared_ptr<rtc::Track> audio_;
     uint32_t audioTimestamp_ = 0;
-    QElapsedTimer lastPli_, lastRemotePli_;
+    QElapsedTimer lastPli_, lastRemotePli_, keyframeReported_;
+    QMap<QString, int> keyframeReasons_;
     qint64 lastSent_ = -1;
     bool sendWaitingForIdr_ = true;
 };
