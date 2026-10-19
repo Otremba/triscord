@@ -1,6 +1,7 @@
 #include "quality_policy.h"
 #include "signaling.h"
 #include "window_lifecycle.h"
+#include "log_filter.h"
 #include <QJsonDocument>
 #include <QSignalSpy>
 #include <QtTest>
@@ -14,6 +15,20 @@ using namespace triscord;
 class CoreTests : public QObject {
     Q_OBJECT
 private slots:
+    // Lines taken from a friend's log on 19/10: FFmpeg's blocks go, Triscord's own lines stay, even right after one.
+    void logDropsFfmpegChatterOnly() {
+        bool block = false;
+        QVERIFY(dropLogLine("Input #0, mp3, from 'C:/Users/x/AppData/Local/Temp/TriscordNativePreview.JYLtyT.mp3':", block));
+        QVERIFY(dropLogLine("  Metadata:", block));
+        QVERIFY(dropLogLine("    encoded_by      : Amadeus Pro", block));
+        QVERIFY(dropLogLine("  Stream #0:0: Audio: mp3 (mp3float), 44100 Hz, stereo, fltp, 320 kb/s", block));
+        QVERIFY(dropLogLine("[mp3float @ 000001d86b9869c0] Could not update timestamps for skipped samples.", block));
+        QVERIFY(!dropLogLine("ui -> core: videoStageOccluders", block));
+        QVERIFY(!dropLogLine("  indented, but not after an FFmpeg header", block));
+        QVERIFY(!dropLogLine("video: 3 lost packets recovered by retransmission, 0 unrecoverable (last 10 s)", block));
+        QVERIFY(!dropLogLine("[not ffmpeg] a bracketed line of ours", block));
+        QVERIFY(!dropLogLine("", block));
+    }
     void loginItemWritesAndReadsBackItsCommand() {
         QTemporaryDir dir;
         QVERIFY(dir.isValid());

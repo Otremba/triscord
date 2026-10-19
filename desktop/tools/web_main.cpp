@@ -20,9 +20,11 @@
 #include "window_lifecycle.h"
 #include "bundled_fonts.h"
 #include "update_splash.h"
+#include "log_filter.h"
 
 #include <share.h>
 #include <io.h>
+#include <fcntl.h>
 #include <QClipboard>
 #include <QCommandLineParser>
 #include <QDir>
@@ -45,7 +47,14 @@
 #include <utility>
 #include <memory>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <algorithm>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <string>
+#include <thread>
 
 using namespace triscord;
 
@@ -78,29 +87,90 @@ protected:
 
 static void log(const QString& text) { std::printf("%s\n", text.toUtf8().constData()); std::fflush(stdout); }
 
+// The log file's writer: every line of stdout/stderr arrives through a pipe and is written with the time in front,
+// so two people's logs can be lined up, minus FFmpeg's chatter (log_filter.h).
+namespace {
+std::mutex logMutex;
+std::condition_variable logDone;
+bool logFinished = false;
+
+void pumpLog(int readFd, FILE* out) {
+    std::string pending;
+    bool ffmpegBlock = false;
+    auto write = [&](std::string line) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (dropLogLine(line, ffmpegBlock)) return;
+        SYSTEMTIME now; GetLocalTime(&now);
+        std::fprintf(out, "%02d:%02d:%02d.%03d %s\n", now.wHour, now.wMinute, now.wSecond, now.wMilliseconds, line.c_str());
+        std::fflush(out);
+    };
+    char buffer[4096];
+    for (int n; (n = _read(readFd, buffer, sizeof buffer)) > 0;) {
+        pending.append(buffer, size_t(n));
+        size_t start = 0;
+        for (size_t end; (end = pending.find('\n', start)) != std::string::npos; start = end + 1) write(pending.substr(start, end - start));
+        pending.erase(0, start);
+        if (pending.size() > 65536) { write(pending); pending.clear(); }
+    }
+    if (!pending.empty()) write(pending);
+    std::fclose(out);
+    { std::lock_guard lock(logMutex); logFinished = true; }
+    logDone.notify_all();
+}
+
+// At exit: closing the pipe's write ends ends the reader, which gets a moment to write what is left.
+void finishLog() {
+    std::fflush(stdout); std::fflush(stderr);
+    _close(_fileno(stdout)); _close(_fileno(stderr));
+    std::unique_lock lock(logMutex);
+    logDone.wait_for(lock, std::chrono::seconds(1), [] { return logFinished; });
+}
+
+// A GUI app without a console hands qWarning/qCritical to the debugger, not to stderr: before 19/10 the log of a failed
+// screen share held the generic notice but not "screen: start failed: <reason>". Debug messages stay out.
+void logQtMessage(QtMsgType type, const QMessageLogContext& context, const QString& text) {
+    if (type == QtDebugMsg) return;
+    const bool named = context.category && std::strcmp(context.category, "default") != 0;
+    std::fprintf(stderr, "%s%s%s%s\n", type == QtInfoMsg ? "" : type == QtWarningMsg ? "warning: " : "error: ",
+                 named ? context.category : "", named ? ": " : "", text.toUtf8().constData());
+    std::fflush(stderr);
+    if (type == QtFatalMsg) std::abort();
+}
+}
+
 // A launched app (no console, stdout not redirected) writes its log to %LOCALAPPDATA%\Triscord\logs\triscord.log,
 // keeping the previous run as triscord.previous.log: capture, connection (relay/direct) and update lines that a user
 // can send when something fails (18/10: a black share could not be reproduced here). It holds command names,
-// connection paths and notices only, never tokens, passwords or message text.
+// connection paths and notices only, never tokens, passwords or message text. A run with its own settings
+// (TRISCORD_SETTINGS_PATH, tests) keeps its log there, so it never rotates away the installed app's log.
 static void logToFile() {
     const auto out = GetStdHandle(STD_OUTPUT_HANDLE);
     if (GetConsoleWindow() || (out && out != INVALID_HANDLE_VALUE && GetFileType(out) != FILE_TYPE_UNKNOWN)) return;
+    const auto settings = qEnvironmentVariable("TRISCORD_SETTINGS_PATH");
     const auto base = qEnvironmentVariable("LOCALAPPDATA");
-    if (base.isEmpty()) return;
-    const QDir dir(base + "/Triscord/logs");
+    if (settings.isEmpty() && base.isEmpty()) return;
+    const QDir dir(settings.isEmpty() ? base + "/Triscord/logs" : QDir(settings).absoluteFilePath("logs"));
     if (!dir.mkpath(".")) return;
     const auto current = dir.filePath("triscord.log"), previous = dir.filePath("triscord.previous.log");
     QFile::remove(previous); QFile::rename(current, previous);
     const auto path = QDir::toNativeSeparators(current).toStdWString();
     // Shared (_SH_DENYNO): the user can open or copy the log while Triscord runs. stdout/stderr get valid descriptors
-    // first (NUL), then point at the log.
+    // first (NUL), then the pipe to the writer.
     FILE* file = nullptr;
     if (_wfreopen_s(&file, L"NUL", L"w", stdout) != 0) return;
     _wfreopen_s(&file, L"NUL", L"w", stderr);
     FILE* shared = _wfsopen(path.c_str(), L"w", _SH_DENYNO);
     if (!shared) return;
-    _dup2(_fileno(shared), _fileno(stdout));
-    _dup2(_fileno(shared), _fileno(stderr));
+    int ends[2];
+    if (_pipe(ends, 65536, _O_BINARY | _O_NOINHERIT) != 0) {
+        // No pipe: the file directly, as before (no times, FFmpeg included).
+        _dup2(_fileno(shared), _fileno(stdout)); _dup2(_fileno(shared), _fileno(stderr));
+    } else {
+        _dup2(ends[1], _fileno(stdout)); _dup2(ends[1], _fileno(stderr)); _close(ends[1]);
+        std::thread(pumpLog, ends[0], shared).detach();
+        std::atexit(finishLog);
+    }
+    qInstallMessageHandler(logQtMessage);
     std::printf("Triscord %s, %s\n", TRISCORD_VERSION, QDateTime::currentDateTime().toString(Qt::ISODate).toUtf8().constData());
     std::fflush(stdout);
 }
