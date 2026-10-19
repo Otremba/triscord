@@ -7,7 +7,7 @@ namespace triscord {
 class CaptureGpuPreview final {
 public:
     CaptureGpuPreview(ID3D11Device* device, ID3D11DeviceContext* context);
-    QImage render(ID3D11Texture2D* texture, QSize content);
+    QImage render(ID3D11Texture2D* texture, QSize content, QSize limit = {640, 360});
 private:
     Microsoft::WRL::ComPtr<ID3D11Device> device_;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> context_;

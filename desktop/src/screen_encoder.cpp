@@ -11,7 +11,7 @@ VideoConfig checked(VideoConfig config) {
 }
 }
 ScreenEncoder::ScreenEncoder(const CaptureSource& source, VideoConfig config)
-    : config_(checked(config)), source_(source), capture_(source, config_.fps),
+    : config_(checked(config)), source_(source), capture_(source, config_.fps, NativeCapture::Backend::Automatic, config_.size),
       converter_(capture_.device(), capture_.context(), config_.size, config_.fps),
       // Hardware first; the Microsoft software H.264 encoder when the GPU has none (18/10: sharing stayed black on a
       // friend's PC, the screen encoder was hardware-only).

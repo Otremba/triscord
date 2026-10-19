@@ -28,9 +28,10 @@ CaptureGpuPreview::CaptureGpuPreview(ID3D11Device* device, ID3D11DeviceContext* 
     D3D11_RASTERIZER_DESC raster{}; raster.FillMode = D3D11_FILL_SOLID; raster.CullMode = D3D11_CULL_NONE; raster.DepthClipEnable = TRUE;
     check(device_->CreateRasterizerState(&raster, &raster_));
 }
-QImage CaptureGpuPreview::render(ID3D11Texture2D* texture, QSize content) {
-    const QSize preview = previewSize(content);
-    if (preview.isEmpty()) throw std::runtime_error("Invalid capture dimensions");
+QImage CaptureGpuPreview::render(ID3D11Texture2D* texture, QSize content, QSize limit) {
+    if (previewSize(content).isEmpty() || limit.isEmpty() || limit.width() > 1920 || limit.height() > 1080)
+        throw std::runtime_error("Invalid capture dimensions");
+    const QSize preview = content.scaled(limit.boundedTo(content), Qt::KeepAspectRatio).expandedTo(QSize(1, 1));
     D3D11_TEXTURE2D_DESC original{}; texture->GetDesc(&original);
     if (original.Width < UINT(content.width()) || original.Height < UINT(content.height()) || original.Format != DXGI_FORMAT_B8G8R8A8_UNORM)
         throw std::runtime_error("Unsupported capture texture");

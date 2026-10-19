@@ -13,7 +13,7 @@ namespace triscord {
 class NativeCapture final {
 public:
     enum class Backend { Automatic, GdiOnly };
-    explicit NativeCapture(const CaptureSource& source, int fps = 15, Backend backend = Backend::Automatic);
+    explicit NativeCapture(const CaptureSource& source, int fps = 15, Backend backend = Backend::Automatic, QSize previewLimit = {640, 360});
     bool usingGdi() const;
     ~NativeCapture();
     // The callback runs while the WGC frame is leased, before preview readback.

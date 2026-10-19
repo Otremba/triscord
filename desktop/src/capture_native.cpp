@@ -57,6 +57,7 @@ struct NativeCapture::State {
     ComPtr<wgc::Session> session;
     std::unique_ptr<CaptureGpuPreview> preview;
     QSize size;
+    QSize previewLimit{640, 360};
     // GDI fallback.
     CaptureSource source;
     int fps = 15, blackFrames = 0, blackLimit = 45;
@@ -124,9 +125,12 @@ bool usableGdi(const CaptureSource& source) {
     catch (const std::exception&) { return false; }
 }
 }
-NativeCapture::NativeCapture(const CaptureSource& source, int fps, Backend backend) : state_(std::make_unique<State>()) {
+NativeCapture::NativeCapture(const CaptureSource& source, int fps, Backend backend, QSize previewLimit) : state_(std::make_unique<State>()) {
     auto& state = *state_;
     if (!source.handle || fps < 1 || fps > 60) throw std::runtime_error("Invalid capture source/rate");
+    if (previewLimit.isEmpty() || previewLimit.width() > 1920 || previewLimit.height() > 1080)
+        throw std::runtime_error("Invalid preview dimensions");
+    state.previewLimit = previewLimit;
     state.source = source; state.fps = fps; state.blackLimit = fps <= 5 ? 1 : 45;
     QueryPerformanceFrequency(&state.frequency);
     // The device first: the encoder and the preview need it whichever way frames are captured. WARP when the GPU
@@ -250,7 +254,7 @@ std::optional<CapturePreview> NativeCapture::next(const FrameConsumer& consume) 
         // when MF encoder threads also access this device's immediate context.
         ContextLock lock(state.protection.Get());
         // Black alone does not prove failure: loading screens and dark scenes can legitimately be black.
-        auto image = state.preview->render(texture.Get(), size);
+        auto image = state.preview->render(texture.Get(), size, state.previewLimit);
         if (allBlack(image)) {
             if (++state.blackFrames >= state.blackLimit) {
                 state.blackFrames = 0;
@@ -294,6 +298,6 @@ std::optional<CapturePreview> NativeCapture::next(const FrameConsumer& consume) 
     }
     state.context->UpdateSubresource(state.upload.Get(), 0, nullptr, image.constBits(), UINT(image.bytesPerLine()), 0);
     if (consume) consume(state.upload.Get(), size, time);
-    return CapturePreview{state.preview->render(state.upload.Get(), size), size, time, 0};
+    return CapturePreview{state.preview->render(state.upload.Get(), size, state.previewLimit), size, time, 0};
 }
 }

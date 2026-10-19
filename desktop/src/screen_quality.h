@@ -64,8 +64,8 @@ inline VideoConfig screenPreset(int height, int fps) {
         throw std::invalid_argument("Unsupported screen preset");
     const int width = height == 480 ? 854 : height == 720 ? 1280 : 1920;
     const int bitrate = height == 480 ? (fps == 15 ? 800000 : fps == 30 ? 1200000 : 2000000)
-        : height == 720 ? (fps == 15 ? 1500000 : fps == 30 ? 2500000 : 4000000)
-        : (fps == 15 ? 3000000 : fps == 30 ? 5000000 : 8000000);
+        : height == 720 ? (fps == 15 ? 2500000 : fps == 30 ? 4000000 : 6000000)
+        : (fps == 15 ? 5000000 : fps == 30 ? 8000000 : 12000000);
     return {{width, height}, fps, bitrate};
 }
 inline int screenRenderInterval(const VideoConfig& config, bool focused) {
