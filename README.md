@@ -2,7 +2,7 @@
 
 Aplicativo para Windows com voz, câmera, compartilhamento de tela, chat e soundboard. O núcleo é **C++20/Qt** e a interface usa **Preact em WebView2**.
 
-**[Baixar para Windows](https://triscord.pages.dev)** · [Releases nativas](https://github.com/Otremba/triscord/releases/tag/desktop-v0.9.32)
+**[Baixar para Windows](https://triscord.pages.dev/download)** · [Releases nativas](https://github.com/Otremba/triscord/releases)
 
 ## Organização
 

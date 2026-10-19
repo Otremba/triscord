@@ -38,5 +38,8 @@ writeFileSync(join(out, 'download', `${values.INSTALLER}.sha256`), `${sha}  ${va
 // /download always points at the current installer.
 writeFileSync(join(out, '_redirects'), `/download /download/${values.INSTALLER} 302\n` +
   (externalDownload ? `/download/${values.INSTALLER} ${releaseUrl} 302\n` : ''));
-writeFileSync(join(out, '_headers'), `/download/*\n  Content-Disposition: attachment\n  Cache-Control: public, max-age=300\n`);
+// Only valid assets are attachments. Missing installers must remain an HTML
+// error page with HTTP 404, never an apparent executable containing the home page.
+writeFileSync(join(out, '_headers'), `/download/${values.INSTALLER}\n  Content-Disposition: attachment\n  Cache-Control: public, max-age=300\n` +
+  `/download/${values.INSTALLER}.sha256\n  Cache-Control: public, max-age=300\n`);
 console.log(JSON.stringify({ out, ...values, externalDownload, files: readdirSync(out).length, installerBytes: statSync(installer).size }, null, 2));
