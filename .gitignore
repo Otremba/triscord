@@ -1,0 +1,16 @@
+node_modules/
+release/
+native/bin/
+.toolchain/
+desktop/out/
+desktop/dist/
+aqtinstall.log
+**/__pycache__/
+desktop/assets/fonts-local/
+desktop/web/dist/
+
+# Local test output, retired checkout artifacts, IDE settings and Wrangler cache
+/build/
+/.claude/
+/.agents/
+**/.wrangler/

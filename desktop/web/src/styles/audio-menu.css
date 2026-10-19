@@ -1,0 +1,20 @@
+/* Measured shell and submenu from claude-observations/ACCOUNT_PANEL.md. */
+.tri-audio-menu { position:fixed; z-index:1003; width:222px; padding:8px; border:1px solid var(--border-subtle); border-radius:8px; background:var(--background-surface-higher); color:var(--text-default); box-shadow:var(--shadow-high); font-size:14px; }
+.tri-audio-menu button { color:inherit; text-align:left; border-radius:4px; }
+.tri-audio-menu button:hover { background:var(--background-mod-normal); color:var(--text-strong); }
+.tri-audio-menu__device { width:100%; min-height:52px; padding:8px; display:flex; align-items:center; gap:8px; }
+.tri-audio-menu__device>span { flex:1; min-width:0; }
+.tri-audio-menu strong { display:block; font-size:14px; font-weight:500; }
+.tri-audio-menu small { display:block; font-size:12px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+.tri-audio-menu__separator { height:1px; margin:4px 8px; background:var(--border-subtle); }
+.tri-audio-menu__volume { display:block; min-height:58px; padding:8px; font-size:14px; }
+.tri-audio-menu__volume input { display:block; margin-top:4px; }
+/* Discord: the gear before the label (audit 18/10). */
+.tri-audio-menu__settings { display:flex; align-items:center; justify-content:flex-start; gap:8px; width:100%; min-height:36px; padding:8px; }
+.tri-audio-menu__submenu { position:absolute; left:calc(100% + 4px); top:8px; width:208px; max-height:calc(100vh - 32px); overflow:auto; padding:8px; border:1px solid var(--border-subtle); border-radius:8px; background:var(--background-surface-higher); box-shadow:var(--shadow-high); scrollbar-width:thin; }
+.tri-audio-menu__submenu.is-left { left:auto; right:calc(100% + 4px); }
+.tri-audio-menu__submenu button { display:flex; align-items:center; gap:8px; min-height:52px; padding:8px; width:100%; font-size:14px; }
+.tri-audio-menu__submenu span { flex:1; overflow-wrap:anywhere; }
+.tri-audio-menu__submenu i { width:20px; height:20px; border:2px solid var(--text-muted); border-radius:50%; flex:none; }
+.tri-audio-menu__submenu i.is-selected { border-color:var(--control-primary-background-default); background:radial-gradient(circle,var(--white) 4px,var(--control-primary-background-default) 4px); }
+button[aria-expanded=true].tri-split__chevron>svg,button[aria-expanded=true].tri-call-button--caret>svg { transform:rotate(180deg); }

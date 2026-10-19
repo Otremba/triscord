@@ -1,0 +1,24 @@
+/* Tooltip (Tooltip.tsx): CSS module _c36707 recovered with REA, primary variant; spring from module 900002.
+   The anchor sits on the target edge (fixed), the tooltip is translated so its pointer side touches it. */
+.tri-tooltip-anchor { position: fixed; z-index: 1002; width: 0; height: 0; pointer-events: none; }
+.tri-tooltip {
+  position: absolute; box-sizing: border-box; width: max-content; max-width: 190px; border: 1px solid var(--border-subtle); border-radius: 8px;
+  background-color: var(--background-surface-high); box-shadow: var(--shadow-high); color: var(--text-default);
+  font-size: 14px; font-weight: var(--font-weight-medium); line-height: 16px; word-wrap: break-word; white-space: nowrap; text-align: center;
+  animation: tri-tooltip-in var(--tri-spring-tooltip-duration) var(--tri-spring-tooltip) both;
+}
+.tri-tooltip.is-leaving { animation: tri-tooltip-out var(--tri-spring-tooltip-duration) var(--tri-spring-tooltip) both; }
+.tri-tooltip--right { left: 0; top: 0; translate: 0 -50%; transform-origin: 0 50%; }
+.tri-tooltip--top { left: 0; bottom: 0; translate: -50% 0; transform-origin: 50% 100%; }
+.tri-tooltip--bottom { left: 0; top: 0; translate: -50% 0; transform-origin: 50% 0; }
+@keyframes tri-tooltip-in { from { opacity: 0; scale: .95; } to { opacity: 1; scale: 1; } }
+@keyframes tri-tooltip-out { from { opacity: 1; scale: 1; } to { opacity: 0; scale: .95; } }
+.tri-tooltip__content { overflow: hidden; padding: 8px 12px; }
+/* GuildTooltip: text-md/semibold, --text-default, max-width 196 (guildTooltipWrapper__b1f768); 18px line measured. */
+.tri-tooltip__content--guild { max-width: 196px; font-size: 16px; line-height: 18px; font-weight: var(--font-weight-semibold); white-space: normal; }
+.tri-tooltip:has(.tri-tooltip__content--guild) { max-width: none; }
+/* Pointer: 5px triangle in the tooltip colour, rotated to the target side, 1.5px into the border. */
+.tri-tooltip__pointer { position: absolute; width: 0; height: 0; border: 5px solid transparent; border-top-color: var(--background-surface-high); z-index: 1; }
+.tri-tooltip--top .tri-tooltip__pointer { top: 100%; left: 50%; margin-left: -5px; margin-top: -1.5px; }
+.tri-tooltip--bottom .tri-tooltip__pointer { bottom: 100%; left: 50%; margin-left: -5px; margin-bottom: -1.5px; transform: rotate(180deg); }
+.tri-tooltip--right .tri-tooltip__pointer { right: 100%; top: 50%; margin-top: -5px; margin-right: -1.5px; transform: rotate(90deg); }

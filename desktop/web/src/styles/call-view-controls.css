@@ -1,0 +1,14 @@
+/* Fullscreen is a native window state. Keep the same mounted call/chat components. */
+.tri-app--call-fullscreen { grid-template-rows:1fr; }
+.tri-app--call-fullscreen>.tri-titlebar, .tri-app--call-fullscreen .tri-sidebar,
+.tri-app--call-fullscreen .tri-chat-panel, .tri-app--call-fullscreen .tri-channel-header__toolbar { display:none; }
+.tri-app--call-fullscreen .tri-page { border:0; }
+.tri-call-bottom:focus-within, .tri-page__main.is-idle .tri-channel-header:focus-within { opacity:1!important; }
+.tri-call.is-idle .tri-call-bottom:focus-within>* { pointer-events:auto; }
+.tri-call-grid .tri-video-tile { flex-direction:column; align-items:stretch; justify-content:flex-start; }
+.tri-video-tile__surface { position:relative; flex:1 1 auto; min-height:0; width:100%; display:grid; place-items:center; overflow:hidden; }
+.tri-video-tile__placeholder { font-size:14px; color:var(--text-muted); text-align:center; padding:8px; }
+.tri-video-tile__error { position:absolute; inset:8px 8px auto; font-size:12px; color:var(--text-feedback-critical); padding:4px 8px; background:var(--background-surface-high); }
+
+.tri-fullscreen-hint { position:fixed; z-index:900; top:16px; left:50%; transform:translateX(-50%); padding:12px 16px; border:1px solid #ffffff40; border-radius:8px; background:#111e; color:#fff; font-size:14px; pointer-events:none; animation:tri-fullscreen-hint 4s forwards; }
+@keyframes tri-fullscreen-hint { 0%,75% {opacity:1;} 100% {opacity:0;visibility:hidden;} }

@@ -1,0 +1,120 @@
+/* User settings (Settings.tsx). Measured on out/claude-observations/motion/settings-*.png (1280x900 window, client
+   1264x892) and SETTINGS.md; colours mapped to tokens (nav #323339 = --background-base-lower, content #36373e =
+   --background-base-low, selected #42434a = --background-mod-normal over the nav). The navigation/shell CSS module
+   was not in the cache (Discord builds this screen with its newer settings layout), so geometry is measured. */
+.tri-modal-backdrop:has(> .tri-settings) { padding: 40px; }
+.tri-settings {
+  display: flex; box-sizing: border-box; width: 100%; height: 100%; overflow: hidden;
+  border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--background-base-low); box-shadow: var(--shadow-high);
+}
+.tri-settings__nav { display: flex; flex-direction: column; flex: 0 0 251px; box-sizing: border-box; min-height: 0; padding: 0 0 0 16px; background: var(--background-base-lower); }
+.tri-settings__profile { display: flex; align-items: center; gap: 12px; flex: none; margin: 24px 16px 16px 0; padding: 0; text-align: start; }
+.tri-avatar--48 { width: 48px; height: 48px; }
+.tri-avatar--48 .tri-avatar__letter { font-size: 20px; }
+.tri-settings__profile-text { display: flex; flex-direction: column; min-width: 0; }
+.tri-settings__profile-name { overflow: hidden; color: var(--text-strong); font-size: 16px; font-weight: var(--font-weight-semibold); line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
+.tri-settings__profile-edit { display: flex; align-items: center; gap: 4px; color: var(--text-subtle); font-size: 14px; line-height: 18px; }
+.tri-settings__search {
+  display: flex; align-items: center; gap: 8px; flex: none; box-sizing: border-box; width: 220px; height: 40px; margin-bottom: 12px; padding: 0 12px;
+  border: 1px solid var(--input-border-default); border-radius: 8px; background: var(--input-background-default); color: var(--text-default);
+}
+.tri-settings__search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text-default); font-size: 16px; outline: 0; }
+.tri-settings__search input::placeholder { color: var(--input-placeholder-text-default); }
+.tri-settings__nav-list { flex: 1 1 auto; overflow: hidden auto; padding: 0 16px 24px 0; scrollbar-width: thin; }
+.tri-settings__group { margin: 16px 0 8px 8px; color: var(--text-subtle); font-size: 14px; font-weight: var(--font-weight-medium); line-height: 18px; }
+.tri-settings__item {
+  display: flex; align-items: center; gap: 8px; box-sizing: border-box; width: 220px; min-height: 36px; margin: 2px 0; padding: 6px 8px;
+  border-radius: 8px; color: var(--interactive-text-default); font-size: 16px; font-weight: var(--font-weight-medium); line-height: 20px; text-align: start;
+}
+.tri-settings__item:hover { background: var(--background-mod-subtle); color: var(--interactive-text-hover); }
+.tri-settings__item.is-selected { background: var(--background-mod-normal); color: var(--interactive-text-active); }
+.tri-settings__item.is-danger { color: var(--text-feedback-critical); }
+.tri-settings__subs { position: relative; margin: 2px 0 4px 18px; padding-left: 0; border-left: 1px solid var(--border-subtle); }
+.tri-settings__sub { position: relative; display: block; width: 100%; height: 36px; padding: 0 0 0 18px; color: var(--interactive-text-default); font-size: 16px; text-align: start; }
+.tri-settings__sub:hover { color: var(--interactive-text-hover); }
+.tri-settings__sub.is-active { color: var(--interactive-text-active); }
+.tri-settings__sub.is-active::before { content: ""; position: absolute; left: -1px; top: 8px; width: 2px; height: 20px; border-radius: 1px; background: var(--white); }
+.tri-settings__separator { margin: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+
+.tri-settings__content { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.tri-settings__header { display: flex; align-items: center; flex: none; box-sizing: border-box; height: 49px; padding: 0 16px; border-bottom: 1px solid var(--border-subtle); }
+.tri-settings__title { flex: 1; margin: 0; color: var(--text-strong); font-size: 16px; font-weight: var(--font-weight-medium); line-height: 20px; }
+.tri-settings__close { display: flex; padding: 4px; color: var(--interactive-text-default); }
+.tri-settings__close:hover { color: var(--interactive-text-hover); }
+.tri-settings__scroller { flex: 1 1 auto; overflow: hidden auto; }   /* centred ignoring the scrollbar (measured) */
+.tri-settings__column { box-sizing: border-box; max-width: 696px; margin: 0 auto; padding: 66px 0 80px; }
+.tri-settings__heading { margin: 0 0 29px; color: var(--text-strong); font-size: 24px; font-weight: var(--font-weight-semibold); line-height: 30px; }
+.tri-settings__heading ~ .tri-settings__heading { margin-top: 0; }
+.tri-settings__label { display: block; margin-bottom: 8px; color: var(--text-strong); font-size: 16px; font-weight: var(--font-weight-semibold); line-height: 20px; }
+.tri-settings__description--above { margin-bottom: 8px !important; }
+.tri-settings__description { margin: 0; color: var(--text-default); font-size: 14px; line-height: 18px; }
+.tri-settings__grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; row-gap: 24px; }
+.tri-settings__field { min-width: 0; }
+.tri-settings__field--half { max-width: 340px; }
+.tri-settings__divider { margin: 32px 0; border-bottom: 1px solid var(--border-subtle); }
+.tri-settings__toggle-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.tri-settings__toggle-row .tri-settings__label { margin-bottom: 4px; }
+.tri-settings__row { display: flex; align-items: center; gap: 16px; min-height: 40px; }
+.tri-settings__row .tri-settings__label { flex: 1; margin: 0; }
+.tri-settings__value { color: var(--text-strong); font-size: 16px; font-weight: var(--font-weight-medium); }
+.tri-settings__row-button { flex: none; width: auto; min-width: 100px; }
+
+/* Select: 40px, radius 8, --input-*; icon before the name; popout like a menu. */
+.tri-select { position: relative; }
+.tri-select__value {
+  display: flex; align-items: center; gap: 8px; box-sizing: border-box; width: 100%; height: 40px; padding: 0 8px 0 12px;
+  border: 1px solid var(--input-border-default); border-radius: 8px; background: var(--input-background-default); color: var(--text-strong);
+  font-size: 16px; font-weight: var(--font-weight-medium); text-align: start;
+}
+.tri-select__value.is-open { border-color: var(--input-border-active); }
+.tri-select__icon { flex: none; color: var(--text-strong); }
+.tri-select__text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tri-select__detail { color: var(--text-muted); font-weight: var(--font-weight-normal); }
+.tri-select__chevron { flex: none; color: var(--interactive-text-default); }
+.tri-select__popout {
+  position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); max-height: 240px; overflow: hidden auto; padding: 4px;
+  border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--background-surface-higher); box-shadow: var(--shadow-high);
+}
+.tri-select__option { display: block; width: 100%; padding: 10px 8px; border-radius: 4px; color: var(--interactive-text-default); font-size: 16px; text-align: start; }
+.tri-select__option:hover { background: var(--interactive-background-hover); color: var(--text-strong); }
+.tri-select__option.is-selected { color: var(--text-strong); font-weight: var(--font-weight-medium); }
+
+/* Slider: 4px track, brand fill, 16px white handle (measured). */
+.tri-slider { --tri-fill: 50%; width: 100%; height: 24px; margin: 0; background: transparent; appearance: none; cursor: pointer; }
+.tri-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--control-primary-background-default) var(--tri-fill), var(--background-mod-strong) var(--tri-fill)); }
+.tri-slider::-webkit-slider-thumb { width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: var(--white); box-shadow: var(--shadow-low, 0 1px 3px rgb(0 0 0 / .3)); appearance: none; }
+
+/* Switch: 48x24, radius 12, 16px knob; brand when on (measured). */
+.tri-switch { position: relative; flex: none; box-sizing: border-box; width: 48px; height: 24px; border: 1px solid var(--switch-border-default); border-radius: 12px; background: var(--switch-background-default); transition: background-color .2s ease, border-color .2s ease; }
+.tri-switch.is-on { border-color: var(--switch-border-selected-default); background: var(--switch-background-selected-default); }
+.tri-switch__knob { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--switch-thumb-background-default); transition: transform .2s ease; }
+.tri-switch.is-on .tri-switch__knob { transform: translateX(24px); }
+
+/* Theme swatches: 48px, 8px apart, radius 8; the selected one has a 2px brand ring and a check badge. */
+.tri-themes { display: flex; gap: 8px; margin-bottom: 24px; }
+.tri-theme { position: relative; width: 48px; height: 48px; border: 1px solid var(--border-strong); border-radius: 8px; }
+.tri-theme--light { background: #ffffff; }
+.tri-theme--dark { background: #323339; }
+.tri-theme--darker { background: #1d1d21; }
+.tri-theme--midnight { background: #000000; }
+/* The preset's gradient (theme-cotton-candy.generated.css: 180.14deg, #f4abb8 8.5%, #b1c2fc 94.28%). */
+.tri-theme--cotton-candy { background: linear-gradient(180.14deg, #f4abb8 8.5%, #b1c2fc 94.28%); }
+.tri-theme.is-selected { box-shadow: 0 0 0 2px var(--control-primary-background-default); border-color: transparent; }
+.tri-theme__check { position: absolute; top: -8px; right: -8px; display: flex; border-radius: 50%; background: var(--white); color: var(--control-primary-background-default); }
+/* Notifications rows (observed): label + 14px description on the left, switch on the right, ~20px apart. */
+.tri-settings__toggle-row--spaced { margin-bottom: 20px; }
+
+/* Conta → Senha e autenticação: the description under the row label. */
+.tri-settings__row .tri-settings__label .tri-settings__description { display: block; margin-top: 4px; font-weight: var(--font-weight-normal); }
+
+/* Consecutive switch rows (Voz e vídeo: Supressão de ruído, Controle de ganho automático): Discord separates each
+   option with 20px and a 1px line (18/10: "tá tudo junto"). The description keeps clear of the switch. */
+/* "Alta qualidade" / "Padrão" under the noise suppression switch (Discord lists its suppressors the same way). */
+.tri-settings__noise-mode { margin-top: 8px; }
+.tri-settings__noise-strength { margin-top: 20px; }
+.tri-settings__noise-strength + .tri-settings__toggle-row { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-subtle); }
+.tri-settings__noise-mode .tri-radio.is-disabled { cursor: not-allowed; opacity: .5; }
+.tri-settings__noise-mode .tri-radio:has(.tri-radio__input:focus-visible) .tri-radio__circle { outline: 2px solid var(--text-link); outline-offset: 2px; }
+.tri-settings__toggle-row + .tri-settings__toggle-row, .tri-settings__noise-mode + .tri-settings__toggle-row { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-subtle); }
+.tri-settings__toggle-row > div:first-child { max-width: 560px; }
+.tri-settings__toggle-row .tri-switch { flex: none; margin-top: 2px; }

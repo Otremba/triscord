@@ -1,0 +1,6 @@
+#pragma once
+namespace triscord::googleClient {
+// A distributed build carries the desktop OAuth client secret (TRISCORD_GOOGLE_CLIENT_SECRET_FILE), empty otherwise.
+// The generated header stays in the ignored build directory, never in source control.
+inline constexpr char builtinSecret[] = "@TRISCORD_GOOGLE_CLIENT_SECRET@";
+}

@@ -1,0 +1,26 @@
+/* Discord's colour themes ("Temas coloridos"), for the one triscord offers: "Algodão-doce" (data-theme="cotton-candy").
+   Its tokens (Discord's light tokens color-mixed with the preset's base/text colours) and the gradient layers come from
+   theme-cotton-candy.generated.css (tools/extract-client-theme.mjs). The rules below are Discord's own
+   .custom-theme-background rules for the surfaces triscord has, recovered with REA:
+   - app frame: .bg__960e4 (555956) var(--background-gradient-app-frame); the title bar sits on it;
+   - channel list: .container__2637a (03e35359) var(--background-gradient-high);
+   - account panels: .panels__5e434 (467847) var(--background-gradient-highest);
+   - page / chat: .chat_f75fb0 + .chatContent_f75fb0 (264141) var(--background-gradient-chat);
+   - channel header (light): .themed__9293f (996499) var(--background-gradient-lowest);
+   - composer: :where(.custom-theme-background) .channelTextArea__74017 (962953) highest + --app-frame-border;
+   - menus and tooltips: 1px --border-strong, tooltip pointer hidden (261000, 348181);
+   - reactions: .reaction__23977 (17256) --background-mod-subtle / --border-strong, own reaction brand 15%. */
+@import '../theme-cotton-candy.generated.css';
+
+:root[data-theme="cotton-candy"] body { background: var(--background-gradient-app-frame); }
+:root[data-theme="cotton-candy"] .tri-titlebar { background: transparent; }
+:root[data-theme="cotton-candy"] .tri-sidebar-list { background: var(--background-gradient-high); }
+:root[data-theme="cotton-candy"] .tri-panels { background: var(--background-gradient-highest); }
+:root[data-theme="cotton-candy"] .tri-page, :root[data-theme="cotton-candy"] .tri-chat-panel { background: var(--background-gradient-chat); }
+:root[data-theme="cotton-candy"] .tri-channel-header { background: var(--background-gradient-lowest); }
+:root[data-theme="cotton-candy"] .tri-composer__box { background: var(--background-gradient-highest); border-color: var(--app-frame-border); }
+:root[data-theme="cotton-candy"] .tri-menu, :root[data-theme="cotton-candy"] .tri-tooltip { border: 1px solid var(--border-strong); }
+:root[data-theme="cotton-candy"] .tri-tooltip__pointer { display: none; }
+:root[data-theme="cotton-candy"] .tri-reaction { background-color: var(--background-mod-subtle); border-color: var(--border-strong); }
+:root[data-theme="cotton-candy"] .tri-reaction.is-me { background-color: color-mix(in srgb, var(--brand-500) 15%, transparent);   /* hsla(--brand-500-hsl / .15) */ border-color: var(--brand-500); }
+:root[data-theme="cotton-candy"] .tri-reaction.is-me .tri-reaction__count { color: var(--text-brand); }

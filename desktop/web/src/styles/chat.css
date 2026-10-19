@@ -1,0 +1,99 @@
+/* Voice channel chat (ChatPanel.tsx; sources there). Page becomes a row so the panel takes the full column height
+   beside the channel header, as observed (panel header 48px + divider at the same height as the page header). */
+.tri-page--row { flex-direction: row; }
+.tri-page__main { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.tri-channel-header__toolbar { display: flex; align-items: center; margin-inline-start: auto; }
+
+.tri-chat-panel { display: flex; flex-direction: column; flex: 0 0 450px; width: 450px; min-height: 0; background: var(--background-base-lower); }
+.tri-chat-panel__header {
+  display: flex; align-items: center; gap: 8px; flex: 0 0 auto; box-sizing: border-box; height: var(--custom-channel-header-height);
+  padding: 0 12px 0 16px; border-bottom: 1px solid var(--border-subtle);
+}
+.tri-chat-panel__icon { flex: none; color: var(--channel-icon); }
+.tri-chat-panel__title { flex: 1 1 auto; margin: 0; overflow: hidden; color: var(--text-strong); font-size: 16px; font-weight: var(--font-weight-semibold); line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
+.tri-chat-panel__scroller { flex: 1 1 auto; min-height: 0; overflow: hidden auto; padding-bottom: 24px; scrollbar-width: thin; }
+.tri-chat-panel__content { display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%; }
+.tri-channel-welcome { display: flex; flex-direction: column; align-items: flex-start; margin: 16px 16px 8px; }
+.tri-channel-welcome__icon { display: flex; align-items: center; justify-content: center; width: 68px; height: 68px; border-radius: 50%; background: var(--background-mod-normal); color: var(--white); }
+.tri-channel-welcome__title { margin: 8px 0; color: var(--text-strong); font-size: 32px; font-weight: var(--font-weight-extrabold); line-height: 40px; }
+.tri-channel-welcome__text { margin: 0; color: var(--text-default); font-size: 16px; line-height: 20px; }
+.tri-messages { display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%; margin: 0; padding: 0; list-style: none; }
+
+/* Cozy message (_c19a55 + __5126c). */
+.tri-message {
+  position: relative; box-sizing: border-box; padding: 2px 48px 2px 72px; min-height: 0;
+  border-end-end-radius: var(--radius-xs); border-start-end-radius: var(--radius-xs); color: var(--text-default);
+}
+.tri-message.is-group-start { margin-top: 17px; min-height: 2.75rem; }
+.tri-message:hover { background: var(--message-background-hover); }
+.tri-message__avatar { position: absolute; left: 16px; top: 4px; width: var(--chat-avatar-size); height: var(--chat-avatar-size); }
+.tri-avatar--40 .tri-avatar__letter { font-size: 16px; }
+.tri-message__header { display: block; margin: 0; min-height: 1.375rem; color: var(--text-muted); font-size: inherit; font-weight: inherit; line-height: 1.375rem; }
+.tri-message__username { color: var(--text-strong); font-size: 1rem; font-weight: var(--font-weight-medium); line-height: 1.375rem; }
+.tri-message__timestamp { display: inline-block; margin-inline-start: .25rem; height: 1.25rem; color: var(--chat-text-muted); font-size: .75rem; font-weight: var(--font-weight-medium); line-height: 1.375rem; vertical-align: baseline; cursor: default; }
+.tri-message__timestamp--alt { position: absolute; left: 0; top: 2px; width: 56px; height: 1.375rem; margin: 0; text-align: end; opacity: 0; }
+.tri-message:hover .tri-message__timestamp--alt { opacity: 1; }
+.tri-message__content { font-size: 1rem; line-height: 1.375rem; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+
+/* Date divider (__908e2 + divider__5126c in group-spacing-16). */
+.tri-divider {
+  display: flex; align-items: center; justify-content: center; box-sizing: border-box; height: 0; margin: 1.5rem .875rem .5rem 1rem;
+  border-top: thin solid var(--border-subtle); pointer-events: none;
+}
+.tri-divider__content { margin-top: -1px; padding: 2px 4px; border-radius: 8px; background: var(--background-base-lower); color: var(--text-muted); font-size: 12px; font-weight: var(--font-weight-semibold); line-height: 13px; }
+.tri-divider + .tri-message.is-group-start { margin-top: 0; }
+
+/* Reactions (_f8896c). */
+.tri-reactions { display: flex; flex-wrap: wrap; align-items: center; margin-bottom: -8px; padding: 1px 0 6px; }
+.tri-reaction { box-sizing: border-box; flex-shrink: 0; margin: 0 4px 4px 0; border: 1px solid transparent; border-radius: 8px; background-color: var(--reaction-background-default); cursor: pointer; user-select: none; transition: background-color .1s ease, border-color .1s ease; }
+.tri-reaction:hover { background-color: var(--reaction-background-hover); border-color: var(--reaction-border-hover); }
+.tri-reaction.is-me { background-color: var(--reaction-background-reacted-default); border-color: var(--reaction-border-reacted-default); }
+.tri-reaction__inner { display: flex; align-items: center; padding: 2px 6px; }
+.tri-reaction__emoji { display: inline-block; font-size: 20px; line-height: 24px; font-variant-emoji: emoji; }
+.tri-reaction__count { margin-inline-start: 6px; color: var(--text-subtle); font-size: 14px; font-weight: var(--font-weight-semibold); }
+.tri-reaction:hover .tri-reaction__count { color: var(--reaction-text-hover); }
+.tri-reaction.is-me .tri-reaction__count { color: var(--reaction-text-reacted-default); }
+
+/* Hover action bar (observed, CHAT.md): 32px box, radius 8, 1px border, 16px above the message and 14px from its
+   right edge; 28px buttons with 20px glyphs; a 1px divider with 4px each side after the quick reactions. Shown
+   on hover (buttons__5126c: opacity 0 -> 1). */
+.tri-message__bar {
+  position: absolute; top: -16px; right: 14px; z-index: 1; display: flex; align-items: center; box-sizing: border-box; height: 32px; padding: 0 1px;
+  border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--background-surface-high); box-shadow: var(--shadow-low, none);
+  opacity: 0; pointer-events: none;
+}
+.tri-message:hover .tri-message__bar, .tri-message__bar.is-open { opacity: 1; pointer-events: auto; }
+.tri-message__bar-button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; color: var(--interactive-text-default); }
+.tri-message__bar-button:hover { background: var(--interactive-background-hover); color: var(--interactive-text-hover); }
+.tri-message__bar-emoji { font-size: 18px; line-height: 20px; }
+.tri-message__bar-divider { width: 1px; height: 20px; margin: 0 4px; background: var(--border-subtle); }
+.tri-reaction-picker {
+  position: absolute; top: calc(100% + 4px); right: 0; display: flex; gap: 2px; padding: 4px;
+  border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--background-surface-high); box-shadow: var(--shadow-high);
+}
+.tri-reaction-picker__item { width: 32px; height: 32px; border-radius: 6px; font-size: 20px; }
+.tri-reaction-picker__item:hover { background: var(--interactive-background-hover); }
+
+/* Channel row hover actions (_c69b6d). */
+.tri-channel__actions { display: none; align-items: center; flex: none; }
+.tri-channel__link:hover .tri-channel__actions, .tri-channel__link:focus-within .tri-channel__actions { display: flex; }
+.tri-channel__action { display: block; margin-inline-start: 4px; line-height: 0; color: var(--icon-muted); }
+.tri-channel__action:hover { color: var(--interactive-text-hover); }
+.tri-channel__action:active { transform: translateY(.5px); }
+.tri-composer__box.is-rate-limited { border-color: var(--text-feedback-critical); }
+
+/* The composer grows with text, as module __74017's scrollableContainer does.
+   Keep the recovered 56px/22px baseline padding and cap long drafts at 50vh. */
+.tri-composer__box:has(textarea) { height: auto; }
+textarea.tri-composer__input {
+  display: block; width: 100%; min-height: var(--custom-channel-textarea-text-area-height);
+  max-height: 50vh; padding-block: calc((var(--custom-channel-textarea-text-area-height) - 1.375rem) / 2);
+  font-family: inherit; font-weight: var(--font-weight-normal); resize: none; overflow-y: auto;
+}
+
+/* Author avatar: still frame; the GIF plays while the message is hovered (Discord's chat behaviour). */
+.tri-message__avatar { overflow: hidden; }
+.tri-message__avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.tri-message__avatar-animated { display: none; }
+.tri-message:hover .tri-message__avatar-animated { display: block; }
+.tri-message:hover .tri-message__avatar-still:has(+ .tri-message__avatar-animated) { display: none; }

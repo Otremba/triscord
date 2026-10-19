@@ -1,0 +1,15 @@
+name = "triscord-auth"
+main = "src/worker.js"
+compatibility_date = "2026-10-12"
+workers_dev = true
+
+[observability]
+enabled = false
+
+[vars]
+GOOGLE_CLIENT_ID = "250225176755-tdsas1pgo4b4ikbspqunik5v88i81rpi.apps.googleusercontent.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "triscord-accounts"
+database_id = "f9a49cc8-9730-4b29-af18-a0e7b6b8404e"

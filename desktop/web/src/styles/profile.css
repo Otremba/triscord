@@ -1,0 +1,55 @@
+/* Retained discord-profile-edit-modal.png: modal1168, appearance column240,
+   central card400 (32px gaps), 400×140 banner and 120px avatar +8px ring.
+   The right column contains Triscord's working profile fields rather than fictitious widgets. */
+.tri-profile-editor { position:relative; width:1168px; height:calc(100vh - 96px); max-width:calc(100vw - 80px); max-height:calc(100vh - 80px); display:flex; flex-direction:column; background:var(--background-base-low); border:1px solid var(--border-subtle); border-radius:16px; box-shadow:var(--shadow-high); overflow:hidden; }
+.tri-profile-editor>header { position:absolute; top:0; left:0; z-index:1; display:flex; align-items:center; width:240px; height:49px; padding:0 16px; border-right:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle); background:var(--background-surface-high); }
+.tri-profile-editor h1 { margin:0; font-size:16px; font-weight:var(--font-weight-semibold); line-height:20px; color:var(--text-strong); }
+.tri-profile-editor__close { position:absolute; top:8px; right:8px; z-index:2; width:32px; height:32px; display:grid; place-items:center; border-radius:8px; color:var(--interactive-text-default); background:var(--interactive-background-default); }
+.tri-profile-editor__close:hover { color:var(--interactive-text-hover); background:var(--interactive-background-hover); }
+.tri-profile-editor__body { display:grid; flex:1 1 auto; grid-template-columns:240px 400px minmax(0,1fr); gap:32px; padding:0 32px 0 0; overflow:auto; align-items:start; min-height:0; scrollbar-width:thin; scrollbar-color:var(--background-mod-strong) transparent; }
+.tri-profile-editor__appearance { align-self:stretch; padding:66px 16px 16px !important; border-right:1px solid var(--border-subtle) !important; background:var(--background-surface-high); }
+.tri-profile-editor__details { padding-top:48px !important; }
+.tri-profile-editor__fields { flex:1; min-width:0; }
+.tri-profile-editor fieldset { margin:0; padding:0; border:0; min-width:0; }
+.tri-profile-editor__fields h2 { font-size:16px; margin:0 0 12px; color:var(--text-strong); }
+.tri-profile-editor__fields label { display:block; font-size:14px; font-weight:600; margin-bottom:16px; color:var(--text-default); }
+.tri-profile-editor__fields input:not([type=file]):not([type=color]), .tri-profile-editor textarea { display:block; width:100%; padding:10px; margin-top:8px; border:1px solid var(--border-subtle); border-radius:8px; background:var(--input-background-default,var(--background-base-lowest)); color:var(--text-strong); font:inherit; font-weight:400; }
+.tri-profile-editor textarea { resize:vertical; min-height:80px; }
+.tri-profile-editor__fields input[type=color] { display:block; margin-top:8px; width:64px; height:40px; border:0; padding:0; background:transparent; }
+.tri-profile-editor__media { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.tri-profile-editor__media label { position:relative; margin:0; display:inline-flex; }
+.tri-profile-editor__media input { position:absolute; inset:0; opacity:0; width:100%; cursor:pointer; }
+.tri-profile-editor__media button,.tri-profile-editor__media label { padding:8px 12px; font-size:13px; }
+.tri-profile-editor__hint { color:var(--text-muted); font-size:12px; line-height:16px; margin-bottom:20px; }
+.tri-profile-editor__colors { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+.tri-profile-editor__colors button { font-size:13px; color:var(--text-link); }
+.tri-profile-editor>footer { padding:16px 24px; border-top:1px solid var(--border-subtle); display:flex; gap:8px; align-items:center; }
+.tri-profile-editor>footer span { flex:1; font-size:13px; color:var(--text-muted); }
+.tri-profile-editor>footer [role=alert] { color:var(--text-feedback-critical); }
+.tri-profile-editor__sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.tri-profile-preview { width:400px; margin:32px 0 24px; border:0; border-radius:16px; background:var(--background-surface-high); overflow:hidden; position:relative; }
+.tri-profile-preview__banner { height:140px; }
+.tri-profile-preview__banner img { width:100%; height:100%; object-fit:cover; }
+.tri-profile-preview__avatar { position:relative; margin:-68px 0 0 24px; width:136px; height:136px; border:8px solid var(--background-surface-high); border-radius:50%; background:var(--control-primary-background-default); display:grid; place-items:center; overflow:hidden; color:var(--white); font-size:40px; font-weight:600; }
+.tri-profile-preview__avatar img { width:120px; height:120px; object-fit:cover; }
+.tri-profile-preview__text { padding:16px 32px 32px; overflow-wrap:anywhere; }
+.tri-profile-preview h2 { font-size:20px; margin:0 0 8px; color:var(--text-strong); }
+.tri-profile-preview h3 { font-size:12px; margin:24px 0 8px; color:var(--text-subtle); }
+.tri-profile-preview p { font-size:14px; line-height:20px; margin:0; color:var(--text-strong); white-space:pre-wrap; }
+.tri-profile-preview .is-empty { color:var(--text-muted); font-style:italic; }
+@media(max-width:1120px) {
+  .tri-profile-editor__body { grid-template-columns:220px minmax(0,1fr); gap:24px; padding-right:24px; }
+  .tri-profile-editor>header { width:220px; }
+  .tri-profile-preview { grid-column:2; grid-row:1; width:100%; max-width:400px; }
+  .tri-profile-editor__appearance { grid-column:1; grid-row:1 / span 2; }
+  .tri-profile-editor__details { grid-column:2; grid-row:2; }
+}
+@media(max-width:700px) {
+  .tri-profile-editor { max-width:calc(100vw - 24px); max-height:calc(100vh - 24px); }
+  .tri-profile-editor>header { position:static; flex:none; width:100%; }
+  .tri-profile-editor__body { display:flex; flex-direction:column; padding:16px; gap:24px; }
+  .tri-profile-editor__fields,.tri-profile-preview { width:100%; }
+  .tri-profile-editor__appearance { border-right:0 !important; padding:0 !important; background:transparent; }
+  .tri-profile-editor>footer { flex-wrap:wrap; padding:12px; }
+  .tri-profile-editor>footer span { flex-basis:100%; }
+}

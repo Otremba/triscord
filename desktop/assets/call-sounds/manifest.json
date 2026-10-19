@@ -1,0 +1,68 @@
+[
+  {
+    "id": "join",
+    "file": "user_join.mp3",
+    "sha256": "d30746caf3e4675ae0d822d51461a9ad24832afa1e20179c3c2fc7b50b911a26",
+    "source": "https://discord.com/assets/b135ff6c8e091b43.mp3"
+  },
+  {
+    "id": "leave",
+    "file": "user_leave.mp3",
+    "sha256": "9fd71c2d8112c82a7fb316602bb1645bc65f5edfa260110bbaae80090fbe9df0",
+    "source": "https://discord.com/assets/7b9a183742515fc2.mp3"
+  },
+  {
+    "id": "disconnect",
+    "file": "disconnect.mp3",
+    "sha256": "c06c7e58099969eacc5f8eb925fb381f445250b9f37acf959b11df72aabb44ca",
+    "source": "https://discord.com/assets/dd0911025fe00b2e.mp3"
+  },
+  {
+    "id": "mute",
+    "file": "mute.mp3",
+    "sha256": "f6194168829b0701e8b40817d5173afed4b3b1e0b5074ab82ca31d97e4cb65c1",
+    "source": "https://discord.com/assets/2d3b4ba32c34c862.mp3"
+  },
+  {
+    "id": "unmute",
+    "file": "unmute.mp3",
+    "sha256": "1572881f90703c1e0cd138fe7486d2e53c0ac5d8509cade32029fb31650b9304",
+    "source": "https://discord.com/assets/e74c4a06134a20e4.mp3"
+  },
+  {
+    "id": "deafen",
+    "file": "deafen.mp3",
+    "sha256": "dee4468bbafb321b159dcab42f52d1fbfb1d01358437e0a3088c3345979211b8",
+    "source": "https://discord.com/assets/529ff198eac567af.mp3"
+  },
+  {
+    "id": "undeafen",
+    "file": "undeafen.mp3",
+    "sha256": "690b64977594baa41c7978d76259224f67799ba337df2d1045dce970ef82b243",
+    "source": "https://discord.com/assets/b150f03c89944403.mp3"
+  },
+  {
+    "id": "camera_on",
+    "file": "camera_on.mp3",
+    "sha256": "faeb721a072575c96d1e140aaecd469bf3f7278347596968dddf22fdb65005bf",
+    "source": "https://discord.com/assets/855607d0932ea396.mp3"
+  },
+  {
+    "id": "camera_off",
+    "file": "camera_off.mp3",
+    "sha256": "fe81a2ab7b0581736108c5fc79ab7884ab2e5211a50b69f56badde08d41e7bfb",
+    "source": "https://discord.com/assets/b1dd204729fe78b4.mp3"
+  },
+  {
+    "id": "stream_started",
+    "file": "stream_started.mp3",
+    "sha256": "b5cb29d5d5cc0e8e22fa014bac4a1c2d601f6890ae6db1c18d4b6310283a3271",
+    "source": "https://discord.com/assets/abe52a3c92953edb.mp3"
+  },
+  {
+    "id": "stream_ended",
+    "file": "stream_ended.mp3",
+    "sha256": "a724e183167405783122b997def6b3e6f53020957031224b27c434d6df8ef75f",
+    "source": "https://discord.com/assets/cbff07b5a83e0321.mp3"
+  }
+]

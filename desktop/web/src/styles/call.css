@@ -1,0 +1,150 @@
+/* Call UI. Sources: CALLS.md / SHARE.md (captures) and Discord CSS modules _f1ceac (call buttons),
+   _bcc569 (control), recovered with REA. Colours only through generated tokens. */
+
+/* Participants under a voice channel */
+.tri-voice-users { padding: 2px 0 4px; }
+.tri-voice-user { position: relative; display: flex; align-items: center; gap: 8px; height: 30px; margin-inline-start: 36px; padding-inline-end: 8px; border-radius: var(--radius-xs); color: var(--channels-default); }
+.tri-voice-user:hover { background: var(--interactive-background-hover); color: var(--interactive-text-hover); }
+.tri-voice-user__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: var(--font-weight-medium); }
+.tri-voice-user__icons { display: flex; gap: 4px; color: var(--interactive-icon-default); }
+/* Own/peer mute icons take the row icon colour; only "Silenciado no servidor" is red (Discord, audit 18/10). */
+.tri-voice-user__muted { color: inherit; }
+.tri-avatar--24 { width: 24px; height: 24px; }
+.tri-avatar--24 .tri-avatar__letter { font-size: 11px; }
+.tri-voice-user.is-speaking .tri-avatar { box-shadow: 0 0 0 2px var(--status-positive); }
+.tri-live-badge { flex: 0 0 auto; padding: 0 4px; border-radius: var(--radius-xs); background: var(--status-danger); color: var(--white); font-size: 11px; font-weight: var(--font-weight-bold); line-height: 16px; }
+
+/* Stage: black, cards centred (CALLS.md "fundo preto") */
+.tri-call { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--black); }
+/* 64px above the cards: the call header floats over the stage (measured: first card 64px below the page top). */
+.tri-call-grid { flex: 1 1 auto; min-height: 0; display: grid; gap: 8px; align-content: center; justify-content: center; padding: 64px 16px 90px; overflow: hidden; }
+.tri-call-card, .tri-call-grid .tri-video-tile {
+  position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-sm); overflow: hidden;
+  display: flex; align-items: center; justify-content: center; background: var(--background-surface-high);
+}
+.tri-call-card.is-speaking, .tri-call-grid .tri-video-tile.is-speaking { box-shadow: inset 0 0 0 2px var(--status-positive); }
+.tri-avatar--80 { width: 80px; height: 80px; }
+.tri-avatar--80 .tri-avatar__letter { font-size: 32px; }
+.tri-call-card__pill {
+  position: absolute; inset-inline-start: 12px; bottom: 12px; display: flex; align-items: center; gap: 4px; height: 32px;
+  padding: 0 8px; border-radius: var(--radius-sm); background: rgb(0 0 0 / .6); color: var(--white); font-size: 16px; font-weight: var(--font-weight-medium);
+}
+
+/* Controls bar */
+.tri-call-controls { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; }
+/* Capsules: Discord .buttonSection_a83780 (current cache): --background-mod-subtle over the black call, --border-muted,
+   radius 12, padding 4; sections 12px apart (.panelRow). Measured near-black in the call (audit 18/10). */
+.tri-call-capsule { display: flex; align-items: center; gap: 8px; height: 50px; padding: 4px; border: 1px solid var(--border-muted); border-radius: 12px; background: var(--background-mod-subtle); }
+.tri-call-button {
+  display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px;
+  color: var(--interactive-text-default); transition: background .15s ease-in-out, color .15s ease-in-out;
+}
+.tri-call-button:hover { background: var(--background-mod-muted); color: var(--interactive-text-active); }
+.tri-call-attached { display: flex; align-items: center; }
+.tri-call-button--mic { width: 36px; border-radius: 8px 0 0 8px; }
+.tri-call-button--caret { width: 16px; margin-inline-start: 1px; border-radius: 0 8px 8px 0; }
+.tri-call-button.is-red { background: var(--opacity-red-12); color: var(--red-400); }
+.tri-call-button.is-red:hover { background: var(--opacity-red-16); }
+.tri-call-button.is-green { background: var(--green-360); color: var(--white); }
+.tri-call-disconnect {
+  display: flex; align-items: center; justify-content: center; width: 64px; height: 50px; border-radius: 12px;
+  background: var(--control-critical-primary-background-default); color: var(--control-critical-primary-text-default); transition: background .15s ease-in-out;
+}
+.tri-call-disconnect:hover { background: var(--control-critical-primary-background-hover); }
+
+/* "Voz conectada" section of the account panel */
+.tri-voice-panel { padding: 12px 11px 13px; border-bottom: 1px solid var(--border-subtle); }
+.tri-voice-panel__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tri-voice-panel__texts { display: flex; flex-direction: column; min-width: 0; }
+/* text-md/semibold: 16px (measured against Discord, audit 18/10: 100px for "Voz conectada"). */
+.tri-voice-panel__title { color: var(--text-feedback-positive); font-size: 16px; font-weight: var(--font-weight-semibold); line-height: 20px; }
+.tri-voice-panel__room { color: var(--text-subtle); font-size: 12px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tri-voice-panel__buttons { display: flex; gap: 8px; margin-top: 12px; }
+.tri-voice-panel__button { flex: 1 1 0; display: flex; align-items: center; justify-content: center; height: 32px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--background-mod-subtle); color: var(--interactive-icon-default); }
+.tri-voice-panel__button:hover { background: var(--interactive-background-hover); color: var(--interactive-icon-hover); }
+/* Discord _e131a9 .button.buttonColor: --control-secondary-* with a --border-muted border and a white icon; while on
+   (camera, sharing) .buttonActive: --opacity-green-12 with --green-new-30 (audit 18/10). */
+.tri-voice-panel .tri-voice-panel__button { border: 1px solid var(--border-muted); background-color: var(--control-secondary-background-default); color: var(--control-secondary-text-default); transition: background-color .1s ease-in-out, color .1s ease-in-out; }
+.tri-voice-panel .tri-voice-panel__button:hover { background-color: var(--control-secondary-background-hover); color: var(--control-secondary-text-default); }
+.tri-voice-panel .tri-voice-panel__button.is-green { border-color: var(--opacity-green-12); background-color: var(--opacity-green-12); color: var(--green-new-30); }
+.tri-voice-panel .tri-voice-panel__button.is-green:hover { background-color: var(--opacity-green-24); }
+.tri-voice-panel__button.is-green { background: var(--green-360); color: var(--white); }
+
+/* Share picker (SHARE.md) */
+/* Modal layer (ModalLayer.tsx): scrim __40128 = --background-scrim on its own layer, springs from
+   motion.generated.css. Entering: scrim fades in, the dialog fades in 64ms later. Closing: scrim fades out with the
+   same spring; the dialog fades out and scales to 0.9 with the close spring. */
+.tri-modal-backdrop { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.tri-modal-backdrop::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--background-scrim);
+  animation: tri-fade-in var(--tri-spring-modal-in-duration) var(--tri-spring-modal-in) both; }
+.tri-modal-backdrop > * { animation: tri-fade-in var(--tri-spring-modal-in-duration) var(--tri-spring-modal-in) 64ms both; }
+.tri-modal-backdrop.is-closing { pointer-events: none; }
+.tri-modal-backdrop.is-closing::before { animation: tri-fade-out var(--tri-spring-modal-in-duration) var(--tri-spring-modal-in) both; }
+.tri-modal-backdrop.is-closing > * { animation: tri-modal-out var(--tri-spring-modal-out-duration) var(--tri-spring-modal-out) both; }
+@keyframes tri-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tri-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes tri-modal-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.9); } }
+.tri-share-picker {
+  display: flex; flex-direction: column; width: min(960px, 100%); height: min(746px, 100%); padding: 25px 25px 0;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--background-surface-high);
+}
+.tri-share-tabs { display: flex; flex: 0 0 auto; height: 40px; padding: 4px; border-radius: var(--radius-sm); background: var(--background-base-lowest); }
+.tri-share-tabs button { flex: 1 1 0; display: flex; align-items: center; justify-content: center; gap: 8px; height: 32px; border-radius: 6px; color: var(--interactive-text-default); font-size: 14px; font-weight: var(--font-weight-medium); }
+.tri-share-tabs button.is-selected { background: var(--background-surface-high); color: var(--interactive-text-active); }
+/* Stream mode block (SHARE.md / Qt picker): 17px above, 73px below; title 16px bold, quality 12px; SD/HD 110x40 track
+   (5/4px inset, 32px segments) as the tabs; gear 40x40, radius 8, 9px after the toggle. */
+.tri-share-mode { position: relative; display: flex; flex: 0 0 auto; align-items: flex-start; margin: 17px 0 73px; }
+.tri-share-mode__text { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }
+.tri-share-mode__text strong { color: var(--text-strong); font-size: 16px; font-weight: var(--font-weight-bold); line-height: 20px; }
+.tri-share-mode__text span { color: var(--text-muted); font-size: 12px; line-height: 18px; }
+.tri-share-quality { display: flex; flex: 0 0 auto; box-sizing: border-box; width: 110px; height: 40px; padding: 4px 5px; border-radius: var(--radius-sm); background: var(--background-base-lowest); }
+.tri-share-quality button { flex: 1 1 0; height: 32px; border-radius: 4px; color: var(--interactive-text-default); font-size: 14px; font-weight: var(--font-weight-semibold); }
+.tri-share-quality button.is-selected { background: var(--background-surface-high); color: var(--interactive-text-active); }
+.tri-share-mode__gear { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 40px; height: 40px; margin-left: 9px; border-radius: 8px;
+  background: var(--background-mod-strong, #44454c); color: var(--white); }
+.tri-share-mode__menu { position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 2; box-sizing: border-box; width: 245px; padding: 8px 0;
+  border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--background-surface-higher); box-shadow: var(--shadow-high); }
+.tri-share-mode__menu-title { height: 21px; padding: 0 17px 6px; color: var(--text-muted); font-size: 14px; }
+.tri-share-mode__row { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 52px; padding: 0 16px 0 17px; text-align: left; }
+.tri-share-mode__row--single { height: 36px; }
+.tri-share-mode__row:hover { background: var(--interactive-background-hover); }
+.tri-share-mode__row > span:first-child { display: flex; flex-direction: column; min-width: 0; }
+.tri-share-mode__row strong { overflow: hidden; color: var(--text-strong); font-size: 14px; font-weight: var(--font-weight-medium); line-height: 20px; white-space: nowrap; text-overflow: ellipsis; }
+.tri-share-mode__radio { margin-left: 8px; }
+/* "Silenciar áudio da transmissão" is one line in the observed menu: the 245px width leaves it 1px short with 8px. */
+.tri-share-mode__row .tri-menu__checkbox { margin-inline-start: 6px; }
+.tri-share-mode__row small { color: var(--text-muted); font-size: 12px; font-weight: var(--font-weight-medium); line-height: 18px; }
+.tri-share-mode__radio { flex: 0 0 auto; box-sizing: border-box; width: 20px; height: 20px; border: 2px solid var(--interactive-text-default); border-radius: 50%; }
+.tri-share-mode__radio.is-checked { border: 0; background: radial-gradient(circle, var(--white) 4px, var(--control-brand-foreground-new, #5865f2) 4.5px); }
+.tri-share-mode__separator { height: 1px; margin: 18px 8px 7px; background: var(--border-subtle); }
+/* Source grid and cards: Discord's module __2f580 (go-live source picker, current Discord cache, css sha256 5fc7cee3…;
+   JS 316898225cbe6756.js e4/e7/e8): two 1fr columns, gap 24 16; a card is a column up to 447px; the preview is a 16:9
+   black box (radius-sm) inside a container whose ::before draws a 2px ring 4px out (radius-md): transparent,
+   --background-mod-strong on hover, --brand-500 when selected. Hover shows an --opacity-black-40 overlay with the
+   white CTA (--white / --black, radius-sm, padding 12/24, text-sm/medium): Discord's own colours, in every theme.
+   Name row 8px below: 16px icon, 8px gap, text-sm/medium, ellipsis. The grid keeps 4px each side for the ring. */
+.tri-share-grid { flex: 1 1 auto; overflow: hidden auto; display: grid; grid-template-columns: 1fr 1fr; gap: 24px 16px; align-content: start;
+  margin: 0 -4px; padding: 20px 4px 16px; }
+.tri-share-source { display: flex; flex-direction: column; max-width: 447px; min-width: 0; text-align: start; }
+.tri-share-source__frame { position: relative; border-radius: var(--radius-md); }
+.tri-share-source__frame::before { content: ""; position: absolute; inset: -4px; border: 2px solid transparent; border-radius: var(--radius-md); }
+.tri-share-source:hover .tri-share-source__frame::before { border-color: var(--background-mod-strong); }
+.tri-share-source.is-selected .tri-share-source__frame::before { border-color: var(--brand-500); }
+.tri-share-source__thumb { position: relative; display: block; aspect-ratio: 16 / 9; max-width: 447px; overflow: hidden; border-radius: var(--radius-sm); background: var(--black); }
+.tri-share-source__thumb img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
+.tri-share-source__overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: var(--opacity-black-40); }
+.tri-share-source:hover .tri-share-source__overlay { display: flex; }
+.tri-share-source__cta { padding: var(--space-12) var(--space-24); border-radius: var(--radius-sm); background: var(--white); color: var(--black); font-size: 14px; line-height: 18px; font-weight: var(--font-weight-medium); }
+.tri-share-source__caption { display: flex; align-items: center; gap: var(--space-8); width: 100%; margin-top: var(--space-8); color: var(--text-default); font-size: 14px; line-height: 18px; font-weight: var(--font-weight-medium); }
+.tri-share-source__caption span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tri-share-source__caption svg { flex: none; }
+/* Dispositivos with no device (e8): VideoIcon md in --icon-muted, 16px below it text-lg/medium --text-strong, 8px,
+   text-sm/medium --text-subtle. Discord's "Saiba Mais" help link is left out (no triscord help page). */
+.tri-share-empty { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 300px; text-align: center; }
+.tri-share-empty svg { margin-bottom: var(--space-16); color: var(--icon-muted); }
+.tri-share-empty strong { margin-bottom: var(--space-8); color: var(--text-strong); font-size: 18px; line-height: 22px; font-weight: var(--font-weight-medium); }
+.tri-share-empty span { color: var(--text-subtle); font-size: 14px; line-height: 18px; font-weight: var(--font-weight-medium); }
+
+/* Share picker card whose thumbnail did not arrive: icon and "Prévia indisponível" on the black card. */
+.tri-share-source__missing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  color: var(--text-muted); font-size: 14px; font-weight: var(--font-weight-medium); }

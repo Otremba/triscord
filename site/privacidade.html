@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacidade · Triscord</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="header">
+  <div class="container">
+    <a class="brand" href="/"><img src="/assets/logo.png" alt="" width="30" height="30">Triscord</a>
+    <nav class="nav" aria-label="Principal">
+      <a href="/#recursos">Recursos</a>
+      <a href="/#baixar">Baixar</a>
+      <a href="/privacidade" aria-current="page">Privacidade</a>
+      <a href="/termos">Termos</a>
+    </nav>
+    <a class="button button--small" href="/#baixar">Baixar</a>
+  </div>
+</header>
+<main class="page">
+<div class="container">
+<h1>Política de Privacidade</h1>
+<p class="lead">Última atualização: 18 de outubro de 2026</p>
+<p>O Triscord é um projeto pessoal e gratuito. Esta política descreve exatamente quais dados ele usa.
+Não há publicidade, não há rastreamento e nenhum dado é vendido ou compartilhado com terceiros.</p>
+
+<h2>Formas de entrar</h2>
+<p>Você pode entrar de duas formas:</p>
+<ul>
+<li><strong>Com um nome de usuário</strong>: basta escolher um nome. A senha é opcional e pode ser criada depois.
+Se você criar uma senha, ela é guardada apenas como um resumo criptográfico (PBKDF2 com sal aleatório). A senha em si
+nunca é armazenada. Esse modo não usa e-mail.</li>
+<li><strong>Com o Google</strong>: o aplicativo solicita apenas os escopos básicos <code>openid</code>, <code>email</code> e
+<code>profile</code>.</li>
+</ul>
+
+<h2>Dados recebidos da sua conta Google</h2>
+<p>Somente se você entrar com o Google, o Triscord recebe:</p>
+<ul>
+<li><strong>Identificador da conta</strong>: para reconhecer que é você nos acessos seguintes.</li>
+<li><strong>Endereço de e-mail</strong>: usado como identificador e para contato sobre a conta.</li>
+<li><strong>Nome e foto do perfil</strong>: usados como nome e avatar iniciais dentro do aplicativo.</li>
+</ul>
+<p>O Triscord <strong>não</strong> acessa seus e-mails, contatos, arquivos, agenda ou qualquer outro dado da sua conta
+Google, e não pede permissão para isso.</p>
+
+<h2>Dados que você cria no aplicativo</h2>
+<ul>
+<li><strong>Nome de usuário e perfil</strong> (nome de exibição, pronomes, bio, avatar e banner), visíveis para quem
+está nos mesmos servidores.</li>
+<li><strong>Servidores e convites</strong> que você cria ou aceita.</li>
+<li><strong>Mensagens de texto</strong> enviadas nas salas. Elas ficam no servidor só temporariamente, para quem entra
+ver o histórico recente da sala.</li>
+</ul>
+
+<h2>Voz, câmera e tela</h2>
+<p>Áudio e vídeo trafegam <strong>diretamente entre os computadores dos participantes</strong> (WebRTC, conexão ponto a
+ponto). Eles não passam por um servidor central, não são gravados e não são armazenados em lugar nenhum.</p>
+<p>Quando a rede impede a conexão direta, o tráfego pode ser repassado por um servidor de retransmissão, só para a
+chamada funcionar. Nesse caso, ele também não é gravado.</p>
+
+<h2>Onde os dados ficam</h2>
+<p>Os dados de conta e de perfil ficam em um banco de dados hospedado na Cloudflare. O servidor de sinalização apenas
+conecta os participantes entre si. Não há cópia desses dados em nenhum outro lugar.</p>
+
+<h2>Seus direitos</h2>
+<p>Você pode pedir a exclusão da sua conta e de todos os dados associados a qualquer momento, escrevendo para o
+endereço abaixo.</p>
+<p>Se entrou com o Google, também pode revogar o acesso do Triscord à sua conta a qualquer momento em
+<a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</p>
+
+<h2>Crianças</h2>
+<p>O Triscord não se destina a menores de 13 anos e não coleta conscientemente dados dessa faixa etária.</p>
+
+<h2>Mudanças</h2>
+<p>Se esta política mudar, a data no topo será atualizada.</p>
+</div>
+</main>
+<footer class="footer">
+  <div class="container">
+    <span>Dúvidas ou pedido de exclusão de dados: matheuscamargotech@gmail.com</span>
+    <nav aria-label="Rodapé"><a href="/privacidade">Privacidade</a><a href="/termos">Termos</a></nav>
+  </div>
+</footer>
+</body>
+</html>

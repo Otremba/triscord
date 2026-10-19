@@ -1,0 +1,26 @@
+name = "triscord-control"
+main = "src/worker.js"
+compatibility_date = "2026-10-12"
+workers_dev = true
+
+[observability]
+enabled = false
+
+[vars]
+# Cloudflare Realtime TURN App token id (not a secret - identifies the TURN
+# app whose credentials GET /ice mints). The matching API token lives only
+# as the TURN_API_TOKEN Worker secret, never in this file.
+TURN_TOKEN_ID = "625b3547f7185b08ef1432a277f5812e"
+
+[[durable_objects.bindings]]
+name = "HUB"
+class_name = "TriscordHub"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "triscord-accounts"
+database_id = "f9a49cc8-9730-4b29-af18-a0e7b6b8404e"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TriscordHub"]

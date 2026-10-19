@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/triscord">
+    <file alias="icon.png">triscord-amoled.png</file>
+  </qresource>
+</RCC>
