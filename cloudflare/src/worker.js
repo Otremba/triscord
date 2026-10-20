@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import sanitize from '../../server/sanitize.js';
 import soundCatalog from '../../shared/soundboard_catalog.json';
+import { handleErrorReports } from './error_reports.js';
 const soundIds = new Set(soundCatalog.map(sound => sound.id));
 
 const { sanitizeUsername, sanitizeUserId, sanitizeColor, sanitizeStatus,
@@ -271,6 +272,8 @@ async function handleRequest(request, env) {
     if (request.method === 'GET' && (url.pathname === '/' || url.pathname === '/health'))
       return json({ ok: true, service: 'triscord-native-control', version: '0.6.0' });
     if (request.method === 'GET' && url.pathname === '/ice') return handleIce(request, env);
+    const reports = await handleErrorReports(request, env, url, { json, resolveSession, bearerToken, equalSecret });
+    if (reports) return reports;
     if (SERVERS_RE.test(url.pathname) || SERVER_DETAIL_RE.test(url.pathname) || SERVER_INVITES_RE.test(url.pathname) || SERVER_LEAVE_RE.test(url.pathname) || INVITE_ACCEPT_RE.test(url.pathname))
       return handleServersApi(request, env, url);
     if (url.pathname !== '/socket.io/' || url.searchParams.get('EIO') !== '4' || url.searchParams.get('transport') !== 'websocket') return json({ error: 'not_found' }, 404);

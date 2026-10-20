@@ -21,6 +21,11 @@ binding = "DB"
 database_name = "triscord-accounts"
 database_id = "f9a49cc8-9730-4b29-af18-a0e7b6b8404e"
 
+# Error reports sent by the desktop app (src/error_reports.js); the admin page needs the ADMIN_KEY secret.
+[[r2_buckets]]
+binding = "LOGS"
+bucket_name = "triscord-error-reports"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["TriscordHub"]
