@@ -1,4 +1,11 @@
 const RTC_EVENTS = new Set(['webrtc-offer', 'webrtc-answer', 'webrtc-ice-candidate']);
+const RTC_LIMIT = 256, CONTROL_LIMIT = 40;
+
+export function controlRateLimitReason(data) {
+  return data.rtcRateCount > RTC_LIMIT
+    ? `Control rate limit (WebRTC ${data.rtcRateCount}/${RTC_LIMIT})`
+    : `Control rate limit (commands ${data.rateCount}/${CONTROL_LIMIT})`;
+}
 
 // Joining an existing call negotiates voice, screens and cameras with multiple peers at once.
 // ICE bursts must not consume the small UI/control budget and force an endless reconnect loop.
@@ -19,5 +26,5 @@ export function consumeControlRate(data, message, now) {
   }
   const counter = rtc ? 'rtcRateCount' : 'rateCount';
   data[counter] = (data[counter] || 0) + 1;
-  return data[counter] <= (rtc ? 256 : 40);
+  return data[counter] <= (rtc ? RTC_LIMIT : CONTROL_LIMIT);
 }

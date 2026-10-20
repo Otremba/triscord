@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { consumeControlRate } from '../src/control_rate.js';
+import { consumeControlRate, controlRateLimitReason } from '../src/control_rate.js';
 
 const packet = (event, payload = {}) => '42' + JSON.stringify([event, payload]);
 const now = 2000;
@@ -15,8 +15,10 @@ for (let peer = 0; peer < 4; ++peer) {
 // UI commands keep the old limit even while WebRTC negotiates.
 for (let n = 0; n < 40; ++n) assert(consumeControlRate(data, packet('user-state-change'), now));
 assert.equal(consumeControlRate(data, packet('user-state-change'), now), false);
+assert.equal(controlRateLimitReason(data), 'Control rate limit (commands 41/40)');
 for (let n = data.rtcRateCount; n < 256; ++n) assert(consumeControlRate(data, packet('webrtc-answer'), now));
 assert.equal(consumeControlRate(data, packet('webrtc-answer'), now), false);
+assert.equal(controlRateLimitReason(data), 'Control rate limit (WebRTC 257/256)');
 // State survives serialization; both budgets reset at the next one-second window.
 const restored = JSON.parse(JSON.stringify(data));
 assert.equal(consumeControlRate(restored, packet('webrtc-answer'), now + 999), false);
