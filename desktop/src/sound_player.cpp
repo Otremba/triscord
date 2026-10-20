@@ -1,4 +1,5 @@
 #include "sound_player.h"
+#include "sound_format.h"
 #include <QAudioSink>
 #include <QAudioBufferOutput>
 #include <QAudioBuffer>
@@ -25,10 +26,8 @@ namespace triscord {
 // channel mask as an empty output layout. Decode and hardware output remain separate.
 class SoundOutput final : public QObject {
 public:
-    static QAudioFormat format() {
-        QAudioFormat f; f.setSampleRate(48000); f.setChannelConfig(QAudioFormat::ChannelConfigStereo);
-        f.setSampleFormat(QAudioFormat::Float); return f;
-    }
+    static QAudioFormat format() { return soundPcmFormat(); }
+    QAudioFormat outputFormat() const { return format_; }
     SoundOutput(QObject* parent, std::function<void()> failure) : QObject(parent), failure_(std::move(failure)) {
         timer_.setInterval(10); connect(&timer_, &QTimer::timeout, this, [this] { flush(); });
     }
@@ -38,17 +37,21 @@ public:
         if (sink_) sink_->reset();
     }
     void setDevice(const QAudioDevice& device) {
-        if (device_.id() == device.id()) return;
-        reset(); delete sink_; sink_ = nullptr; device_ = device;
+        const auto wanted = device.isNull() ? QAudioFormat{} : soundOutputFormat(device.preferredFormat(),
+            [&](const QAudioFormat& format) { return device.isFormatSupported(format); });
+        if (device_.id() == device.id() && format_ == wanted) return;
+        reset(); delete sink_; sink_ = nullptr; device_ = device; format_ = wanted;
     }
     void setVolume(float volume) { volume_ = volume; if (sink_) sink_->setVolume(volume); }
     void append(const QAudioBuffer& buffer) {
         if (!buffer.isValid() || !buffer.byteCount()) return;
         if (!sink_) {
             if (device_.isNull()) { fail("no output device"); return; }
-            if (!device_.isFormatSupported(format())) { fail("unsupported PCM format"); return; }
-            sink_ = new QAudioSink(device_, format(), this); sink_->setBufferSize(format().bytesForDuration(80000));
+            if (!format_.isValid() || !device_.isFormatSupported(format_)) { fail("unsupported PCM format"); return; }
+            if (buffer.format() != format_) { fail("decoded PCM format mismatch"); return; }
+            sink_ = new QAudioSink(device_, format_, this); sink_->setBufferSize(format_.bytesForDuration(80000));
             sink_->setVolume(volume_);
+            qInfo("sound: output format %d Hz, %d channels, sample format %d", format_.sampleRate(), format_.channelCount(), int(format_.sampleFormat()));
         }
         if (!writer_) writer_ = sink_->start();
         if (!writer_) { fail("output did not start"); return; }
@@ -71,12 +74,13 @@ private:
             if (n < 0) { fail("PCM write failed"); return; } pending_.remove(0, n); submitted_ += n;
         }
         const bool drained = !sink_ || (sink_->state() == QtAudio::IdleState &&
-            sink_->processedUSecs() + 2500 >= format().durationForBytes(submitted_));
+            sink_->processedUSecs() + 2500 >= format_.durationForBytes(submitted_));
         if (finished_ && pending_.isEmpty() && (drained || drain_.elapsed() > 2000)) {
             auto callback = std::move(finished_); finished_ = {}; timer_.stop(); callback();
         }
     }
     QAudioDevice device_;
+    QAudioFormat format_;
     QAudioSink* sink_ = nullptr;
     QIODevice* writer_ = nullptr;
     QTimer timer_;
@@ -115,8 +119,42 @@ QMediaPlayer* SoundPlayer::createPlayer(SoundOutput*& output, CuePlayback* cue) 
             emit failed("Não foi possível enviar o som ao alto-falante. Confira a saída nas configurações.");
         });
     }
+    if (output) {
+        auto device = QMediaDevices::defaultAudioOutput();
+        if (!cue) for (const auto& candidate : QMediaDevices::audioOutputs())
+            if (candidate.id() == device_) { device = candidate; break; }
+        output->setDevice(device);
+    }
+    configureAudioBuffers(player, output, cue);
+    connect(player, &QMediaPlayer::errorOccurred, this, [this, cue] {
+        if (cue) { cue->active = false; cue->player->stop(); if (cue->output) cue->output->reset(); }
+        else { stop(); emit failed("Não foi possível reproduzir esse som. Confira a saída de áudio nas configurações."); }
+    });
+    connect(player, &QMediaPlayer::mediaStatusChanged, this, [this, player, cue](QMediaPlayer::MediaStatus status) {
+        if (status == QMediaPlayer::LoadedMedia) player->setActiveVideoTrack(-1);
+        if (status == QMediaPlayer::EndOfMedia) {
+            auto* output = cue ? cue->output : output_;
+            const auto generation = cue ? cue->generation : 0;
+            auto done = [this, cue, generation] {
+                if (cue) {
+                    if (cue->generation != generation) return;
+                    cue->active = false;
+                    if (cue->output) cue->output->reset();
+                } else stop();
+            };
+            if (output) output->finish(done); else done();
+        }
+    });
+    return player;
+}
+void SoundPlayer::configureAudioBuffers(QMediaPlayer* player, SoundOutput* output, CuePlayback* cue) {
+    const auto wanted = output && output->outputFormat().isValid() ? output->outputFormat() : SoundOutput::format();
+    auto* previous = player->audioBufferOutput();
+    if (previous && previous->format() == wanted) return;
+    player->setAudioBufferOutput(nullptr);
+    delete previous;
     if (output || qEnvironmentVariableIsSet("TRISCORD_TEST_DECODE_AUDIO")) {
-        auto* buffers = new QAudioBufferOutput(SoundOutput::format(), player);
+        auto* buffers = new QAudioBufferOutput(wanted, player);
         player->setAudioBufferOutput(buffers);
         if (output) connect(buffers, &QAudioBufferOutput::audioBufferReceived, output, [output](const QAudioBuffer& buffer) { output->append(buffer); });
         connect(buffers, &QAudioBufferOutput::audioBufferReceived, this, [this, cue](const QAudioBuffer& buffer) {
@@ -138,26 +176,6 @@ QMediaPlayer* SoundPlayer::createPlayer(SoundOutput*& output, CuePlayback* cue) 
             if (peak > 0) { reported = true; emit decoded(cue ? "cue" : "soundboard", id, buffer.sampleCount(), peak); }
         });
     }
-    connect(player, &QMediaPlayer::errorOccurred, this, [this, cue] {
-        if (cue) { cue->active = false; cue->player->stop(); if (cue->output) cue->output->reset(); }
-        else { stop(); emit failed("Não foi possível reproduzir esse som. Confira a saída de áudio nas configurações."); }
-    });
-    connect(player, &QMediaPlayer::mediaStatusChanged, this, [this, player, cue](QMediaPlayer::MediaStatus status) {
-        if (status == QMediaPlayer::LoadedMedia) player->setActiveVideoTrack(-1);
-        if (status == QMediaPlayer::EndOfMedia) {
-            auto* output = cue ? cue->output : output_;
-            const auto generation = cue ? cue->generation : 0;
-            auto done = [this, cue, generation] {
-                if (cue) {
-                    if (cue->generation != generation) return;
-                    cue->active = false;
-                    if (cue->output) cue->output->reset();
-                } else stop();
-            };
-            if (output) output->finish(done); else done();
-        }
-    });
-    return player;
 }
 void SoundPlayer::playCue(const QString& id) {
     const bool feedback = id == "mute" || id == "unmute" || id == "deafen" || id == "undeafen";
@@ -258,8 +276,14 @@ void SoundPlayer::setOutput(const QByteArray& id) {
     device_ = id;
     auto device = QMediaDevices::defaultAudioOutput();
     for (const auto& d : QMediaDevices::audioOutputs()) if (d.id() == id) { device = d; break; }
-    if (output_) output_->setDevice(device);
+    if (output_) {
+        output_->setDevice(device);
+        configureAudioBuffers(player_, output_, nullptr);
+    }
     const auto notificationDevice = QMediaDevices::defaultAudioOutput();
-    for (const auto& [cueId, cue] : cues_) if (cue->output) cue->output->setDevice(notificationDevice);
+    for (const auto& [cueId, cue] : cues_) if (cue->output) {
+        cue->output->setDevice(notificationDevice);
+        configureAudioBuffers(cue->player, cue->output, cue.get());
+    }
 }
 }

@@ -36,6 +36,7 @@ private:
         bool active = false, decoded = false;
     };
     QMediaPlayer* createPlayer(SoundOutput*& output, CuePlayback* cue = nullptr);
+    void configureAudioBuffers(QMediaPlayer* player, SoundOutput* output, CuePlayback* cue);
     QMediaPlayer* player_ = nullptr;
     SoundOutput* output_ = nullptr;
     // Heap-owned entries keep callback addresses stable as other cue IDs are inserted.
