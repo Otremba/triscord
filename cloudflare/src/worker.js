@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import sanitize from '../../server/sanitize.js';
 import soundCatalog from '../../shared/soundboard_catalog.json';
 import { handleErrorReports } from './error_reports.js';
+import { consumeControlRate } from './control_rate.js';
 const soundIds = new Set(soundCatalog.map(sound => sound.id));
 
 const { sanitizeUsername, sanitizeUserId, sanitizeColor, sanitizeStatus,
@@ -371,8 +372,7 @@ export class TriscordHub extends DurableObject {
     if (!client) return;
     if (typeof message !== 'string' || message.length > 262144) { ws.close(1009, 'Control message too large'); this.close(client); return; }
     const now = Date.now();
-    if (now - client.data.rateTime > 1000) { client.data.rateTime = now; client.data.rateCount = 0; }
-    if (++client.data.rateCount > 40) { ws.close(1008, 'Control rate limit'); this.close(client); return; }
+    if (!consumeControlRate(client.data, message, now)) { ws.close(1008, 'Control rate limit'); this.close(client); return; }
     if (!(await this.validateSession(client))) return;
     this.attach(client);
     try {
