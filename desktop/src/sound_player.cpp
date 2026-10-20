@@ -18,6 +18,7 @@
 #include <cmath>
 #include <functional>
 #include <QElapsedTimer>
+#include <QDebug>
 static void initializeWebSounds() { static const bool once = [] { Q_INIT_RESOURCE(soundboard); return true; }(); Q_UNUSED(once); }
 namespace triscord {
 // An explicit PCM layout avoids Qt/FFmpeg interpreting a headset's unspecified Windows
@@ -44,22 +45,30 @@ public:
     void append(const QAudioBuffer& buffer) {
         if (!buffer.isValid() || !buffer.byteCount()) return;
         if (!sink_) {
-            if (device_.isNull() || !device_.isFormatSupported(format())) { fail(); return; }
+            if (device_.isNull()) { fail("no output device"); return; }
+            if (!device_.isFormatSupported(format())) { fail("unsupported PCM format"); return; }
             sink_ = new QAudioSink(device_, format(), this); sink_->setBufferSize(format().bytesForDuration(80000));
             sink_->setVolume(volume_);
         }
         if (!writer_) writer_ = sink_->start();
-        if (!writer_ || (sink_->error() != QtAudio::NoError && sink_->error() != QtAudio::UnderrunError) || pending_.size() + buffer.byteCount() > 4194304) { fail(); return; }
+        if (!writer_) { fail("output did not start"); return; }
+        if (sink_->error() != QtAudio::NoError && sink_->error() != QtAudio::UnderrunError) { fail("audio sink error"); return; }
+        if (pending_.size() + buffer.byteCount() > 4194304) { fail("PCM queue overflow"); return; }
         pending_.append(buffer.constData<char>(), buffer.byteCount()); timer_.start(); flush();
     }
     void finish(std::function<void()> callback) { finished_ = std::move(callback); drain_.start(); timer_.start(); }
 private:
-    void fail() { reset(); failure_(); }
+    void fail(const char* reason) {
+        qWarning().noquote() << "sound: output failed:" << reason
+            << "error" << (sink_ ? int(sink_->error()) : -1)
+            << "state" << (sink_ ? int(sink_->state()) : -1);
+        reset(); failure_();
+    }
     void flush() {
-        if (sink_ && sink_->error() != QtAudio::NoError && sink_->error() != QtAudio::UnderrunError) { fail(); return; }
+        if (sink_ && sink_->error() != QtAudio::NoError && sink_->error() != QtAudio::UnderrunError) { fail("audio sink error"); return; }
         if (writer_ && !pending_.isEmpty()) {
             const auto n = writer_->write(pending_.constData(), std::min<qint64>(pending_.size(), sink_->bytesFree()));
-            if (n < 0) { fail(); return; } pending_.remove(0, n); submitted_ += n;
+            if (n < 0) { fail("PCM write failed"); return; } pending_.remove(0, n); submitted_ += n;
         }
         const bool drained = !sink_ || (sink_->state() == QtAudio::IdleState &&
             sink_->processedUSecs() + 2500 >= format().durationForBytes(submitted_));

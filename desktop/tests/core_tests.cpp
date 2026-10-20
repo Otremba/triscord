@@ -56,6 +56,12 @@ private slots:
         loop += "10:03:00.000 video: 9 lost packets recovered by retransmission, 60 unrecoverable (last 10 s)\n10:04:00.000 error: qt.core: fatal-ish\n";
         QCOMPARE(logSignals(loop), (QStringList{"packet-loss", "signaling", "voice-reconnect", "qt-error"}));
     }
+    void errorReportsRecognizeSoundOutputFailures() {
+        const QString legacy = QStringLiteral("15:49:13.970 notice: Não foi possível enviar o som ao alto-falante. Confira a saída nas configurações.\r\n");
+        QCOMPARE(logSignals(legacy), QStringList{"sound-output"});
+        QCOMPARE(logSignals(QStringLiteral("15:49:13.970 warning: sound: output failed: unsupported PCM format error -1 state -1\n")), QStringList{"sound-output"});
+        QVERIFY(logSignals(QStringLiteral("15:49:13.970 voice: Voz conectada.\n")).isEmpty());
+    }
     void errorReportTextKeepsTheHeaderAndHidesSecrets() {
         const QString log = "00:00:00.000 Triscord 0.9.39, x\nsession " + QString(64, 'a') + " for diego@example.com\n" + QString(2000, 'z') + "\nlast line\n";
         const auto text = reportText(log, 600);

@@ -5,9 +5,7 @@
 #include <QVersionNumber>
 
 namespace triscord {
-// What makes a session's log worth an error report (20/10): the app sends the previous run's log only when one of
-// these shows up, so a session without trouble never leaves the computer. Each threshold sits above what a healthy
-// call writes; the names are the signals the admin page groups by (cloudflare/src/error_reports.js).
+// Labels attached to periodic reports, including reports without failures. The admin page groups by these names.
 inline constexpr char kLogClosedLine[] = "Triscord closed";
 // The first version whose log ends with kLogClosedLine; an older log never does, so its end proves nothing.
 inline constexpr char kFirstVersionWithClosedLine[] = "0.9.39";
@@ -29,6 +27,8 @@ inline QStringList logSignals(const QString& log) {
     add("screen-start", log.contains(QStringLiteral("screen: start failed")));
     add("decoder", log.contains(QStringLiteral("keyframe: decoder:")));
     add("capture", log.contains(QRegularExpression(QStringLiteral("capture: [^\\n]*failed"))));
+    add("sound-output", log.contains(QStringLiteral("Não foi possível enviar o som ao alto-falante."))
+        || log.contains(QStringLiteral("sound: output failed:")));
     // "video: asked the sender for a keyframe: frame backlog x12, incomplete frame x3", one line per 10 s at most.
     qint64 keyframes = 0;
     static const QRegularExpression times(QStringLiteral(" x(\\d+)(?=,|$)"));
