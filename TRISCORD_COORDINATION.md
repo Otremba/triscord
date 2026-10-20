@@ -1,7 +1,7 @@
 # Estado atual do Triscord
 
 - Cliente principal: `desktop/src` (C++20/Qt) e `desktop/web` (Preact/WebView2).
-- Branch principal: `main`. A versão nativa publicada é `desktop-v0.9.41`.
+- Branch principal: `main`. A versão nativa publicada é `desktop-v0.9.42`.
 - Download: https://triscord.pages.dev . Releases nativas e Electron antigo têm canais separados; a ponte de migração ainda não foi implementada.
 - Servidor Node em `server/` é mantido por compatibilidade e por ferramentas/testes locais. Os serviços do cliente distribuído ficam em `cloudflare/` e `cloudflare-auth/`.
 - Não executar E2E sem nova instrução do usuário. A CI padrão não os executa. Compilações/testes Qt e empacotamento devem ser sequenciais.
@@ -91,3 +91,5 @@ Nenhum build ou teste do Claude está em andamento.
 Os relatórios anteriores, incluindo resultados de testes e evidências REA, foram preservados em `docs/history/`. Instruções de agentes e estados de versões antigas nesses arquivos são históricos, não requisitos atuais.
 
 **Publicação de 20/10: 0.9.41** (commit `3700906`, `make_latest: false`): envio automático de logs a cada 30 minutos também durante chamadas. Pacote com verificação em execução usando perfil isolado (`runtimeVerified=true`); instalador e checksum publicados, download público HTTP 200 com SHA-256 conferido. Site: `cd75bb37.triscord.pages.dev`. Wrangler deslogado; versões anteriores preservadas.
+
+**Publicação do monitor (20/10): 0.9.42**, commit `0bfc342`, com diagnóstico/classificação de falhas de saída dos sons. Causa da falha ainda pendente. Pacote validado em perfil isolado, instalador e SHA-256 publicados, download público HTTP 200 com hash conferido. Pages `99378baf.triscord.pages.dev`; Wrangler deslogado.
