@@ -1,7 +1,7 @@
 # Estado atual do Triscord
 
 - Cliente principal: `desktop/src` (C++20/Qt) e `desktop/web` (Preact/WebView2).
-- Branch principal: `main`. A versão nativa publicada é `desktop-v0.9.43`.
+- Branch principal: `main`. A versão nativa publicada é `desktop-v0.9.44`.
 - Download: https://triscord.pages.dev . Releases nativas e Electron antigo têm canais separados; a ponte de migração ainda não foi implementada.
 - Servidor Node em `server/` é mantido por compatibilidade e por ferramentas/testes locais. Os serviços do cliente distribuído ficam em `cloudflare/` e `cloudflare-auth/`.
 - Não executar E2E sem nova instrução do usuário. A CI padrão não os executa. Compilações/testes Qt e empacotamento devem ser sequenciais.
@@ -97,3 +97,5 @@ Os relatórios anteriores, incluindo resultados de testes e evidências REA, for
 **Monitor, 20/10: 0.9.43 publicada**, commit `bdc36ac`: corrige arredondamento do timer de captura, que podia descartar disparos alternados. Testes unitários sem interface passaram; sem E2E, captura ou execução de app/instalador (`runtimeVerified=false`). Download público com SHA-256 conferido. Site `30e3e85c.triscord.pages.dev`, republicado usando token Pages restrito, protegido por DPAPI fora do Git. OAuth do Wrangler permanece deslogado. Próximos deploys via `site/deploy.ps1`.
 
 **Monitor, 20/10: reconexão por limite de sinalização corrigida no servidor**, commit `2f0316f`, Worker `e0302b2e`. Negociação WebRTC tem orçamento separado (256/s) do controle comum (40/s), evitando expulsar clientes ao negociar chamadas com vários participantes. Unitários Node + bundle passaram; health 200 após deploy, OAuth deslogado. Nenhuma release nativa nova: 0.9.43 continua atual. Sem E2E ou execução do aplicativo.
+
+**20/10: 0.9.44 publicada** (commit `9a157a0`, `make_latest: false`): corrige formato de áudio fixo recusado por certas saídas, com negociação e decodificação compatíveis. Testes unitários sem interface passaram; compilação/empacotamento sem E2E ou execução do app/instalador (`runtimeVerified=false`). Download público e checksum conferidos; site `e040a52d.triscord.pages.dev`, token Pages, OAuth deslogado. Reprodução real ainda aguarda confirmação.
