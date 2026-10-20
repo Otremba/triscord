@@ -1,7 +1,7 @@
 # Estado atual do Triscord
 
 - Cliente principal: `desktop/src` (C++20/Qt) e `desktop/web` (Preact/WebView2).
-- Branch principal: `main`. A versão nativa publicada é `desktop-v0.9.42`.
+- Branch principal: `main`. A versão nativa publicada é `desktop-v0.9.43`.
 - Download: https://triscord.pages.dev . Releases nativas e Electron antigo têm canais separados; a ponte de migração ainda não foi implementada.
 - Servidor Node em `server/` é mantido por compatibilidade e por ferramentas/testes locais. Os serviços do cliente distribuído ficam em `cloudflare/` e `cloudflare-auth/`.
 - Não executar E2E sem nova instrução do usuário. A CI padrão não os executa. Compilações/testes Qt e empacotamento devem ser sequenciais.
@@ -93,3 +93,5 @@ Os relatórios anteriores, incluindo resultados de testes e evidências REA, for
 **Publicação de 20/10: 0.9.41** (commit `3700906`, `make_latest: false`): envio automático de logs a cada 30 minutos também durante chamadas. Pacote com verificação em execução usando perfil isolado (`runtimeVerified=true`); instalador e checksum publicados, download público HTTP 200 com SHA-256 conferido. Site: `cd75bb37.triscord.pages.dev`. Wrangler deslogado; versões anteriores preservadas.
 
 **Publicação do monitor (20/10): 0.9.42**, commit `0bfc342`, com diagnóstico/classificação de falhas de saída dos sons. Causa da falha ainda pendente. Pacote validado em perfil isolado, instalador e SHA-256 publicados, download público HTTP 200 com hash conferido. Pages `99378baf.triscord.pages.dev`; Wrangler deslogado.
+
+**Monitor, 20/10: 0.9.43 publicada**, commit `bdc36ac`: corrige arredondamento do timer de captura, que podia descartar disparos alternados. Testes unitários sem interface passaram; sem E2E, captura ou execução de app/instalador (`runtimeVerified=false`). Download público com SHA-256 conferido. Site `30e3e85c.triscord.pages.dev`, republicado usando token Pages restrito, protegido por DPAPI fora do Git. OAuth do Wrangler permanece deslogado. Próximos deploys via `site/deploy.ps1`.
