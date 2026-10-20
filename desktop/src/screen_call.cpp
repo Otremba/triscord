@@ -52,7 +52,7 @@ void ScreenCall::adaptBitrate(BitrateSignal signal) {
         if (encoder_) encoder_->setBitrate(target);
         else emit bitrateRequested(target);
         // In the log a user can send: a stream that turns blurry shows here with its cause.
-        std::printf("%s: bitrate %d kbps for %d viewer(s)%s\n", media_ == MediaKind::Camera ? "camera" : "screen", target / 1000, viewers,
+        std::printf("%s: bitrate %d kbps for %d viewer(s)%s\n", kind(), target / 1000, viewers,
                     signal == BitrateSignal::Congested ? " (send buffer full)" : signal == BitrateSignal::KeyframeRequest ? " (viewer losses)" : "");
         std::fflush(stdout);
     } catch (const std::exception& error) {
@@ -163,6 +163,9 @@ void ScreenCall::start(const CaptureSource& source, bool shareAudio, VideoConfig
         for (const auto& [id, member] : members_) { (void)member; reconcile(id, true); }
         if (shareAudio) audio_.startCapture();
         captureTimer_.start(); emit sharingChanged(true);
+        std::printf("%s: sharing %dx%d at %d fps, %d kbps, %s encoder, %s capture%s\n", kind(), config_.size.width(), config_.size.height(), config_.fps,
+                    config_.bitrate / 1000, encoder_->hardware() ? "hardware" : "software", encoder_->usingGdi() ? "GDI" : "WGC", shareAudio ? ", with audio" : "");
+        std::fflush(stdout); sentFrames_ = 0; statsClock_.start();
     } catch (const std::exception& error) { qWarning("screen: start failed: %s", error.what()); stop(); emit message("Não foi possível compartilhar. Escolha outra fonte ou confira o driver de vídeo."); }
 }
 void ScreenCall::startInjected() {
@@ -183,6 +186,7 @@ void ScreenCall::stop(bool notify) {
     audio_.stopCapture();
     captureTimer_.stop(); encoder_.reset();
     const bool wasSharing = sharing_; sharing_ = false;
+    if (wasSharing) { std::printf("%s: sharing stopped\n", kind()); std::fflush(stdout); }
     bitrate_.reset();
     emit generationRemoved("$local");
     if (notify) emit sharingChanged(false);
@@ -217,6 +221,7 @@ void ScreenCall::tick() {
     try {
         auto result = encoder_->tick();
         for (const auto& encoded : result.encoded) sendFrame(encoded);
+        sentFrames_ += int(result.encoded.size());
         if (result.preview) emit frame("$local", localGeneration_, result.preview->image);
     } catch (const std::exception& error) { qWarning("screen: capture/encode failed: %s", error.what()); stop(); emit message("O compartilhamento foi interrompido. Confira a fonte e tente novamente."); }
 }
@@ -232,6 +237,12 @@ void ScreenCall::receive(const QString& id, const QString& local, const QByteArr
         const auto time = session.clock.accept(stamp); if (!time) return;
         auto render = [&] {
             for (const auto& decoded : session.decoder->poll()) {
+                ++session.decodedFrames;
+                if (!session.firstFrameLogged) {
+                    session.firstFrameLogged = true;
+                    std::printf("%s: first frame from peer %s (%dx%d at %d fps)\n", kind(), qPrintable(id.left(6)), session.remoteConfig.size.width(),
+                                session.remoteConfig.size.height(), session.remoteConfig.fps); std::fflush(stdout);
+                }
                 const bool focused = focus_.isEmpty() || focus_ == id;
                 if (session.rendered.isValid() && session.rendered.elapsed() < screenRenderInterval(session.remoteConfig, focused)) continue;
                 session.rendered.start();
@@ -337,10 +348,28 @@ void ScreenCall::event(const QString& name, const QJsonArray& args) {
             if (member->second.watching) requestLocalKeyframe();
         } else if (name == "kicked" || name == "session-replaced") leave();
         else if (name.startsWith("webrtc-") && !room_.isEmpty()) signal(name, payload);
-    } catch (const std::exception&) { emit message("Não foi possível conectar uma transmissão. Tente entrar novamente na sala."); }
+    } catch (const std::exception& error) {
+        std::printf("%s: %s failed: %s\n", kind(), qPrintable(name), error.what()); std::fflush(stdout);
+        emit message("Não foi possível conectar uma transmissão. Tente entrar novamente na sala.");
+    }
+}
+void ScreenCall::logStats() {
+    if (!statsClock_.isValid()) { statsClock_.start(); return; }
+    const double seconds = statsClock_.elapsed() / 1000.0;
+    if (seconds < 60) return;
+    if (sharing_ && encoder_)
+        std::printf("%s: last %.0f s: sent %d frames (%.1f fps) to %d viewer(s)\n", kind(), seconds, sentFrames_, sentFrames_ / seconds,
+                    int(std::count_if(members_.begin(), members_.end(), [](const auto& member) { return member.second.watching; })));
+    for (auto& [id, session] : peers_)
+        if (session->decoder) std::printf("%s: last %.0f s from peer %s: %d frames decoded (%.1f fps)\n", kind(), seconds, qPrintable(id.left(6)),
+                                          session->decodedFrames, session->decodedFrames / seconds);
+    std::fflush(stdout);
+    sentFrames_ = 0; for (auto& [id, session] : peers_) { (void)id; session->decodedFrames = 0; }
+    statsClock_.start();
 }
 void ScreenCall::recover() {
     adaptBitrate(BitrateSignal::Calm);
+    logStats();
     QStringList rebuild;
     for (const auto& [id, session] : peers_) {
         if (session->peer->connected()) {
@@ -353,6 +382,7 @@ void ScreenCall::recover() {
         if (self_ < id && session->age.elapsed() > 12000 && session->attempts < 3) rebuild.append(id);
         else if (!session->failureReported && session->age.elapsed() > (self_ < id ? 12000 : 60000)) {
             session->failureReported = true;
+            std::printf("%s: no connection to peer %s after %d attempts\n", kind(), qPrintable(id.left(6)), session->attempts + 1); std::fflush(stdout);
             emit message("Não foi possível conectar a tela de " + members_.at(id).name + ". Tente entrar novamente ou usar outra rede.");
         }
     }

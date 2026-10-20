@@ -295,7 +295,7 @@ if(TRISCORD_BUILD_DEV_TOOLS OR TRISCORD_BUILD_WEB_CLIENT)
   add_executable(triscord-web tools/web_main.cpp ${CMAKE_CURRENT_BINARY_DIR}/generated/web_application.rc src/webview_host.cpp src/webview_host.h src/core_session.cpp src/core_session.h
     src/win_notifier.cpp src/win_notifier.h src/update_splash.cpp src/update_splash.h assets/application.qrc
     src/video_overlays.cpp src/video_overlays.h src/sound_player.cpp src/sound_player.h assets/soundboard.qrc
-    src/discord_icons.cpp src/discord_icons.h src/markdown_parser.cpp src/markdown_parser.h src/markdown_web.h)
+    src/discord_icons.cpp src/discord_icons.h src/markdown_parser.cpp src/markdown_parser.h src/markdown_web.h src/system_info.cpp src/system_info.h)
   set_target_properties(triscord-web PROPERTIES AUTORCC ON)
   target_sources(triscord-web PRIVATE src/bundled_fonts.cpp src/bundled_fonts.h)
   if(TRISCORD_LOCAL_FONT_FILES)
@@ -304,7 +304,7 @@ if(TRISCORD_BUILD_DEV_TOOLS OR TRISCORD_BUILD_WEB_CLIENT)
   endif()
   target_include_directories(triscord-web PRIVATE src "${TRISCORD_WEBVIEW2_SDK}/include" "${CMAKE_CURRENT_BINARY_DIR}/generated")
   target_compile_definitions(triscord-web PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE TRISCORD_VERSION="${PROJECT_VERSION}")
-  target_link_libraries(triscord-web PRIVATE triscord_screen_call triscord_camera triscord_voice triscord_auth triscord_core Qt6::Gui ole32 shlwapi shell32 dwmapi)
+  target_link_libraries(triscord-web PRIVATE triscord_screen_call triscord_camera triscord_voice triscord_auth triscord_core Qt6::Gui ole32 shlwapi shell32 dwmapi dxgi)
   add_custom_command(TARGET triscord-web POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${TRISCORD_WEBVIEW2_SDK}/x64/WebView2Loader.dll" "$<TARGET_FILE_DIR:triscord-web>")
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/web/dist/index.html")

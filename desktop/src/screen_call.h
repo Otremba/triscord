@@ -63,6 +63,8 @@ private:
         int attempts = 0;
         bool described = false, configured = false;
         bool failureReported = false;
+        int decodedFrames = 0;   // since the last stats line (logStats)
+        bool firstFrameLogged = false;
     };
     Session& create(const QString& id, int attempts = 0);
     void reconcile(const QString& id, bool rebuild = false);
@@ -93,6 +95,11 @@ private:
     std::map<QString, std::unique_ptr<Session>> peers_;
     std::unique_ptr<ScreenEncoder> encoder_;
     QTimer captureTimer_, recoveryTimer_;
+    // Once a minute while sharing or watching: frames sent and shown, for "travando" reports (logStats).
+    QElapsedTimer statsClock_;
+    int sentFrames_ = 0;
+    void logStats();
+    const char* kind() const { return media_ == MediaKind::Camera ? "camera" : "screen"; }   // log prefix
     CaptureThumbnails thumbnails_{this};
     ScreenAudio audio_{this};
     quint64 nextGeneration_ = 0, localGeneration_ = 0;

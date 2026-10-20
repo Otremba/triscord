@@ -50,6 +50,7 @@ private slots:
         QVERIFY(logSignals(healthy).isEmpty());
         QVERIFY(logSignals(QString(healthy).replace("0.9.37", "0.9.39") + "10:01:00.000 Triscord closed\n").isEmpty());
         QCOMPARE(logSignals(QString(healthy).replace("0.9.37", "0.9.39")), QStringList{"unclean-exit"});
+        QCOMPARE(logSignals(healthy + "10:01:00.000 crash: exception 0xC0000005 at Qt6Gui.dll+0x1A2B3\n"), QStringList{"crash"});
         QString loop = healthy;
         for (int n = 0; n < 3; ++n) loop += "10:02:00.000 voice: connection restored, rejoining the call\n10:02:01.000 signaling: heartbeat timeout\n";
         loop += "10:03:00.000 video: 9 lost packets recovered by retransmission, 60 unrecoverable (last 10 s)\n10:04:00.000 error: qt.core: fatal-ish\n";

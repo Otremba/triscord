@@ -190,11 +190,16 @@ void VoiceCall::event(const QString& name, const QJsonArray& args) {
             }
             recovery_.start();
             playout_.start();
+            std::printf("voice: joined the room with %d other(s)\n", int(peers_.size())); std::fflush(stdout);
         } else if (name == "user-joined" && !room_.isEmpty()) {
             const auto id = payload.value("socketId").toString();
             if (payload.value("userData").toObject().value("isServerMuted").toBool()) serverMutedPeers_.insert(id);
             addMember(id);
-        } else if (name == "user-left") { const auto id = payload.value("socketId").toString(); removeMember(id); serverMutedPeers_.remove(id); }
+            std::printf("voice: peer %s joined\n", qPrintable(id.left(6))); std::fflush(stdout);
+        } else if (name == "user-left") {
+            const auto id = payload.value("socketId").toString(); removeMember(id); serverMutedPeers_.remove(id);
+            std::printf("voice: peer %s left\n", qPrintable(id.left(6))); std::fflush(stdout);
+        }
         else if (name == "user-state-updated" && payload.value("state").toObject().contains("isServerMuted")) {
             const auto id = payload.value("socketId").toString(); const bool muted = payload.value("state").toObject().value("isServerMuted").toBool();
             if (id == self_) { serverMuted_ = muted; if (muted) devices_.setMuted(true); }
@@ -206,7 +211,10 @@ void VoiceCall::event(const QString& name, const QJsonArray& args) {
         }
         else if (name == "kicked" || name == "session-replaced") leave();
         else if (name.startsWith("webrtc-") && !room_.isEmpty()) receiveSignal(name, payload);
-    } catch (const std::exception&) { emit message("Não foi possível estabelecer a voz. Tente entrar novamente."); }
+    } catch (const std::exception& error) {
+        std::printf("voice: %s failed: %s\n", qPrintable(name), error.what()); std::fflush(stdout);
+        emit message("Não foi possível estabelecer a voz. Tente entrar novamente.");
+    }
 }
 void VoiceCall::receiveSignal(const QString& name, const QJsonObject& payload) {
     const auto kind = payload.value("type").toString();
@@ -253,6 +261,7 @@ void VoiceCall::recover() {
         if (self_ < id && !session->peer->connected() && session->age.elapsed() > 12000 && session->attempts < 3) rebuild.append(id);
         else if (self_ < id && !session->peer->connected() && session->age.elapsed() > 12000 && !session->failureReported) {
             session->failureReported = true;
+            std::printf("voice: gave up connecting to peer %s after %d attempts\n", qPrintable(id.left(6)), session->attempts + 1); std::fflush(stdout);
             emit message("Não foi possível conectar a voz de um participante. Confira a rede e entre novamente na sala.");
         }
     }
@@ -260,6 +269,7 @@ void VoiceCall::recover() {
         const int attempts = peers_.at(id)->attempts + 1;
         auto& session = create(id, attempts);
         session.peer->offer();
+        std::printf("voice: no connection to peer %s after 12 s, retrying (attempt %d)\n", qPrintable(id.left(6)), attempts + 1); std::fflush(stdout);
         emit message("Reconectando a voz de um participante.");
     }
 }

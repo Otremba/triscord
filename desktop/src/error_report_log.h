@@ -25,6 +25,7 @@ inline QStringList logSignals(const QString& log) {
     const bool closedLineKnown = !version.isEmpty()
         && QVersionNumber::fromString(version) >= QVersionNumber::fromString(QString::fromLatin1(kFirstVersionWithClosedLine));
     add("unclean-exit", closedLineKnown && !log.trimmed().endsWith(QString::fromLatin1(kLogClosedLine)));
+    add("crash", log.contains(QRegularExpression(QStringLiteral("(?:^|\\n)(?:\\S+ )?crash: "))));
     add("screen-start", log.contains(QStringLiteral("screen: start failed")));
     add("decoder", log.contains(QStringLiteral("keyframe: decoder:")));
     add("capture", log.contains(QRegularExpression(QStringLiteral("capture: [^\\n]*failed"))));

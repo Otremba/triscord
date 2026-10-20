@@ -250,6 +250,16 @@ CoreSession::CoreSession(Signaling* signaling, VoiceService* voice, AuthSession*
         // refused from then on, so without a fresh list the client retried that server forever (18/10).
         if (!switchingServer_) refreshServers();
     });
+    // Voice problems ("Reconectando a voz de um participante", device failures) are not shown in this interface; the
+    // log keeps them, each text at most once per 10 s (a failing send repeats it for every packet).
+    connect(voice_, &VoiceService::message, this, [](const QString& text) {
+        static QHash<QString, qint64> last;
+        const auto now = QDateTime::currentMSecsSinceEpoch();
+        auto& at = last[text];
+        if (at && now - at < 10000) return;
+        at = now;
+        std::printf("voice: %s\n", qPrintable(text)); std::fflush(stdout);
+    });
     connect(voice_, &VoiceService::speakingChanged, this, [this](const QString& peer, bool active) {
         const bool changed = active ? !speaking_.contains(peer) : speaking_.contains(peer);
         if (!changed) return;

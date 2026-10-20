@@ -18,6 +18,8 @@ public:
     ScreenTick tick();
     bool requestKeyframe();
     void setBitrate(int bitrate) { encoder_.setBitrate(bitrate); requestKeyframe(); }
+    bool hardware() const { return encoder_.hardware(); }
+    bool usingGdi() const { return capture_.usingGdi(); }
 private:
     VideoConfig config_;
     CaptureSource source_;

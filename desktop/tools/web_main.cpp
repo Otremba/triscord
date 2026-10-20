@@ -22,6 +22,8 @@
 #include "update_splash.h"
 #include "log_filter.h"
 #include "error_report_log.h"
+#include "system_info.h"
+#include <exception>
 
 #include <share.h>
 #include <io.h>
@@ -40,6 +42,7 @@
 #include <QJsonDocument>
 #include <QScreen>
 #include <QSessionManager>
+#include <QSet>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTimer>
@@ -86,6 +89,19 @@ protected:
     }
 };
 
+// Commands the page sends many times a minute (video layout and acks): they buried the useful lines (20/10).
+static bool quietCommand(const QString& name) {
+    static const QSet<QString> quiet{"videoStats", "videoSurface", "videoStageOccluders", "videoOccluders", "videoIdle", "videoAck",
+                                     "keepCameraPreview", "window"};
+    return quiet.contains(name);
+}
+// A command's name, plus the setting key for setSetting (never its value: device ids, volumes).
+static QString commandLabel(const QJsonObject& incoming) {
+    const auto command = incoming.value("command").toObject();
+    const auto name = command.value("name").toString();
+    return name == "setSetting" ? name + " " + command.value("key").toString().left(40) : name;
+}
+
 static void log(const QString& text) { std::printf("%s\n", text.toUtf8().constData()); std::fflush(stdout); }
 
 // The log file's writer: every line of stdout/stderr arrives through a pipe and is written with the time in front,
@@ -131,12 +147,44 @@ void finishLog() {
 // screen share held the generic notice but not "screen: start failed: <reason>". Debug messages stay out.
 void logQtMessage(QtMsgType type, const QMessageLogContext& context, const QString& text) {
     if (type == QtDebugMsg) return;
+    // Qt Multimedia asks for a single-threaded apartment on media threads that joined the multithreaded one on purpose
+    // (com_apartment.h); its "Failed to initialize COM library" is expected there and only looked like a bug.
+    if (text.startsWith(QLatin1String("Failed to initialize COM library"))) return;
     const bool named = context.category && std::strcmp(context.category, "default") != 0;
     std::fprintf(stderr, "%s%s%s%s\n", type == QtInfoMsg ? "" : type == QtWarningMsg ? "warning: " : "error: ",
                  named ? context.category : "", named ? ": " : "", text.toUtf8().constData());
     std::fflush(stderr);
     if (type == QtFatalMsg) std::abort();
 }
+}
+
+// A crash leaves its code and where it happened (module + offset) instead of a log that just stops (20/10). The
+// writer thread still runs while the filter does, so a short wait gets the line into the file.
+static LONG WINAPI logCrash(EXCEPTION_POINTERS* info) {
+    const auto* record = info->ExceptionRecord;
+    HMODULE module = nullptr;
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       static_cast<LPCWSTR>(record->ExceptionAddress), &module);
+    wchar_t path[MAX_PATH] = L"unknown";
+    if (module) GetModuleFileNameW(module, path, MAX_PATH);
+    const wchar_t* file = wcsrchr(path, L'\\'); file = file ? file + 1 : path;
+    char name[MAX_PATH * 3] = {};
+    WideCharToMultiByte(CP_UTF8, 0, file, -1, name, sizeof name, nullptr, nullptr);
+    std::fprintf(stderr, "crash: exception 0x%08lX at %s+0x%llX\n", static_cast<unsigned long>(record->ExceptionCode), name,
+                 static_cast<unsigned long long>(static_cast<const char*>(record->ExceptionAddress) - reinterpret_cast<const char*>(module)));
+    std::fflush(stderr);
+    Sleep(300);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+static void logTerminate() {
+    const char* what = "unknown";
+    try { if (const auto error = std::current_exception()) std::rethrow_exception(error); }
+    catch (const std::exception& error) { what = error.what(); }
+    catch (...) {}
+    std::fprintf(stderr, "crash: uncaught exception: %s\n", what);
+    std::fflush(stderr);
+    Sleep(300);
+    std::abort();
 }
 
 // The last line of a run that ended normally; error reports treat a log without it as an unclean exit.
@@ -196,8 +244,14 @@ int main(int argc, char** argv) {
         return 0;
     }
     const auto logDirectory = logToFile();
+    SetUnhandledExceptionFilter(logCrash);
+    std::set_terminate(logTerminate);
     QGuiApplication app(argc, argv);
     instance.startListening();
+    logSystemInfo();
+    // Tests check the crash line on a real access violation; only with their own settings.
+    if (!qEnvironmentVariable("TRISCORD_SETTINGS_PATH").isEmpty() && qEnvironmentVariable("TRISCORD_CRASH_TEST") == "1")
+        QTimer::singleShot(4000, [] { volatile int* nowhere = nullptr; *nowhere = 1; });
     app.setOrganizationName("Triscord");
     app.setApplicationName("TriscordNativePreview");   // same settings as the Qt client: same account/session
     // No applicationDisplayName: Qt would append " - Triscord" to every window title (the call popout is titled with the
@@ -508,7 +562,7 @@ int main(int argc, char** argv) {
         const auto incoming = QJsonDocument::fromJson(json).object();
         const auto name = incoming.value("command").toObject().value("name").toString();
         // Never log chat text, private profile notes, upload chunks or other command payloads.
-        if (name != "videoStats" && name != "videoSurface") log("ui -> core: " + name);
+        if (!quietCommand(name)) log("ui -> core: " + commandLabel(incoming));
         const auto result = core.handleMessage(incoming);   // empty: answered later through CoreSession::reply
         if (optionSet("devtools") && name == "setStreamHidden" && result.value("ok").toBool())
             log(QString("video hidden=%1").arg(incoming.value("command").toObject().value("hidden").toBool() ? 1 : 0));
@@ -638,7 +692,7 @@ int main(int argc, char** argv) {
                 if (!popoutHost) return;
                 const auto incoming = QJsonDocument::fromJson(json).object();
                 const auto name = incoming.value("command").toObject().value("name").toString();
-                if (name != "videoStats" && name != "videoSurface") log("popout ui -> core: " + name);
+                if (!quietCommand(name)) log("popout ui -> core: " + commandLabel(incoming));
                 fromPopout = true;
                 const auto result = core.handleMessage(incoming);
                 fromPopout = false;
