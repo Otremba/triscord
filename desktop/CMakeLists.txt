@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(TriscordNative VERSION 0.9.39 LANGUAGES C CXX)
+project(TriscordNative VERSION 0.9.40 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
