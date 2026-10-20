@@ -8,6 +8,7 @@
 - Sem escopo, corpo, trailers, coautoria ou atribuições a assistentes. Não colocar versão na mensagem; tags nativas usam `desktop-vX.Y.Z`.
 - Não reescrever histórico, apagar releases/deployments nem repetir o reset sem nova instrução explícita.
 - Push, publicação de release e deploy precisam estar autorizados pelo pedido. Não inferir publicação de uma simples revisão.
+- Em 20/10 o usuário autorizou a automação de logs a corrigir e publicar atualizações a cada revisão de 30 minutos quando houver mudanças justificadas e validadas: push, release nativa com instalador/SHA-256 e `make_latest: false`, site e backend necessário. Sem novidade útil, não criar versão vazia. Preservar trabalho alheio e concluir logout do Wrangler; solicitar apenas autenticação OAuth quando necessária.
 - Testes: em 19/10 o usuário liberou rodar o app e os testes para testar e corrigir (antes tinha proibido). Rodar o app só com perfil isolado (`TRISCORD_SETTINGS_PATH`) e build próprio; nunca interromper o app instalado nem chamadas.
 - Não interromper o aplicativo instalado ou chamadas. Não versionar credenciais, SDKs, caches ou binários.
 - Após um deploy autorizado, fazer logout do Wrangler, conforme pedido do usuário de 19/10/2026. Não afirmar revogação no servidor sem confirmação.
