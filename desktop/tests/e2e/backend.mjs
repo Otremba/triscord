@@ -76,6 +76,8 @@ const ingress = `export default { fetch(request, env) {
   url.pathname = url.pathname.slice(auth ? 13 : 12);
   return (auth ? env.AUTH : env.CONTROL).fetch(new Request(url, request));
 }}`;
+// The admin page's key for the error reports (cloudflare/src/error_reports.js); local only.
+const adminKey = 'native-e2e-admin-key-0123456789';
 const mf = new Miniflare(convertV4MiniflareOptions({ host: '127.0.0.1', port: 0, workers: [
   { name: 'entry', modules: true, script: ingress, compatibilityDate: '2026-10-12',
     serviceBindings: { AUTH: 'auth', CONTROL: 'control' } },
@@ -83,17 +85,18 @@ const mf = new Miniflare(convertV4MiniflareOptions({ host: '127.0.0.1', port: 0,
     d1Databases: { DB: 'native-e2e-shared' },
     bindings: { GOOGLE_CLIENT_ID: clientId, GOOGLE_JWKS_URL: `${googleOrigin}/certs` } },
   { name: 'control', modules: true, script: readFileSync(hubBundle, 'utf8'), compatibilityDate: '2026-10-12',
-    d1Databases: { DB: 'native-e2e-shared' }, bindings: { INVITE_CODE: 'native-e2e-legacy-invite' },
+    d1Databases: { DB: 'native-e2e-shared' }, r2Buckets: { LOGS: 'native-e2e-error-reports' },
+    bindings: { INVITE_CODE: 'native-e2e-legacy-invite', ADMIN_KEY: adminKey },
     durableObjects: { HUB: { className: 'TriscordHub', useSQLite: true } } },
 ] }));
 const origin = (await mf.ready).origin.toString().replace(/\/$/, '');
 const db = await mf.getD1Database('DB', 'auth');
-for (const path of ['cloudflare-auth/schema.sql', 'cloudflare/migrations/0001_servers.sql']) {
+for (const path of ['cloudflare-auth/schema.sql', 'cloudflare/migrations/0001_servers.sql', 'cloudflare/migrations/0002_error_reports.sql']) {
   for (const sql of readFileSync(resolve(root, path), 'utf8').replace(/--[^\n]*/g, '').split(';')
     .map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean)) await db.exec(sql);
 }
 console.log(JSON.stringify({ authUrl: `${origin}/auth-service`, hubUrl: `${origin}/hub-service`,
-  googleAuthUrl: `${googleOrigin}/auth`, googleTokenUrl: `${googleOrigin}/token` }));
+  googleAuthUrl: `${googleOrigin}/auth`, googleTokenUrl: `${googleOrigin}/token`, adminKey }));
 const stop = async () => { await mf.dispose(); google.close(); process.exit(0); };
 process.on('SIGINT', stop); process.on('SIGTERM', stop);
 process.stdin.on('end', stop); process.stdin.resume(); // parent closing stdin ends the backend

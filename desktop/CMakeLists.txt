@@ -60,7 +60,7 @@ if(EXISTS "${TRISCORD_DEEPFILTER_DIR}/df.dll" AND EXISTS "${TRISCORD_DEEPFILTER_
   file(COPY "${TRISCORD_DEEPFILTER_DIR}/licenses/" DESTINATION "${CMAKE_BINARY_DIR}/media-licenses/DeepFilterNet")
 endif()
 target_link_libraries(triscord_voice PUBLIC opus datachannel triscord_dsp triscord_rnnoise Qt6::Multimedia)
-add_library(triscord_auth STATIC src/google_auth.cpp src/google_auth.h src/auth_session.cpp src/auth_session.h src/hub_api.cpp src/hub_api.h src/profile_media.cpp src/profile_media.h)
+add_library(triscord_auth STATIC src/google_auth.cpp src/google_auth.h src/auth_session.cpp src/auth_session.h src/hub_api.cpp src/hub_api.h src/error_reports.cpp src/error_reports.h src/error_report_log.h src/profile_media.cpp src/profile_media.h)
 target_include_directories(triscord_auth PUBLIC src)
 target_include_directories(triscord_auth PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(triscord_auth PUBLIC Qt6::Network Qt6::Gui)

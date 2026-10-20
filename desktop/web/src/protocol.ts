@@ -129,6 +129,9 @@ export interface SettingsState {
   taskbarAlert: boolean;         // flash the taskbar button for those notifications
   closeToTray?: boolean;         // "Minimizar para a bandeja": the close button hides the window, the call keeps running
   startMinimized?: boolean;      // "Abrir minimizado": a start at logon stays in the tray
+  errorReports?: boolean;        // "Enviar relatórios de erro": the log of a session with signs of a bug goes to the hub
+  errorReportsAvailable?: boolean; // this run writes a log file (false in development and most tests)
+  errorReportsNotice?: boolean;  // the one-time notice about error reports is still to be shown
   openAtLogin?: boolean;         // "Abrir o Triscord": starts with Windows (read back from the Run key)
   loginSupported?: boolean;      // false in development builds, which must not register themselves
   callSounds?: boolean;
@@ -255,10 +258,11 @@ export type Command =
   | { name: 'copyInvite'; code: string }         // native clipboard; only codes the core created
   | { name: 'openServerDialog' }
   | { name: 'openSettings' }
+  | { name: 'sendErrorReport' }                    // the running session's log to the hub ("Enviar log agora")
   | { name: 'requestDevices' }                     // the camera list arrives in session.settings
   | { name: 'setSetting'; key: 'inputDevice' | 'outputDevice' | 'cameraDevice' | 'theme'; value: string }
   | { name: 'setSetting'; key: 'inputVolume' | 'outputVolume' | 'soundboardVolume' | 'noiseSuppressionStrength'; value: number }
-  | { name: 'setSetting'; key: 'callSounds' | 'noiseSuppression' | 'automaticGainControl' | 'desktopNotifications' | 'taskbarAlert' | 'closeToTray' | 'startMinimized' | 'openAtLogin' | 'shareHd' | 'shareAudio'; value: boolean }
+  | { name: 'setSetting'; key: 'callSounds' | 'noiseSuppression' | 'automaticGainControl' | 'desktopNotifications' | 'taskbarAlert' | 'closeToTray' | 'startMinimized' | 'openAtLogin' | 'shareHd' | 'shareAudio' | 'errorReports' | 'errorReportsNoticeSeen'; value: boolean }
   | { name: 'setSetting'; key: 'shareMode'; value: 'game' | 'screen' }
   | { name: 'setSetting'; key: 'noiseSuppressionMode'; value: 'standard' | 'high' }
   | { name: 'window'; action: 'minimize' | 'maximize' | 'close' | 'move' | `resize-${'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'}` }

@@ -2,6 +2,7 @@
 #include "signaling.h"
 #include "window_lifecycle.h"
 #include "log_filter.h"
+#include "error_report_log.h"
 #include <QJsonDocument>
 #include <QSignalSpy>
 #include <QtTest>
@@ -28,6 +29,41 @@ private slots:
         QVERIFY(!dropLogLine("video: 3 lost packets recovered by retransmission, 0 unrecoverable (last 10 s)", block));
         QVERIFY(!dropLogLine("[not ffmpeg] a bracketed line of ours", block));
         QVERIFY(!dropLogLine("", block));
+    }
+    void errorReportSignalsComeFromRealFailureLines() {
+        // Diego's 0.9.37 log of 19/10: the decoder failed on every frame, then the share thumbnails.
+        const QString diego = QStringLiteral(
+            "19:42:40.151 Triscord 0.9.37, 2026-10-19T19:42:40\n"
+            "19:43:08.103 video: asked the sender for a keyframe: decoder: COM video initialization HRESULT=2147549446 x1\n"
+            "19:43:18.116 video: asked the sender for a keyframe: decoder: COM video initialization HRESULT=2147549446 x24\n"
+            "19:43:28.214 video: asked the sender for a keyframe: decoder: COM video initialization HRESULT=2147549446 x37, incomplete frame x2\n"
+            "19:50:09.414 capture: thumbnail 0 failed: Windows capture failed (0x80010106)\n"
+            "19:53:19.124 warning: screen: start failed: Windows capture failed (0x80010106)\n");
+        QCOMPARE(logSignals(diego), (QStringList{"screen-start", "decoder", "capture", "keyframe-storm"}));
+        // A healthy session: a few keyframes and losses, one dropped connection; and an old log without the closing line.
+        const QString healthy = QStringLiteral(
+            "10:00:00.000 Triscord 0.9.37, 2026-10-19T10:00:00\n"
+            "10:00:10.000 video: asked the sender for a keyframe: frame backlog x2\n"
+            "10:00:20.000 video: 12 lost packets recovered by retransmission, 3 unrecoverable (last 10 s)\n"
+            "10:00:30.000 signaling: connection closed (1006)\n"
+            "10:00:40.000 voice: connection restored, rejoining the call\n");
+        QVERIFY(logSignals(healthy).isEmpty());
+        QVERIFY(logSignals(QString(healthy).replace("0.9.37", "0.9.39") + "10:01:00.000 Triscord closed\n").isEmpty());
+        QCOMPARE(logSignals(QString(healthy).replace("0.9.37", "0.9.39")), QStringList{"unclean-exit"});
+        QString loop = healthy;
+        for (int n = 0; n < 3; ++n) loop += "10:02:00.000 voice: connection restored, rejoining the call\n10:02:01.000 signaling: heartbeat timeout\n";
+        loop += "10:03:00.000 video: 9 lost packets recovered by retransmission, 60 unrecoverable (last 10 s)\n10:04:00.000 error: qt.core: fatal-ish\n";
+        QCOMPARE(logSignals(loop), (QStringList{"packet-loss", "signaling", "voice-reconnect", "qt-error"}));
+    }
+    void errorReportTextKeepsTheHeaderAndHidesSecrets() {
+        const QString log = "00:00:00.000 Triscord 0.9.39, x\nsession " + QString(64, 'a') + " for diego@example.com\n" + QString(2000, 'z') + "\nlast line\n";
+        const auto text = reportText(log, 600);
+        QVERIFY(text.startsWith("00:00:00.000 Triscord 0.9.39, x\n[…]\n"));
+        QVERIFY(text.endsWith("last line\n"));
+        QVERIFY(text.size() <= 600);
+        const auto whole = reportText(log);
+        QVERIFY(whole.contains("session <hex> for <email>"));
+        QVERIFY(!whole.contains("diego@example.com"));
     }
     void loginItemWritesAndReadsBackItsCommand() {
         QTemporaryDir dir;

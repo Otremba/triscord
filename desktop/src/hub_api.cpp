@@ -39,6 +39,21 @@ void HubApi::request(const QByteArray& method, const QString& path, const QJsonO
     });
 }
 
+void HubApi::upload(const QString& path, const QByteArray& body, const QList<QPair<QByteArray, QByteArray>>& headers, std::function<void(int)> done) {
+    if (!canCall()) { if (done) done(0); return; }
+    auto base = base_;
+    while (base.endsWith('/')) base.chop(1);
+    QNetworkRequest request(QUrl(base + path));
+    request.setRawHeader("Authorization", "Bearer " + session_.toUtf8());
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
+    for (const auto& [name, value] : headers) request.setRawHeader(name, value);
+    auto* reply = network_.post(request, body);
+    connect(reply, &QNetworkReply::finished, this, [reply, done] {
+        reply->deleteLater();
+        if (done) done(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
+    });
+}
+
 void HubApi::fetchIce(std::function<void(int, const QJsonArray&)> done) {
     request("GET", "/ice", {}, [done](int status, const QJsonObject& body) {
         done(status, status == 200 ? body.value("iceServers").toArray() : QJsonArray{});

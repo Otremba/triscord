@@ -21,6 +21,7 @@
 #include "bundled_fonts.h"
 #include "update_splash.h"
 #include "log_filter.h"
+#include "error_report_log.h"
 
 #include <share.h>
 #include <io.h>
@@ -138,29 +139,33 @@ void logQtMessage(QtMsgType type, const QMessageLogContext& context, const QStri
 }
 }
 
+// The last line of a run that ended normally; error reports treat a log without it as an unclean exit.
+static void logClosed() { std::printf("%s\n", kLogClosedLine); std::fflush(stdout); }
+
 // A launched app (no console, stdout not redirected) writes its log to %LOCALAPPDATA%\Triscord\logs\triscord.log,
 // keeping the previous run as triscord.previous.log: capture, connection (relay/direct) and update lines that a user
 // can send when something fails (18/10: a black share could not be reproduced here). It holds command names,
 // connection paths and notices only, never tokens, passwords or message text. A run with its own settings
-// (TRISCORD_SETTINGS_PATH, tests) keeps its log there, so it never rotates away the installed app's log.
-static void logToFile() {
+// (TRISCORD_SETTINGS_PATH, tests) keeps its log there, so it never rotates away the installed app's log. Returns the
+// log's folder (error reports read it), empty when the run writes no log file.
+static QString logToFile() {
     const auto out = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (GetConsoleWindow() || (out && out != INVALID_HANDLE_VALUE && GetFileType(out) != FILE_TYPE_UNKNOWN)) return;
+    if (GetConsoleWindow() || (out && out != INVALID_HANDLE_VALUE && GetFileType(out) != FILE_TYPE_UNKNOWN)) return {};
     const auto settings = qEnvironmentVariable("TRISCORD_SETTINGS_PATH");
     const auto base = qEnvironmentVariable("LOCALAPPDATA");
-    if (settings.isEmpty() && base.isEmpty()) return;
+    if (settings.isEmpty() && base.isEmpty()) return {};
     const QDir dir(settings.isEmpty() ? base + "/Triscord/logs" : QDir(settings).absoluteFilePath("logs"));
-    if (!dir.mkpath(".")) return;
+    if (!dir.mkpath(".")) return {};
     const auto current = dir.filePath("triscord.log"), previous = dir.filePath("triscord.previous.log");
     QFile::remove(previous); QFile::rename(current, previous);
     const auto path = QDir::toNativeSeparators(current).toStdWString();
     // Shared (_SH_DENYNO): the user can open or copy the log while Triscord runs. stdout/stderr get valid descriptors
     // first (NUL), then the pipe to the writer.
     FILE* file = nullptr;
-    if (_wfreopen_s(&file, L"NUL", L"w", stdout) != 0) return;
+    if (_wfreopen_s(&file, L"NUL", L"w", stdout) != 0) return {};
     _wfreopen_s(&file, L"NUL", L"w", stderr);
     FILE* shared = _wfsopen(path.c_str(), L"w", _SH_DENYNO);
-    if (!shared) return;
+    if (!shared) return {};
     int ends[2];
     if (_pipe(ends, 65536, _O_BINARY | _O_NOINHERIT) != 0) {
         // No pipe: the file directly, as before (no times, FFmpeg included).
@@ -170,9 +175,11 @@ static void logToFile() {
         std::thread(pumpLog, ends[0], shared).detach();
         std::atexit(finishLog);
     }
+    std::atexit(logClosed);   // registered last, so it runs before finishLog closes the pipe
     qInstallMessageHandler(logQtMessage);
     std::printf("Triscord %s, %s\n", TRISCORD_VERSION, QDateTime::currentDateTime().toString(Qt::ISODate).toUtf8().constData());
     std::fflush(stdout);
+    return dir.absolutePath();
 }
 
 int main(int argc, char** argv) {
@@ -188,7 +195,7 @@ int main(int argc, char** argv) {
         instance.notifyPrimary();
         return 0;
     }
-    logToFile();
+    const auto logDirectory = logToFile();
     QGuiApplication app(argc, argv);
     instance.startListening();
     app.setOrganizationName("Triscord");
@@ -259,6 +266,8 @@ int main(int argc, char** argv) {
     auto hubUrl = qEnvironmentVariable("TRISCORD_HUB_SERVER", QString::fromUtf8(groupConnection::server));
     CoreSession core(&signaling, &voice, &auth, &hub, hubUrl, QString::fromUtf8(groupConnection::invite),
                      CoreSession::Media{&screen, &camera, syntheticVideo});
+    // Tests point the error reports at a log folder of their own (their output goes to a pipe, not to a log file).
+    core.setLogDirectory(qEnvironmentVariable("TRISCORD_REPORT_LOG_DIR", logDirectory));
 
     QWindow window;
     window.setTitle("Triscord");

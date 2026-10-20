@@ -23,6 +23,7 @@ class CameraPublisher;
 class CameraService;
 class DeviceShare;
 class HubApi;
+class ErrorReporter;
 class ScreenService;
 class Signaling;
 class VoiceService;
@@ -56,6 +57,8 @@ public:
                 QString hubUrl, QString groupInvite, Media media = {}, QObject* parent = nullptr);
 
     void start();
+    // Error reports (error_reports.h): the folder of the log this run writes; empty when it writes none.
+    void setLogDirectory(const QString& directory);
     void setCallFullscreenState(bool fullscreen);
     // Janela destacada (Discord "Nova Janela", ARQUITETURA_WEBVIEW2.md Fase 10): the host closed the call popout window
     // itself (its close button, the main window closing); same effect as "Voltar para o Discord".
@@ -182,6 +185,10 @@ private:
     bool leavingVoice_ = false;
     QTimer soundAckDeadline_;
     QTimer iceRefresh_;
+    // Error reports: the previous run's log goes out a while after sign-in, outside calls (scheduleErrorReport).
+    ErrorReporter* reporter_ = nullptr;
+    QTimer reportTimer_;
+    void sendScheduledErrorReport();
     QString pendingSoundRequest_, pendingSoundId_;
     void finishSoundRequest(const QString& failure = {});
     ProfileMediaClient* profileMedia_ = nullptr;

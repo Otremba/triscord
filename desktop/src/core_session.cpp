@@ -1,4 +1,5 @@
 #include "core_session.h"
+#include "error_reports.h"
 #include <QTimeZone>
 #include <QScopedValueRollback>
 #include "screen_quality.h"
@@ -127,6 +128,7 @@ const QHash<QString, QSet<QString>>& commandFields() {
         {"openServerDialog", {}},
         {"openSettings", {}},
         {"setSetting", {"key", "value"}},
+        {"sendErrorReport", {}},
         {"requestDevices", {}},
         {"window", {"action"}},
         {"videoAck", {"index", "seq"}},
@@ -156,6 +158,9 @@ CoreSession::CoreSession(Signaling* signaling, VoiceService* voice, AuthSession*
     : QObject(parent), signaling_(signaling), voice_(voice), auth_(auth), hub_(hub), media_(media),
       hubUrl_(std::move(hubUrl)), groupInvite_(std::move(groupInvite)) {
     QSettings settings;
+    reporter_ = new ErrorReporter(hub_, QStringLiteral(TRISCORD_VERSION), this);
+    reportTimer_.setSingleShot(true);
+    connect(&reportTimer_, &QTimer::timeout, this, &CoreSession::sendScheduledErrorReport);
     sounds_ = new SoundPlayer(this);
     // Notifications (same rule as the Qt client): mentions of you and people entering your room, while in the
     // background. "Ativar notificações na área de trabalho" / "Ativar alerta na barra de tarefas" pick how.
@@ -616,6 +621,19 @@ void CoreSession::start() {
     if (auth_->isValid()) startSignedIn();   // otherwise the interface shows the login screen
 }
 
+void CoreSession::setLogDirectory(const QString& directory) {
+    reporter_->setLogDirectory(directory);
+    publishSettings();
+}
+
+// The previous run's log, when it shows a sign of a bug (error_report_log.h), a while after sign-in and never during
+// a call: the upload is one small background request, but a call keeps its start and its bandwidth to itself.
+void CoreSession::sendScheduledErrorReport() {
+    if (!auth_->isValid() || !QSettings().value("errorReports", true).toBool()) return;
+    if (!session_.value("connectedChannelId").toString().isEmpty()) { reportTimer_.start(60000); return; }
+    reporter_->sendPrevious();
+}
+
 // 18/10: the WebView2 client never fetched the hub's TURN relays, so calls only had STUN. Between two homes behind
 // CGNAT/symmetric NAT the direct path fails and nobody hears anybody; the relay carries the audio then.
 void CoreSession::refreshIce() {
@@ -639,6 +657,9 @@ void CoreSession::startSignedIn() {
     refreshServers();   // picks the server to show and connects to it
     if (!session_.value("selectedServerId").toString().isEmpty()) connectSignaling();
     loadOwnProfile();
+    bool customDelay = false;   // tests shorten the wait
+    const int reportDelay = qEnvironmentVariableIntValue("TRISCORD_REPORT_DELAY_MS", &customDelay);
+    if (!reportTimer_.isActive()) reportTimer_.start(customDelay ? reportDelay : 20000);
 }
 
 void CoreSession::setAuthState(const QString& state, const QString& error, const QString& suggestion) {
@@ -1046,6 +1067,7 @@ QString CoreSession::validateCommand(const QJsonObject& command) const {
         if (key == "noiseSuppressionMode") return value.toString() == "standard" || value.toString() == "high" ? QString() : "invalid_value";
         if (key == "desktopNotifications" || key == "taskbarAlert" || key == "callSounds") return value.isBool() ? QString() : "invalid_value";
         if (key == "closeToTray" || key == "startMinimized") return value.isBool() ? QString() : "invalid_value";
+        if (key == "errorReports" || key == "errorReportsNoticeSeen") return value.isBool() ? QString() : "invalid_value";
         if (key == "openAtLogin") return !value.isBool() ? "invalid_value" : loginSupported() ? QString() : "unsupported";
         if (key == "soundboardVolume") return value.isDouble() && value.toInt() >= 0 && value.toInt() <= 100 ? QString() : "invalid_value";
         if (key == "theme") return QStringList{"light", "dark", "darker", "midnight", "cotton-candy"}.contains(value.toString()) ? QString() : "invalid_value";
@@ -1288,6 +1310,10 @@ void CoreSession::publishSettings() {
         {"startMinimized", WindowPrefs::load(settings).startMinimized},
         {"openAtLogin", loginEnabled()},
         {"loginSupported", loginSupported()},
+        // Error reports (error_reports.h): on by default; the notice explains them once.
+        {"errorReports", settings.value("errorReports", true).toBool()},
+        {"errorReportsAvailable", reporter_->hasLog()},
+        {"errorReportsNotice", reporter_->hasLog() && !settings.value("errorReportsNoticeSeen", false).toBool()},
         {"shareMode", settings.value("shareMode", "game").toString() == "screen" ? "screen" : "game"},
         {"shareHd", settings.value("shareResolution", 720).toInt() >= 1080},
         {"shareAudio", settings.value("shareSystemAudio", false).toBool()},
@@ -1522,6 +1548,16 @@ QJsonObject CoreSession::handleMessage(const QJsonObject& incoming) {
         patch({{"profile", QJsonValue()}, {"auth", QJsonObject{{"state", "signedOut"}}}, {"connection", "offline"}, {"account", accountJson()},
                {"servers", QJsonArray{}}, {"selectedServerId", ""}});
         return ok(requestId);
+    }
+    if (name == "sendErrorReport") {
+        if (!reporter_->hasLog()) return error(requestId, "no_log", "Este Triscord não está gravando o log.");
+        reporter_->sendCurrent([this, requestId](int status, const QStringList&) {
+            if (status == 201) { emit reply(ok(requestId)); return; }
+            emit reply(error(requestId, status == 429 ? "rate_limited" : status == 0 ? "offline" : "failed",
+                             status == 429 ? "Você já enviou 3 logs na última hora. Tente de novo mais tarde."
+                             : status == 0 ? "Sem conexão com o servidor. Tente novamente." : "Não foi possível enviar o log agora."));
+        });
+        return {};
     }
     if (name == "createServer") {
         hub_->createServer(command.value("serverName").toString().trimmed(), [this, requestId](int status, const HubServer& server) {
@@ -1770,7 +1806,8 @@ QJsonObject CoreSession::handleMessage(const QJsonObject& incoming) {
             const auto run = LoginItem::registryStore();
             if (!LoginItem(run.get()).setEnabled(value.toBool(), QCoreApplication::applicationFilePath()))
                 return error(requestId, "login_item_failed", "Não foi possível alterar a inicialização com o Windows.");
-        } else if (key == "shareHd") QSettings().setValue("shareResolution", value.toBool() ? 1080 : 720);
+        } else if (key == "errorReports" || key == "errorReportsNoticeSeen") QSettings().setValue(key, value.toBool());
+        else if (key == "shareHd") QSettings().setValue("shareResolution", value.toBool() ? 1080 : 720);
         else if (key == "shareAudio") QSettings().setValue("shareSystemAudio", value.toBool());
         else if (key == "shareMode") QSettings().setValue("shareMode", value.toString());
         else QSettings().setValue(stored.value(key), key == "cameraDevice" ? QVariant(QByteArray::fromHex(value.toString().toLatin1())) : value.toVariant());

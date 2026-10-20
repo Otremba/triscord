@@ -27,12 +27,39 @@ import { Modal } from './Modal';
 // "Teste do microfone", input profiles, sensitivity, echo cancellation, notifications (needs a widget-free notifier
 // in the web client), and every other category.
 type Page = 'account' | 'notifications' | 'voice' | 'appearance' | 'windows';
+// "Relatórios de erro" (20/10): when a session shows signs of a bug, the next start sends its log to the hub
+// (desktop/src/error_reports.h); "Enviar log agora" sends the running session's log at once.
+function ErrorReports({ bridge, enabled, available, onChange }: { bridge: Bridge; enabled: boolean; available: boolean; onChange: (on: boolean) => void }) {
+  const [state, setState] = useState<{ busy?: boolean; done?: boolean; error?: string }>({});
+  const send = () => {
+    setState({ busy: true });
+    bridge.request({ name: 'sendErrorReport' }).then(() => setState({ done: true })).catch((err: Error) => setState({ error: err.message }));
+  };
+  return (
+    <>
+      <h2 class="tri-settings__heading" data-sub>Relatórios de erro</h2>
+      <div class="tri-settings__toggle-row tri-settings__toggle-row--spaced">
+        <div><span class="tri-settings__label">Enviar relatórios de erro automaticamente</span>
+          <p class="tri-settings__description">Quando algo falhar (transmissão, compartilhamento, conexão), o Triscord envia o log daquela sessão para os desenvolvedores na próxima vez que abrir. O log não tem mensagens, senhas nem tokens, e é apagado depois de 14 dias.</p></div>
+        <Switch checked={enabled} label="Enviar relatórios de erro automaticamente" onChange={onChange} />
+      </div>
+      <div class="tri-settings__row">
+        <span class="tri-settings__label">Enviar log agora
+          <span class="tri-settings__description" role="status">{!available ? 'Esta instalação não grava log.'
+            : state.done ? 'Log enviado. Obrigado!' : state.error ? state.error : 'Use quando algo estiver dando errado agora, para os desenvolvedores verem.'}</span></span>
+        <button class="tri-button tri-button--secondary tri-settings__row-button" disabled={!available || state.busy} onClick={send}>
+          {state.busy ? 'Enviando…' : 'Enviar log'}</button>
+      </div>
+    </>
+  );
+}
+
 const NAV: { page: Page; label: string; icon: IconName; group?: string; subs: string[] }[] = [
   { page: 'account', label: 'Conta', icon: 'User', subs: ['Informações da conta', 'Senha e autenticação'] },
   { page: 'notifications', label: 'Notificações', icon: 'Bell', subs: ['Visão geral'] },
   { page: 'voice', label: 'Voz e vídeo', icon: 'Microphone', group: 'Experiência', subs: ['Voz', 'Câmera', 'Painel de efeitos sonoros'] },
   { page: 'appearance', label: 'Aparência', icon: 'PaintPalette', subs: ['Tema'] },
-  { page: 'windows', label: 'Configurações do Windows', icon: 'WindowLaunch', subs: ['Inicialização', 'Janela'] },
+  { page: 'windows', label: 'Configurações do Windows', icon: 'WindowLaunch', subs: ['Inicialização', 'Janela', 'Relatórios de erro'] },
 ];
 const TITLES: Record<Page, string> = { account: 'Conta', notifications: 'Notificações', voice: 'Voz e vídeo', appearance: 'Aparência', windows: 'Configurações do Windows' };
 const THEMES: { id: SettingsState['theme']; name: string }[] = [
@@ -367,6 +394,7 @@ export function Settings({ session, bridge, store, onClose }: { session: Session
                       <p class="tri-settings__description">Fechar a janela mantém o Triscord na bandeja do sistema, e sua chamada continua. Para sair de vez, use o ícone da bandeja.</p></div>
                     <Switch checked={s.closeToTray !== false} label="Minimizar para a bandeja" onChange={on => set('closeToTray', on)} />
                   </div>
+                  <ErrorReports bridge={bridge} enabled={s.errorReports !== false} available={!!s.errorReportsAvailable} onChange={on => set('errorReports', on)} />
                 </>
               )}
               {page === 'appearance' && s && (

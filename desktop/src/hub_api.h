@@ -47,6 +47,8 @@ public:
     bool canCall() const { return !base_.isEmpty() && !session_.isEmpty(); }
 
     void request(const QByteArray& method, const QString& path, const QJsonObject& body, Reply done);
+    // POST of raw bytes (application/octet-stream) with extra headers; error reports (error_reports.h).
+    void upload(const QString& path, const QByteArray& body, const QList<QPair<QByteArray, QByteArray>>& headers, std::function<void(int status)> done);
 
     void fetchIce(std::function<void(int status, const QJsonArray& iceServers)> done);
     void listServers(std::function<void(int status, const QList<HubServer>& servers)> done);
