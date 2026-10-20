@@ -9,6 +9,21 @@ using namespace triscord;
 class ScreenClientTests : public QObject {
     Q_OBJECT
 private slots:
+    void captureTimerDoesNotWakeBeforeTheEncoderFrameDeadline() {
+        for (const int fps : {15, 30, 60}) {
+            const auto config = screenPreset(720, fps);
+            const qint64 interval = screenCaptureInterval(config) * 10000LL;
+            QVERIFY(interval >= 10000000 / fps);
+            QVERIFY(interval < 10000000 / fps + 10000);
+            ScreenFrameSchedule schedule;
+            // No device, wall-clock timer or encoder: reproduce consecutive timer deadlines exactly.
+            for (int tick = 0; tick < 120; ++tick) {
+                const auto now = tick * interval;
+                QVERIFY2(schedule.shouldSubmit(now, fps, true, true), "A regular capture wake-up must not lose every second frame");
+                schedule.submitted(now);
+            }
+        }
+    }
     void staticShareAnswersKeyframesWithoutNewCapture() {
         ScreenFrameSchedule schedule;
         QVERIFY(schedule.shouldSubmit(0, 30, true, true));

@@ -76,6 +76,11 @@ inline VideoConfig screenPreset(int height, int fps) {
         : (fps == 15 ? 3000000 : fps == 30 ? 5000000 : 8000000);
     return {{width, height}, fps, bitrate};
 }
+// The encoder enforces 10000000/fps ticks between submissions. Rounding the timer down (33 ms at 30 fps,
+// 16 ms at 60 fps) makes every other wake-up too early and can halve the actual frame rate.
+inline int screenCaptureInterval(const VideoConfig& config) {
+    return std::max(1, (1000 + config.fps - 1) / config.fps);
+}
 inline int screenRenderInterval(const VideoConfig& config, bool focused) {
     return focused ? std::max(1, 1000 / config.fps) : 200;
 }

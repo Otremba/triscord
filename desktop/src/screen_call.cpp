@@ -154,7 +154,7 @@ void ScreenCall::start(const CaptureSource& source, bool shareAudio, VideoConfig
     if (room_.isEmpty() || mode_ != SourceMode::Native) { emit message("Entre em uma sala antes de compartilhar."); return; }
     if (!config.valid()) { emit message("escolha uma qualidade de transmissão válida"); return; }
     stop(false);
-    config_ = config; captureTimer_.setInterval(std::max(1, 1000 / config_.fps));
+    config_ = config; captureTimer_.setInterval(screenCaptureInterval(config_));
     try {
         encoder_ = std::make_unique<ScreenEncoder>(source, config_);
         sharing_ = true; localGeneration_ = ++nextGeneration_;
