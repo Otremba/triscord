@@ -40,9 +40,6 @@
 .tri-delete-preview { margin-bottom: 20px; padding: 10px 0; border-radius: 3px; background: var(--background-base-low); box-shadow: var(--legacy-elevation-border), var(--legacy-elevation-high); overflow: hidden; pointer-events: none; }
 .tri-message--preview { margin: 0 !important; }
 .tri-delete-hint { margin: 0; color: var(--text-default); font-size: 14px; line-height: 18px; }
-/* Error reports notice (ErrorReportsNotice.tsx): two short paragraphs in the body text of the delete hint. */
-.tri-error-reports-notice { margin: 0 0 12px; color: var(--text-default); font-size: 14px; line-height: 20px; }
-.tri-error-reports-notice:last-child { margin-bottom: 0; }
 
 /* Fields: label text-md/medium in --text-strong with 8px below (container__5a838 labelContainer). */
 .tri-field { display: flex; flex-direction: column; }

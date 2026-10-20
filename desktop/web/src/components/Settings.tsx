@@ -27,8 +27,8 @@ import { Modal } from './Modal';
 // "Teste do microfone", input profiles, sensitivity, echo cancellation, notifications (needs a widget-free notifier
 // in the web client), and every other category.
 type Page = 'account' | 'notifications' | 'voice' | 'appearance' | 'windows';
-// "Relatórios de erro" (20/10): when a session shows signs of a bug, the next start sends its log to the hub
-// (desktop/src/error_reports.h); "Enviar log agora" sends the running session's log at once.
+// "Relatórios de erro" (20/10): every 30 minutes, and at start for the previous session, a log with new signs of a bug
+// goes to the hub (desktop/src/error_reports.h); "Enviar log agora" sends the running session's log at once.
 function ErrorReports({ bridge, enabled, available, onChange }: { bridge: Bridge; enabled: boolean; available: boolean; onChange: (on: boolean) => void }) {
   const [state, setState] = useState<{ busy?: boolean; done?: boolean; error?: string }>({});
   const send = () => {
@@ -40,7 +40,7 @@ function ErrorReports({ bridge, enabled, available, onChange }: { bridge: Bridge
       <h2 class="tri-settings__heading" data-sub>Relatórios de erro</h2>
       <div class="tri-settings__toggle-row tri-settings__toggle-row--spaced">
         <div><span class="tri-settings__label">Enviar relatórios de erro automaticamente</span>
-          <p class="tri-settings__description">Quando algo falhar (transmissão, compartilhamento, conexão), o Triscord envia o log daquela sessão para os desenvolvedores na próxima vez que abrir. O log não tem mensagens, senhas nem tokens, e é apagado depois de 14 dias.</p></div>
+          <p class="tri-settings__description">Quando algo falhar (transmissão, compartilhamento, conexão), o Triscord envia o log da sessão para os desenvolvedores automaticamente. O log não tem mensagens, senhas nem tokens, e é apagado depois de 14 dias.</p></div>
         <Switch checked={enabled} label="Enviar relatórios de erro automaticamente" onChange={onChange} />
       </div>
       <div class="tri-settings__row">

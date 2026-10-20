@@ -626,12 +626,16 @@ void CoreSession::setLogDirectory(const QString& directory) {
     publishSettings();
 }
 
-// The previous run's log, when it shows a sign of a bug (error_report_log.h), a while after sign-in and never during
-// a call: the upload is one small background request, but a call keeps its start and its bandwidth to itself.
+// Error reports (error_report_log.h): 20 s after sign-in the previous run's log (a crash shows there), then every
+// 30 minutes the running one; each goes out only with a sign of a bug not reported yet. Never during a call: the
+// check waits for the call to end, so a call keeps its bandwidth to itself.
 void CoreSession::sendScheduledErrorReport() {
-    if (!auth_->isValid() || !QSettings().value("errorReports", true).toBool()) return;
+    bool customInterval = false;   // tests shorten the interval
+    const int interval = qEnvironmentVariableIntValue("TRISCORD_REPORT_INTERVAL_MS", &customInterval);
+    if (!auth_->isValid()) return;
     if (!session_.value("connectedChannelId").toString().isEmpty()) { reportTimer_.start(60000); return; }
-    reporter_->sendPrevious();
+    if (QSettings().value("errorReports", true).toBool()) { reporter_->sendPrevious(); reporter_->sendCurrent(true); }
+    reportTimer_.start(customInterval ? interval : 30 * 60 * 1000);
 }
 
 // 18/10: the WebView2 client never fetched the hub's TURN relays, so calls only had STUN. Between two homes behind
@@ -1067,7 +1071,7 @@ QString CoreSession::validateCommand(const QJsonObject& command) const {
         if (key == "noiseSuppressionMode") return value.toString() == "standard" || value.toString() == "high" ? QString() : "invalid_value";
         if (key == "desktopNotifications" || key == "taskbarAlert" || key == "callSounds") return value.isBool() ? QString() : "invalid_value";
         if (key == "closeToTray" || key == "startMinimized") return value.isBool() ? QString() : "invalid_value";
-        if (key == "errorReports" || key == "errorReportsNoticeSeen") return value.isBool() ? QString() : "invalid_value";
+        if (key == "errorReports") return value.isBool() ? QString() : "invalid_value";
         if (key == "openAtLogin") return !value.isBool() ? "invalid_value" : loginSupported() ? QString() : "unsupported";
         if (key == "soundboardVolume") return value.isDouble() && value.toInt() >= 0 && value.toInt() <= 100 ? QString() : "invalid_value";
         if (key == "theme") return QStringList{"light", "dark", "darker", "midnight", "cotton-candy"}.contains(value.toString()) ? QString() : "invalid_value";
@@ -1310,10 +1314,9 @@ void CoreSession::publishSettings() {
         {"startMinimized", WindowPrefs::load(settings).startMinimized},
         {"openAtLogin", loginEnabled()},
         {"loginSupported", loginSupported()},
-        // Error reports (error_reports.h): on by default; the notice explains them once.
+        // Error reports (error_reports.h): on by default.
         {"errorReports", settings.value("errorReports", true).toBool()},
         {"errorReportsAvailable", reporter_->hasLog()},
-        {"errorReportsNotice", reporter_->hasLog() && !settings.value("errorReportsNoticeSeen", false).toBool()},
         {"shareMode", settings.value("shareMode", "game").toString() == "screen" ? "screen" : "game"},
         {"shareHd", settings.value("shareResolution", 720).toInt() >= 1080},
         {"shareAudio", settings.value("shareSystemAudio", false).toBool()},
@@ -1551,7 +1554,7 @@ QJsonObject CoreSession::handleMessage(const QJsonObject& incoming) {
     }
     if (name == "sendErrorReport") {
         if (!reporter_->hasLog()) return error(requestId, "no_log", "Este Triscord não está gravando o log.");
-        reporter_->sendCurrent([this, requestId](int status, const QStringList&) {
+        reporter_->sendCurrent(false, [this, requestId](int status, const QStringList&) {
             if (status == 201) { emit reply(ok(requestId)); return; }
             emit reply(error(requestId, status == 429 ? "rate_limited" : status == 0 ? "offline" : "failed",
                              status == 429 ? "Você já enviou 3 logs na última hora. Tente de novo mais tarde."
@@ -1806,7 +1809,7 @@ QJsonObject CoreSession::handleMessage(const QJsonObject& incoming) {
             const auto run = LoginItem::registryStore();
             if (!LoginItem(run.get()).setEnabled(value.toBool(), QCoreApplication::applicationFilePath()))
                 return error(requestId, "login_item_failed", "Não foi possível alterar a inicialização com o Windows.");
-        } else if (key == "errorReports" || key == "errorReportsNoticeSeen") QSettings().setValue(key, value.toBool());
+        } else if (key == "errorReports") QSettings().setValue(key, value.toBool());
         else if (key == "shareHd") QSettings().setValue("shareResolution", value.toBool() ? 1080 : 720);
         else if (key == "shareAudio") QSettings().setValue("shareSystemAudio", value.toBool());
         else if (key == "shareMode") QSettings().setValue("shareMode", value.toString());

@@ -20,7 +20,6 @@ import { ProfileEditor } from './components/ProfileEditor';
 import { AudioMenuHost } from './components/AudioMenu';
 import { ServerRemovalModal } from './components/ServerRemovalModal';
 import { DeleteMessageModal } from './components/DeleteMessageModal';
-import { ErrorReportsNotice } from './components/ErrorReportsNotice';
 import type { ChatMessage } from './protocol';
 import { useEffect, useLayoutEffect, useState } from 'preact/hooks';
 
@@ -36,7 +35,6 @@ type OpenModal = { kind: 'createChannel'; categoryName: string } | { kind: 'invi
 export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) {
   const session = useSession(store);
   const [serverModal, setServerModal] = useState(false);
-  const [noticeClosed, setNoticeClosed] = useState(false);   // until the core's next settings say it was seen
   useEffect(() => { const open = () => setServerModal(true); addEventListener('tri-open-server-modal', open); return () => removeEventListener('tri-open-server-modal', open); }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [cameraPreviewOpen, setCameraPreviewOpen] = useState(false);
@@ -119,8 +117,6 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
       <ParticipantProfileHost session={session} bridge={bridge}/>
       <PeerAudioHost session={session} bridge={bridge}/>
       {serverModal && <ServerModal bridge={bridge} displayName={session.account.displayName} onClose={() => setServerModal(false)} />}
-      {session.settings?.errorReportsNotice && !noticeClosed && !modal && !settingsOpen && !serverModal && !profileOpen && !session.connectedChannelId &&
-        <ErrorReportsNotice bridge={bridge} onClose={() => setNoticeClosed(true)} />}
     </div>
   );
 }

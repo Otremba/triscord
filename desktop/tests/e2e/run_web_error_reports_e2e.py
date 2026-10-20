@@ -1,10 +1,11 @@
-"""Error reports reach the hub (20/10): the app sends a failed session's log by itself, the user can send one by hand,
-and turning the reports off stops them.
+"""Error reports reach the hub (20/10): the app sends logs with signs of a bug by itself, each problem once, the user
+can send one by hand, and turning the reports off stops them.
 
-  - run 1: the previous run's log is Diego's 19/10 failure (decoder + capture + "start failed"); the one-time notice
-    shows, "Entendi" closes it for good, the automatic report arrives with those signals, and "Enviar log" sends the
-    running session's log too;
-  - run 2: same failed previous log, reports turned off in the settings: nothing is sent.
+  - run 1: the previous run's log is Diego's 19/10 failure (decoder + capture + "start failed") and the running log
+    has a dropped-connection loop; both arrive by themselves, the running one only once although it is checked every
+    2 s (30 minutes outside tests), and "Enviar log" sends the running log too;
+  - run 2: the previous log is run 1's running log, already reported: nothing new goes out;
+  - run 3: a new failure, reports turned off in the settings: nothing is sent.
 The local backend's admin API (ADMIN_KEY, cloudflare/src/error_reports.js) is what checks what arrived.
 
 Usage (from desktop/): .toolchain/venv/Scripts/python.exe tests/e2e/run_web_error_reports_e2e.py --exe out/build-claude/triscord-web.exe
@@ -32,34 +33,25 @@ FAILED_LOG = (
     "19:43:28.214 video: asked the sender for a keyframe: decoder: COM video initialization HRESULT=2147549446 x38\n"
     "19:50:09.414 capture: thumbnail 0 failed: Windows capture failed (0x80010106)\n"
     "19:53:19.124 warning: screen: start failed: Windows capture failed (0x80010106)\n")
+RUNNING_LOG = (
+    "10:00:00.000 Triscord 0.9.38, 2026-10-20T10:00:00\n"
+    "10:00:01.000 signed in\n"
+    "10:05:00.000 signaling: heartbeat timeout\n10:06:00.000 signaling: heartbeat timeout\n10:07:00.000 signaling: heartbeat timeout\n")
+HEALTHY_LOG = "11:00:00.000 Triscord 0.9.38, 2026-10-20T11:00:00\n11:00:01.000 signed in\n"
 RUN1 = r"""
 const log = window.__e2e = window.__e2e || {}, s = () => window.__triscord.store.current, b = window.__triscord.bridge;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function wait(test, label, ms = 15000) { const end = Date.now() + ms; while (Date.now() < end) { if (test()) return; await sleep(80); } throw Error(label); }
 (async () => {
-  await wait(() => s().auth?.state === 'signedIn' && s().settings, 'signed in');
+  while (!(s().auth?.state === 'signedIn' && s().settings)) await sleep(80);
   log.available = !!s().settings.errorReportsAvailable; log.enabled = s().settings.errorReports !== false;
-  await wait(() => document.querySelector('.tri-error-reports-notice'), 'notice shown');
-  log.notice = true;
-  [...document.querySelectorAll('.tri-dmodal button')].find(x => x.textContent.trim() === 'Entendi').click();
-  await wait(() => s().settings.errorReportsNotice === false, 'notice marked seen');
-  await wait(() => !document.querySelector('.tri-error-reports-notice'), 'notice closed');
-  log.noticeSeen = true;
+  await sleep(6000);   // the automatic checks run first
+  log.notice = !!document.querySelector('.tri-dmodal');
   await b.request({ name: 'sendErrorReport' });
   log.manual = 'ok';
 })().catch(e => log.error = e.message);
 'run 1 started'
 """
-RUN2 = r"""
-const log = window.__e2e = window.__e2e || {}, s = () => window.__triscord.store.current;
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-(async () => {
-  while (!(s().auth?.state === 'signedIn' && s().settings)) await sleep(80);
-  log.enabled = s().settings.errorReports !== false; log.notice = !!document.querySelector('.tri-error-reports-notice');
-})();
-'run 2 started'
-"""
-PROBE = "JSON.stringify({ e2e: window.__e2e || {}, notice: !!window.__triscord.store.current.settings?.errorReportsNotice })"
+PROBE = "JSON.stringify({ e2e: window.__e2e || {} })"
 
 
 def last_probe(text):
@@ -79,16 +71,19 @@ def admin(config, path):
         return response.read().decode("utf-8")
 
 
-def run(exe, assets, config, settings, logs, script, name, report, quit_after=14):
-    for file, text in (("triscord.previous.log", FAILED_LOG), ("triscord.log", "10:00:00.000 Triscord 0.9.38, now\n10:00:01.000 ui -> core: requestSnapshot\n")):
-        (logs / file).write_text(text, encoding="utf-8")
-    os.environ.update(TRISCORD_REPORT_LOG_DIR=str(logs), TRISCORD_REPORT_DELAY_MS="1500")
+def run(exe, assets, config, settings, logs, previous, running, script, name, report, quit_after):
+    (logs / "triscord.previous.log").write_text(previous, encoding="utf-8")
+    (logs / "triscord.log").write_text(running, encoding="utf-8")
+    os.environ.update(TRISCORD_REPORT_LOG_DIR=str(logs), TRISCORD_REPORT_DELAY_MS="1500", TRISCORD_REPORT_INTERVAL_MS="2000")
     out = (report / f"{name}.log").open("w", encoding="utf-8")
     process = launch(exe, assets, config, settings, script, 2500, report / "probe.js", (quit_after - 2) * 1000,
                      report / f"{name}.png", quit_after, out)
     process.wait(timeout=60)
     out.close()
-    return (report / f"{name}.log").read_text(encoding="utf-8", errors="replace")
+    text = (report / f"{name}.log").read_text(encoding="utf-8", errors="replace")
+    lines = [l for l in text.splitlines() if l.startswith("reports:")]
+    print(f"  {name} app lines:", lines, flush=True)
+    return text, lines
 
 
 def main():
@@ -113,44 +108,44 @@ def main():
         logs = work / "logs"
         logs.mkdir()
         (work / "run1.js").write_text(RUN1, encoding="utf-8")
-        (work / "run2.js").write_text(RUN2, encoding="utf-8")
+        (work / "idle.js").write_text("'idle'", encoding="utf-8")
         (report / "probe.js").write_text(PROBE, encoding="utf-8")
 
-        text1 = run(args.exe, args.assets, config, settings, logs, work / "run1.js", "run1", report)
-        probe1 = last_probe(text1)
-        reports1 = json.loads(admin(config, "/admin/api/reports"))["reports"]
-        auto = [r for r in reports1 if r["reason"] == "auto"]
-        manual = [r for r in reports1 if r["reason"] == "manual"]
-        auto_text = admin(config, f"/admin/api/reports/{auto[0]['id']}") if auto else ""
+        text1, lines1 = run(args.exe, args.assets, config, settings, logs, FAILED_LOG, RUNNING_LOG, work / "run1.js", "run1", report, 14)
+        probe1 = last_probe(text1).get("e2e", {})
+        reports = json.loads(admin(config, "/admin/api/reports"))["reports"]
+        auto = sorted((r for r in reports if r["reason"] == "auto"), key=lambda r: r["createdAt"])
+        manual = [r for r in reports if r["reason"] == "manual"]
+        previous_text = admin(config, f"/admin/api/reports/{auto[0]['id']}") if auto else ""
         print("  run 1 probe:", json.dumps(probe1, ensure_ascii=False), flush=True)
-        print("  run 1 reports:", json.dumps(reports1, ensure_ascii=False), flush=True)
-        print("  run 1 app lines:", [l for l in text1.splitlines() if l.startswith("reports:")], flush=True)
+        print("  run 1 reports:", json.dumps([[r["reason"], r["signals"]] for r in reports]), flush=True)
+
+        _, lines2 = run(args.exe, args.assets, config, settings, logs, RUNNING_LOG, HEALTHY_LOG, work / "idle.js", "run2", report, 9)
 
         ini = settings / "Triscord" / "TriscordNativePreview.ini"
         ini.write_text(ini.read_text(encoding="utf-8").replace("[General]", "[General]\nerrorReports=false", 1), encoding="utf-8")
-        text2 = run(args.exe, args.assets, config, settings, logs, work / "run2.js", "run2", report, quit_after=10)
-        probe2 = last_probe(text2)
-        reports2 = json.loads(admin(config, "/admin/api/reports"))["reports"]
-        print("  run 2 probe:", json.dumps(probe2, ensure_ascii=False), flush=True)
+        _, lines3 = run(args.exe, args.assets, config, settings, logs, FAILED_LOG.replace("19:42:40.151", "19:42:40.152"),
+                        RUNNING_LOG.replace("10:00:00.000", "10:00:00.001"), work / "idle.js", "run3", report, 9)
+        after = json.loads(admin(config, "/admin/api/reports"))["reports"]
 
-        e1 = probe1.get("e2e", {})
         checks = {
-            "reports are available and on by default": e1.get("available") is True and e1.get("enabled") is True,
-            "the one-time notice shows and 'Entendi' marks it seen": e1.get("notice") is True and e1.get("noticeSeen") is True and probe1.get("notice") is False,
-            "the failed session's log arrives by itself, with its signals": len(auto) == 1
+            "reports are available and on by default": probe1.get("available") is True and probe1.get("enabled") is True,
+            "no notice is shown": probe1.get("notice") is False,
+            "the previous session's failure arrives by itself, with its signals": len(auto) >= 1
                 and auto[0]["signals"] == ["screen-start", "decoder", "capture", "keyframe-storm"] and auto[0]["nick"] == "Alice",
-            "the report holds the failure, not the token or the e-mail": "COM video initialization" in auto_text
-                and SECRET not in auto_text and "alice@example.com" not in auto_text,
-            "'Enviar log' sends the running session's log": e1.get("manual") == "ok" and len(manual) == 1,
-            "the app logs what it sent": any(l.startswith("reports: automatic report sent") for l in text1.splitlines()),
-            "turned off: nothing is sent and no notice shows": probe2.get("e2e", {}).get("enabled") is False
-                and probe2.get("e2e", {}).get("notice") is False and len(reports2) == len(reports1),
-            "no script errors": not e1.get("error"),
+            "the running log's problem arrives once, though checked every 2 s": len(auto) == 2 and auto[1]["signals"] == ["signaling"]
+                and sum(l.startswith("reports: automatic") for l in lines1) == 2,
+            "the report holds the failure, not the token or the e-mail": "COM video initialization" in previous_text
+                and SECRET not in previous_text and "alice@example.com" not in previous_text,
+            "'Enviar log' sends the running session's log": probe1.get("manual") == "ok" and len(manual) == 1,
+            "a problem already reported is not sent again at the next start": not lines2,
+            "turned off: nothing is sent": not lines3 and len(after) == len(reports),
+            "no script errors": not probe1.get("error"),
         }
         for name, ok in checks.items():
             print(f"  {'ok' if ok else 'FAIL'}: {name}", flush=True)
-        if e1.get("error"):
-            print("  run 1 error:", e1["error"], flush=True)
+        if probe1.get("error"):
+            print("  run 1 error:", probe1["error"], flush=True)
         passed = all(checks.values())
     except Exception as error:
         print("FAIL:", error, flush=True)
