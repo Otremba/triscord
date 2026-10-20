@@ -9,8 +9,8 @@ class HubApi;
 
 // Error reports (20/10): sends the log to the hub's POST /logs (cloudflare/src/error_reports.js) so a bug no longer
 // depends on asking someone for triscord.log. Every 30 minutes the part of the running log not sent yet goes out,
-// whatever it holds, and at start what the previous run's last minutes left (CoreSession decides when, never during a
-// call); each report carries the log's version and system lines and the signals it shows (error_report_log.h). The
+// whatever it holds, and at start what the previous run's last minutes left (CoreSession decides when, including
+// during calls); each report carries the log's version and system lines and the signals it shows (error_report_log.h). The
 // user can also send the whole running log by hand. One compressed request; the log never holds the bearer token.
 class ErrorReporter final : public QObject {
     Q_OBJECT

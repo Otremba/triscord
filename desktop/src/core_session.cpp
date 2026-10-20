@@ -637,13 +637,11 @@ void CoreSession::setLogDirectory(const QString& directory) {
 }
 
 // Error reports (error_reports.h): 20 s after sign-in what the previous run's log did not send yet (a crash shows
-// there), then every 30 minutes the new part of the running one. Never during a call: the send waits for the call to
-// end, so a call keeps its bandwidth to itself.
+// there), then every 30 minutes the new part of the running one, including during calls.
 void CoreSession::sendScheduledErrorReport() {
     bool customInterval = false;   // tests shorten the interval
     const int interval = qEnvironmentVariableIntValue("TRISCORD_REPORT_INTERVAL_MS", &customInterval);
     if (!auth_->isValid()) return;
-    if (!session_.value("connectedChannelId").toString().isEmpty()) { reportTimer_.start(60000); return; }
     if (QSettings().value("errorReports", true).toBool()) { reporter_->sendPrevious(); reporter_->sendCurrent(true); }
     reportTimer_.start(customInterval ? interval : 30 * 60 * 1000);
 }
