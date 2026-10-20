@@ -10,9 +10,8 @@ const bundlePath = resolve(process.env.TRISCORD_CONTROL_TEST_BUNDLE || 'out/work
 const mf = new Miniflare(convertV4MiniflareOptions({ scriptPath: bundlePath, modules: true,
   compatibilityDate: '2026-10-12', host: '127.0.0.1', port: 0,
   durableObjects: { HUB: { className: 'TriscordHub', useSQLite: true } }, bindings: { INVITE_CODE: 'local-test-private-group-code', ADMIN_KEY: adminKey },
-  d1Databases: { DB: 'triscord-accounts-reports-test' }, r2Buckets: { LOGS: 'triscord-error-reports-test' } }));
+  d1Databases: { DB: 'triscord-accounts-reports-test' } }));
 const db = await mf.getD1Database('DB');
-const bucket = await mf.getR2Bucket('LOGS');
 for (const file of ['../cloudflare-auth/schema.sql', 'migrations/0001_servers.sql', 'migrations/0002_error_reports.sql']) {
   const statements = readFileSync(resolve(file), 'utf8').replace(/--[^\n]*/g, '').split(';').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
   for (const statement of statements) await db.exec(statement);
@@ -45,15 +44,15 @@ try {
   assert.equal((await upload(diego, log, { 'X-Triscord-Version': '0.9' })).status, 400, 'the version is validated');
   assert.equal((await upload(diego, log, { 'X-Triscord-Reason': 'other' })).status, 400, 'the reason is validated');
   assert.equal((await upload(diego, Buffer.from('not deflate'))).status, 400, 'a body that is not deflate is refused');
-  assert.equal((await upload(diego, deflateSync(Buffer.alloc(3 * 1024 * 1024, 0x61)))).status, 413, 'a body that inflates past 2 MB is refused');
+  assert.equal((await upload(diego, deflateSync(Buffer.alloc(3 * 1024 * 1024, 0x61)))).status, 413, 'a body that inflates past 1 MB is refused');
   console.log('ok: invalid uploads are refused');
 
   const sent = await upload(diego, log);
   assert.equal(sent.status, 201);
   const { id } = await sent.json();
-  const stored = await (await bucket.get(`reports/${id}.log`)).text();
+  const stored = (await db.prepare('SELECT text FROM error_reports WHERE id = ?').bind(id).first()).text;
   assert.ok(stored.includes('COM video initialization') && stored.includes('<hex>') && stored.includes('<email>'));
-  assert.ok(!stored.includes(leaked) && !stored.includes('diego@example.com'), 'tokens and e-mails never reach the bucket');
+  assert.ok(!stored.includes(leaked) && !stored.includes('diego@example.com'), 'tokens and e-mails are never stored');
   const row = await db.prepare('SELECT nick, version, signals, reason FROM error_reports WHERE id = ?').bind(id).first();
   assert.deepEqual({ ...row }, { nick: 'Diego', version: '0.9.39', signals: 'decoder,screen-start', reason: 'auto' });
   console.log('ok: a report is stored scrubbed, with its index row');
@@ -65,12 +64,10 @@ try {
   console.log('ok: at most 3 reports per account per hour');
 
   const old = '00000000-0000-4000-8000-000000000000';
-  await bucket.put(`reports/${old}.log`, 'old');
-  await db.prepare('INSERT INTO error_reports(id,account_id,nick,version,signals,reason,bytes,created_at) VALUES (?,?,?,?,?,?,?,?)')
-    .bind(old, 'acc-ana', 'Ana', '0.9.30', 'crash', 'auto', 3, Date.now() - 15 * 24 * 60 * 60 * 1000).run();
+  await db.prepare('INSERT INTO error_reports(id,account_id,nick,version,signals,reason,bytes,created_at,text) VALUES (?,?,?,?,?,?,?,?,?)')
+    .bind(old, 'acc-ana', 'Ana', '0.9.30', 'crash', 'auto', 3, Date.now() - 15 * 24 * 60 * 60 * 1000, 'old').run();
   assert.equal((await upload(ana, log)).status, 201);
-  assert.equal(await bucket.get(`reports/${old}.log`), null, 'reports older than 14 days are deleted');
-  assert.equal(await db.prepare('SELECT 1 FROM error_reports WHERE id = ?').bind(old).first(), null);
+  assert.equal(await db.prepare('SELECT 1 FROM error_reports WHERE id = ?').bind(old).first(), null, 'reports older than 14 days are deleted');
   console.log('ok: reports older than 14 days are removed');
 
   assert.equal((await admin('/admin/api/reports', {}, 'wrong-key-0123456789')).status, 401, 'a wrong key reads nothing');
@@ -83,7 +80,7 @@ try {
   assert.equal(await text.text(), stored);
   assert.equal((await admin(`/admin/api/reports/${id}`, { method: 'DELETE' })).status, 204);
   assert.equal((await admin(`/admin/api/reports/${id}`)).status, 404);
-  assert.equal(await bucket.get(`reports/${id}.log`), null);
+  assert.equal(await db.prepare('SELECT 1 FROM error_reports WHERE id = ?').bind(id).first(), null);
   const page = await mf.dispatchFetch('http://localhost/admin');
   assert.equal(page.status, 200);
   assert.match(page.headers.get('Content-Security-Policy'), /script-src 'self'/);

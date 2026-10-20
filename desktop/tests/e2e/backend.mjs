@@ -85,7 +85,7 @@ const mf = new Miniflare(convertV4MiniflareOptions({ host: '127.0.0.1', port: 0,
     d1Databases: { DB: 'native-e2e-shared' },
     bindings: { GOOGLE_CLIENT_ID: clientId, GOOGLE_JWKS_URL: `${googleOrigin}/certs` } },
   { name: 'control', modules: true, script: readFileSync(hubBundle, 'utf8'), compatibilityDate: '2026-10-12',
-    d1Databases: { DB: 'native-e2e-shared' }, r2Buckets: { LOGS: 'native-e2e-error-reports' },
+    d1Databases: { DB: 'native-e2e-shared' },
     bindings: { INVITE_CODE: 'native-e2e-legacy-invite', ADMIN_KEY: adminKey },
     durableObjects: { HUB: { className: 'TriscordHub', useSQLite: true } } },
 ] }));

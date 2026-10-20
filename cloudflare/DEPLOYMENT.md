@@ -60,18 +60,20 @@ O limite diário local interrompe operações; no plano Free não habilitamos
 cobrança para ultrapassar franquias. As cotas da plataforma são independentes
 do orçamento do aplicativo e devem ser acompanhadas no painel da Cloudflare.
 
-## Relatórios de erro — 20/10/2026 (ainda não implantado)
+## Relatórios de erro — 20/10/2026
 
 O aplicativo envia o log de uma sessão com sinais de bug para `POST /logs`
 (`src/error_reports.js`); a página `/admin` lista e abre os relatórios com a
 chave `ADMIN_KEY`. Antes de publicar o Worker com essa rota:
 
-1. Criar o bucket R2 do binding `LOGS`: `npx.cmd wrangler r2 bucket create triscord-error-reports`
-   (R2 entra no plano gratuito até 10 GB; os relatórios somem em 14 dias).
-2. Aplicar a migração: `npx.cmd wrangler d1 execute triscord-accounts --remote --file migrations/0002_error_reports.sql`.
-3. Definir a chave da página de admin (16 caracteres ou mais, guardada fora do repositório):
-   `npx.cmd wrangler secret put ADMIN_KEY`.
-4. `npx.cmd wrangler deploy` e conferir `/admin` com a chave.
+O texto de cada relatório fica na própria linha do D1 (sem R2, que exigiria
+cartão na conta); no máximo 1 MB por relatório, 3 por conta por hora, apagados
+em 14 dias.
 
-Sem o bucket ou a chave, `/logs` e `/admin/api` respondem 503 e o aplicativo
+1. Aplicar a migração: `npx.cmd wrangler d1 execute triscord-accounts --remote --file migrations/0002_error_reports.sql`.
+2. Definir a chave da página de admin (16 caracteres ou mais, guardada fora do repositório):
+   `npx.cmd wrangler secret put ADMIN_KEY`.
+3. `npx.cmd wrangler deploy` e conferir `/admin` com a chave.
+
+Sem a chave, `/admin/api` responde 503; sem a migração, `/logs` falha e o aplicativo
 apenas registra no log que o relatório não foi enviado.

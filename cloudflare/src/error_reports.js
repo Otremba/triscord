@@ -1,9 +1,11 @@
 // Error reports (20/10): the desktop app sends the log of a session that showed signs of a bug (desktop/src/
-// error_reports.cpp), so a failure no longer depends on asking a friend for triscord.log. The log text goes to the
-// LOGS R2 bucket, its index to D1 (migrations/0002_error_reports.sql). The admin page (/admin) lists and opens them
+// error_reports.cpp), so a failure no longer depends on asking a friend for triscord.log. Each report, text included,
+// is a row of the error_reports D1 table (migrations/0002_error_reports.sql): R2 needs a payment method on the account,
+// and a log is small (the app sends at most ~512 KB, usually 10-50 KB; 3 per account per hour, kept 14 days). The admin page (/admin) lists and opens them
 // with the ADMIN_KEY Worker secret. Nothing here is reachable without a session (upload) or that key (reading).
 export const REPORT_MAX_COMPRESSED = 256 * 1024;
-export const REPORT_MAX_TEXT = 2 * 1024 * 1024;
+// Below D1's 2 MB limit for one value, with room for the scrubbed text.
+export const REPORT_MAX_TEXT = 1000 * 1000;
 export const REPORTS_PER_HOUR = 3;
 export const REPORT_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
 const VERSION_RE = /^\d{1,3}\.\d{1,3}\.\d{1,4}$/;
@@ -45,7 +47,6 @@ async function inflate(request) {
 async function pruneExpired(env, now) {
   const { results } = await env.DB.prepare('SELECT id FROM error_reports WHERE created_at < ?1 LIMIT 25').bind(now - REPORT_RETENTION_MS).all();
   if (!results.length) return;
-  await env.LOGS.delete(results.map(row => `reports/${row.id}.log`));
   await env.DB.batch(results.map(row => env.DB.prepare('DELETE FROM error_reports WHERE id = ?1').bind(row.id)));
 }
 
@@ -53,7 +54,7 @@ async function pruneExpired(env, now) {
 // app send it), X-Triscord-Reason (auto | manual). At most REPORTS_PER_HOUR per account.
 async function handleUpload(request, env, helpers) {
   const { json, resolveSession, bearerToken } = helpers;
-  if (!env.DB || !env.LOGS) return json({ error: 'service_not_configured' }, 503);
+  if (!env.DB) return json({ error: 'service_not_configured' }, 503);
   const identity = await resolveSession(env, bearerToken(request));
   if (!identity) return json({ error: 'unauthorized' }, 401);
   const version = request.headers.get('X-Triscord-Version') || '';
@@ -68,9 +69,8 @@ async function handleUpload(request, env, helpers) {
   if (body.error) return json({ error: body.error }, body.error === 'too_large' ? 413 : 400);
   const text = scrubLog(body.text);
   const id = crypto.randomUUID();
-  await env.LOGS.put(`reports/${id}.log`, text, { httpMetadata: { contentType: 'text/plain; charset=utf-8' } });
-  await env.DB.prepare('INSERT INTO error_reports(id,account_id,nick,version,signals,reason,bytes,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)')
-    .bind(id, identity.accountId, identity.nick, version, signals.join(','), reason, text.length, now).run();
+  await env.DB.prepare('INSERT INTO error_reports(id,account_id,nick,version,signals,reason,bytes,created_at,text) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)')
+    .bind(id, identity.accountId, identity.nick, version, signals.join(','), reason, text.length, now, text).run();
   await pruneExpired(env, now);
   return json({ id }, 201);
 }
@@ -86,7 +86,7 @@ async function handleAdminApi(request, env, url, helpers) {
   const { json } = helpers;
   if (!env.ADMIN_KEY) return json({ error: 'service_not_configured' }, 503);
   if (!adminAuthorized(request, env, helpers)) return json({ error: 'unauthorized' }, 401);
-  if (!env.DB || !env.LOGS) return json({ error: 'service_not_configured' }, 503);
+  if (!env.DB) return json({ error: 'service_not_configured' }, 503);
   const since = Date.now() - REPORT_RETENTION_MS;
   if (request.method === 'GET' && url.pathname === '/admin/api/reports') {
     const { results } = await env.DB.prepare(
@@ -99,11 +99,10 @@ async function handleAdminApi(request, env, url, helpers) {
   if (match && REPORT_ID_RE.test(match[1])) {
     const id = match[1];
     if (request.method === 'GET') {
-      const object = await env.LOGS.get(`reports/${id}.log`);
-      return object ? new Response(object.body, { headers: adminHeaders('text/plain; charset=utf-8') }) : json({ error: 'not_found' }, 404);
+      const row = await env.DB.prepare('SELECT text FROM error_reports WHERE id = ?1').bind(id).first();
+      return row ? new Response(row.text, { headers: adminHeaders('text/plain; charset=utf-8') }) : json({ error: 'not_found' }, 404);
     }
     if (request.method === 'DELETE') {
-      await env.LOGS.delete(`reports/${id}.log`);
       await env.DB.prepare('DELETE FROM error_reports WHERE id = ?1').bind(id).run();
       return new Response(null, { status: 204 });
     }
