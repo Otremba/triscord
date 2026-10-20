@@ -67,7 +67,7 @@ O aplicativo envia o log de uma sessão com sinais de bug para `POST /logs`
 chave `ADMIN_KEY`. Antes de publicar o Worker com essa rota:
 
 O texto de cada relatório fica na própria linha do D1 (sem R2, que exigiria
-cartão na conta); no máximo 1 MB por relatório, 3 por conta por hora, apagados
+cartão na conta); no máximo 1 MB por relatório, 6 por conta por hora, apagados
 em 14 dias.
 
 1. Aplicar a migração: `npx.cmd wrangler d1 execute triscord-accounts --remote --file migrations/0002_error_reports.sql`.

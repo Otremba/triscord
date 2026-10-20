@@ -58,10 +58,10 @@ try {
   console.log('ok: a report is stored scrubbed, with its index row');
 
   assert.equal((await upload(diego, log, { 'X-Triscord-Reason': 'manual' })).status, 201);
-  assert.equal((await upload(diego, log)).status, 201);
-  assert.equal((await upload(diego, log)).status, 429, 'a fourth report within the hour is refused');
+  for (let n = 0; n < 4; ++n) assert.equal((await upload(diego, log, { 'X-Triscord-Reason': 'periodic', 'X-Triscord-Signals': 'none' })).status, 201);
+  assert.equal((await upload(diego, log)).status, 429, 'a seventh report within the hour is refused');
   assert.equal((await upload(ana, log)).status, 201, 'the limit is per account');
-  console.log('ok: at most 3 reports per account per hour');
+  console.log('ok: at most 6 reports per account per hour');
 
   const old = '00000000-0000-4000-8000-000000000000';
   await db.prepare('INSERT INTO error_reports(id,account_id,nick,version,signals,reason,bytes,created_at,text) VALUES (?,?,?,?,?,?,?,?,?)')
@@ -73,7 +73,7 @@ try {
   assert.equal((await admin('/admin/api/reports', {}, 'wrong-key-0123456789')).status, 401, 'a wrong key reads nothing');
   assert.equal((await mf.dispatchFetch('http://localhost/admin/api/reports')).status, 401, 'no key reads nothing');
   const list = await (await admin('/admin/api/reports')).json();
-  assert.equal(list.reports.length, 5);
+  assert.equal(list.reports.length, 8);
   assert.deepEqual(list.reports.find(r => r.id === id).signals, ['decoder', 'screen-start']);
   const text = await admin(`/admin/api/reports/${id}`);
   assert.equal(text.status, 200);

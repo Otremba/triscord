@@ -636,9 +636,9 @@ void CoreSession::setLogDirectory(const QString& directory) {
     publishSettings();
 }
 
-// Error reports (error_report_log.h): 20 s after sign-in the previous run's log (a crash shows there), then every
-// 30 minutes the running one; each goes out only with a sign of a bug not reported yet. Never during a call: the
-// check waits for the call to end, so a call keeps its bandwidth to itself.
+// Error reports (error_reports.h): 20 s after sign-in what the previous run's log did not send yet (a crash shows
+// there), then every 30 minutes the new part of the running one. Never during a call: the send waits for the call to
+// end, so a call keeps its bandwidth to itself.
 void CoreSession::sendScheduledErrorReport() {
     bool customInterval = false;   // tests shorten the interval
     const int interval = qEnvironmentVariableIntValue("TRISCORD_REPORT_INTERVAL_MS", &customInterval);
@@ -1567,7 +1567,7 @@ QJsonObject CoreSession::handleMessage(const QJsonObject& incoming) {
         reporter_->sendCurrent(false, [this, requestId](int status, const QStringList&) {
             if (status == 201) { emit reply(ok(requestId)); return; }
             emit reply(error(requestId, status == 429 ? "rate_limited" : status == 0 ? "offline" : "failed",
-                             status == 429 ? "Você já enviou 3 logs na última hora. Tente de novo mais tarde."
+                             status == 429 ? "Muitos logs enviados na última hora. Tente de novo mais tarde."
                              : status == 0 ? "Sem conexão com o servidor. Tente novamente." : "Não foi possível enviar o log agora."));
         });
         return {};

@@ -1,12 +1,13 @@
 // Error reports (20/10): the desktop app sends the log of a session that showed signs of a bug (desktop/src/
 // error_reports.cpp), so a failure no longer depends on asking a friend for triscord.log. Each report, text included,
 // is a row of the error_reports D1 table (migrations/0002_error_reports.sql): R2 needs a payment method on the account,
-// and a log is small (the app sends at most ~512 KB, usually 10-50 KB; 3 per account per hour, kept 14 days). The admin page (/admin) lists and opens them
+// and a log is small (the app sends at most ~512 KB, usually 10-50 KB; 6 per account per hour, kept 14 days). The admin page (/admin) lists and opens them
 // with the ADMIN_KEY Worker secret. Nothing here is reachable without a session (upload) or that key (reading).
 export const REPORT_MAX_COMPRESSED = 256 * 1024;
 // Below D1's 2 MB limit for one value, with room for the scrubbed text.
 export const REPORT_MAX_TEXT = 1000 * 1000;
-export const REPORTS_PER_HOUR = 3;
+// The app sends every 30 minutes, plus the previous session at start and the "Enviar log" button.
+export const REPORTS_PER_HOUR = 6;
 export const REPORT_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
 const VERSION_RE = /^\d{1,3}\.\d{1,3}\.\d{1,4}$/;
 const SIGNAL_RE = /^[a-z][a-z-]{0,23}$/;
@@ -50,8 +51,8 @@ async function pruneExpired(env, now) {
   await env.DB.batch(results.map(row => env.DB.prepare('DELETE FROM error_reports WHERE id = ?1').bind(row.id)));
 }
 
-// POST /logs: body = the log compressed with zlib (deflate), X-Triscord-Version, X-Triscord-Signals (what made the
-// app send it), X-Triscord-Reason (auto | manual). At most REPORTS_PER_HOUR per account.
+// POST /logs: body = the log compressed with zlib (deflate), X-Triscord-Version, X-Triscord-Signals (signs of a bug
+// in it, or none), X-Triscord-Reason (periodic | manual; auto from 0.9.39). At most REPORTS_PER_HOUR per account.
 async function handleUpload(request, env, helpers) {
   const { json, resolveSession, bearerToken } = helpers;
   if (!env.DB) return json({ error: 'service_not_configured' }, 503);
@@ -60,7 +61,7 @@ async function handleUpload(request, env, helpers) {
   const version = request.headers.get('X-Triscord-Version') || '';
   const signals = parseSignals(request.headers.get('X-Triscord-Signals'));
   const reason = request.headers.get('X-Triscord-Reason');
-  if (!VERSION_RE.test(version) || !signals || (reason !== 'auto' && reason !== 'manual')) return json({ error: 'invalid_report' }, 400);
+  if (!VERSION_RE.test(version) || !signals || !['periodic', 'auto', 'manual'].includes(reason)) return json({ error: 'invalid_report' }, 400);
   const now = Date.now();
   const recent = await env.DB.prepare('SELECT COUNT(*) AS n FROM error_reports WHERE account_id = ?1 AND created_at > ?2')
     .bind(identity.accountId, now - 60 * 60 * 1000).first();

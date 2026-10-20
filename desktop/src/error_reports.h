@@ -7,11 +7,11 @@
 namespace triscord {
 class HubApi;
 
-// Error reports (20/10): sends a log to the hub's POST /logs (cloudflare/src/error_reports.js) so a bug no longer
-// depends on asking someone for triscord.log. An automatic report goes out only when the log shows a signal
-// (error_report_log.h) that was not reported for that log yet, so each problem is sent once: the running log every
-// 30 minutes and the previous run's log at start (CoreSession decides when, never during a call). The user can also
-// send the running log by hand. One compressed request in the background; the log never holds the bearer token.
+// Error reports (20/10): sends the log to the hub's POST /logs (cloudflare/src/error_reports.js) so a bug no longer
+// depends on asking someone for triscord.log. Every 30 minutes the part of the running log not sent yet goes out,
+// whatever it holds, and at start what the previous run's last minutes left (CoreSession decides when, never during a
+// call); each report carries the log's version and system lines and the signals it shows (error_report_log.h). The
+// user can also send the whole running log by hand. One compressed request; the log never holds the bearer token.
 class ErrorReporter final : public QObject {
     Q_OBJECT
 public:
@@ -22,9 +22,9 @@ public:
     // The folder holding triscord.log and triscord.previous.log; empty disables the reports.
     void setLogDirectory(const QString& directory) { directory_ = directory; }
     bool hasLog() const { return !directory_.isEmpty(); }
-    // The previous run's log, when it shows a new signal. Only the first call of a run does anything.
+    // What the previous run's log has not sent yet. Only the first call of a run does anything.
     void sendPrevious(Done done = {});
-    // The running session's log: automatic (only with a new signal) or by hand ("Enviar log agora", always).
+    // The running session's log: automatic (only the part not sent yet) or by hand ("Enviar log agora", all of it).
     void sendCurrent(bool automatic, Done done = {});
 
 private:
