@@ -19,21 +19,24 @@
 }
 
 .tri-members-group {
-  margin-top: 8px;
+  margin-top: 12px;
+}
+.tri-members-group:first-child {
+  margin-top: 0;
 }
 
 .tri-members-group__title {
   display: flex;
   align-items: center;
   box-sizing: border-box;
-  height: 40px;
-  padding: 24px 8px 0 16px;
+  height: 28px;
+  padding: 8px 8px 4px 16px;
   margin: 0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: var(--font-weight-bold, 700);
   line-height: 16px;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   color: var(--channels-default, #949ba4);
   overflow: hidden;
   text-overflow: ellipsis;

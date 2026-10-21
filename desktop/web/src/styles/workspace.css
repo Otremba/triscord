@@ -266,34 +266,6 @@
   transition: width 180ms cubic-bezier(0.16, 1, 0.3, 1), opacity 140ms ease;
 }
 
-:root[data-design="workspace"] .tri-members-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 48px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--ui-border);
-  flex: none;
-}
-:root[data-design="workspace"] .tri-members-header__title {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--ui-muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-:root[data-design="workspace"] .tri-members-header__close {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  color: var(--ui-muted);
-}
-:root[data-design="workspace"] .tri-members-header__close:hover {
-  background: var(--ui-field);
-  color: var(--ui-text);
-}
 :root[data-design="workspace"] .tri-workspace-header {
   display: flex;
   align-items: center;
@@ -977,7 +949,9 @@
 :root[data-design="workspace"] .tri-message:hover { background:var(--ui-message-hover); }
 
 /* Review feedback: quiet navigation, compact settings, no ornamental selection stripe. */
-:root[data-design="workspace"] .tri-members-group__title { gap:8px;text-transform:none;font-size:12px;letter-spacing:0;font-weight:600;color:var(--ui-muted); }
+:root[data-design="workspace"] .tri-members-group { margin-top: 12px; }
+:root[data-design="workspace"] .tri-members-group:first-child { margin-top: 0; }
+:root[data-design="workspace"] .tri-members-group__title { display:flex;align-items:center;gap:8px;text-transform:none;font-size:12px;letter-spacing:0;font-weight:600;color:var(--ui-muted);padding:6px 8px 4px;height:28px;box-sizing:border-box; }
 :root[data-design="workspace"] .tri-members-group__count { color:var(--ui-subtle);font-weight:400; }
 :root[data-design="workspace"] .tri-settings__column { max-width:640px;padding-top:28px; }
 :root[data-design="workspace"] .tri-settings__heading { font-size:18px;line-height:24px;font-weight:600;margin-bottom:20px; }

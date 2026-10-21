@@ -57,23 +57,6 @@ export function MemberList({ session, bridge, onClose }: { session: Session; bri
 
   return (
     <aside class="tri-members-sidebar" aria-label="Membros do servidor">
-      <div class="tri-members-header">
-        <span class="tri-members-header__title">Membros</span>
-        {onClose && (
-          <Tooltip text="Recolher (Ctrl+U)" position="bottom">
-            <button
-              type="button"
-              class="tri-icon-button tri-members-header__close"
-              aria-label="Recolher lista de membros"
-              onClick={onClose}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </button>
-          </Tooltip>
-        )}
-      </div>
       <div class="tri-members-scroller">
         {onlineMembers.length > 0 && (
           <div class="tri-members-group">
