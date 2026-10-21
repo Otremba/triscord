@@ -4,6 +4,7 @@ import soundCatalog from '../../shared/soundboard_catalog.json';
 import { handleErrorReports } from './error_reports.js';
 import { consumeControlRate, controlRateLimitReason } from './control_rate.js';
 import { mediaMode, mediaCredentials, removeMediaParticipant } from './media_tokens.js';
+import { lastControlActivity, recordControlClose } from './control_diagnostics.js';
 const soundIds = new Set(soundCatalog.map(sound => sound.id));
 
 const { sanitizeUsername, sanitizeUserId, sanitizeColor, sanitizeStatus,
@@ -343,6 +344,16 @@ export class TriscordHub extends DurableObject {
   }
   saveRoom(id) { this.ctx.storage.sql.exec('INSERT OR REPLACE INTO rooms(id,data) VALUES(?,?)', id, JSON.stringify(this.rooms.get(id))); }
   attach(client) { client.ws.serializeAttachment(client.data); }
+  noteClose(client, code, reason) {
+    const data = { ...client.data, identity: client.data.identity && { ...client.data.identity } };
+    const automatic = this.ctx.getWebSocketAutoResponseTimestamp(client.ws)?.getTime() || 0;
+    this.ctx.waitUntil(recordControlClose(this.env, data, code, reason, Date.now(), automatic));
+  }
+  terminate(client, code, reason) {
+    this.noteClose(client, code, reason);
+    try { client.ws.close(code, reason); } catch { /* A broken socket still needs membership cleanup. */ }
+    this.close(client);
+  }
   users(room) { return [...this.clients.values()].filter(c => c.data.ready && c.data.room === room && c.data.user); }
   directory() { return [...this.rooms.values()].map(room => ({ ...room, userCount: this.users(room.id).length, users: this.users(room.id).map(c => c.data.user) })); }
   history(room) { return [...this.ctx.storage.sql.exec('SELECT data FROM (SELECT rowid,data FROM messages WHERE room=? ORDER BY rowid DESC LIMIT 200) ORDER BY rowid', room)].map(row => JSON.parse(row.data)); }
@@ -371,10 +382,11 @@ export class TriscordHub extends DurableObject {
   async webSocketMessage(ws, message) {
     const attached = ws.deserializeAttachment(), client = attached && this.clients.get(attached.sid);
     if (!client) return;
-    if (typeof message !== 'string' || message.length > 262144) { ws.close(1009, 'Control message too large'); this.close(client); return; }
+    if (typeof message !== 'string' || message.length > 262144) { this.terminate(client, 1009, 'Control message too large'); return; }
     const now = Date.now();
-    if (!consumeControlRate(client.data, message, now)) { ws.close(1008, controlRateLimitReason(client.data)); this.close(client); return; }
+    if (!consumeControlRate(client.data, message, now)) { this.terminate(client, 1008, controlRateLimitReason(client.data)); return; }
     if (!(await this.validateSession(client))) return;
+    client.data.lastActivity = now;
     this.attach(client);
     try {
       if (message.startsWith('40') && !client.data.ready) {
@@ -506,11 +518,11 @@ export class TriscordHub extends DurableObject {
         if (!member) current = null;
       }
     } catch {
-      client.ws.close(1013, 'Service temporarily unavailable'); this.close(client); return false;
+      this.terminate(client, 1013, 'Service temporarily unavailable'); return false;
     }
     if (this.clients.get(client.data.sid) !== client) return false;
     if (!current || current.accountId !== identity.accountId) {
-      client.ws.close(1008, 'Session expired or revoked'); this.close(client); return false;
+      this.terminate(client, 1008, 'Session expired or revoked'); return false;
     }
     return true;
   }
@@ -609,15 +621,24 @@ export class TriscordHub extends DurableObject {
     this.broadcast('rooms-update', this.directory());
   }
   close(client) { this.leave(client); this.clients.delete(client.data.sid); }
-  webSocketClose(ws) { const data = ws.deserializeAttachment(); const client = data && this.clients.get(data.sid); if (client) this.close(client); }
-  webSocketError(ws) { this.webSocketClose(ws); }
+  webSocketClose(ws, code, reason) {
+    const data = ws.deserializeAttachment(), client = data && this.clients.get(data.sid);
+    if (client) { if (data.room) this.noteClose(client, code || 1006, 'Remote transport closed'); this.close(client); }
+  }
+  webSocketError(ws) {
+    const data = ws.deserializeAttachment(), client = data && this.clients.get(data.sid);
+    if (client) { this.noteClose(client, 1011, 'WebSocket runtime error'); this.close(client); }
+  }
   async alarm() {
     const now = Date.now();
     for (const client of [...this.clients.values()]) {
       if (!(await this.validateSession(client))) continue;
-      const last = this.ctx.getWebSocketAutoResponseTimestamp(client.ws)?.getTime() || client.data.created;
-      if ((!client.data.ready && now - client.data.created > 10000) || now - last > 50000) { client.ws.close(1001, 'Heartbeat timeout'); this.close(client); }
-      else { try { client.ws.send('2'); } catch { this.close(client); } }
+      const last = lastControlActivity(client.data, this.ctx.getWebSocketAutoResponseTimestamp(client.ws)?.getTime());
+      if ((!client.data.ready && now - client.data.created > 10000) || now - last > 50000) { this.terminate(client, 1001, 'Heartbeat timeout'); }
+      else {
+        try { client.ws.send('2'); client.data.lastPingAt = now; this.attach(client); }
+        catch { this.noteClose(client, 1011, 'Heartbeat send failed'); this.close(client); }
+      }
     }
     if (this.clients.size) await this.ctx.storage.setAlarm(now + 25000);
   }

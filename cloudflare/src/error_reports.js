@@ -16,7 +16,9 @@ const ADMIN_REPORT_RE = /^\/admin\/api\/reports\/([0-9a-f-]{36})$/;
 
 // Defence in depth: the app already scrubs, but a log must never keep a bearer token or an e-mail address here.
 export function scrubLog(text) {
-  return text.replace(/[0-9a-fA-F]{32,}/g, '<hex>').replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '<email>');
+  return text.replace(/\bBearer\s+[^\s"']+/gi, 'Bearer <token>')
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '<jwt>')
+    .replace(/[0-9a-fA-F]{32,}/g, '<hex>').replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '<email>');
 }
 export function parseSignals(header) {
   if (typeof header !== 'string' || !header.trim()) return null;
@@ -63,7 +65,7 @@ async function handleUpload(request, env, helpers) {
   const reason = request.headers.get('X-Triscord-Reason');
   if (!VERSION_RE.test(version) || !signals || !['periodic', 'auto', 'manual'].includes(reason)) return json({ error: 'invalid_report' }, 400);
   const now = Date.now();
-  const recent = await env.DB.prepare('SELECT COUNT(*) AS n FROM error_reports WHERE account_id = ?1 AND created_at > ?2')
+  const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM error_reports WHERE account_id = ?1 AND reason <> 'server' AND created_at > ?2")
     .bind(identity.accountId, now - 60 * 60 * 1000).first();
   if ((recent?.n || 0) >= REPORTS_PER_HOUR) return json({ error: 'rate_limited' }, 429);
   const body = await inflate(request);
@@ -184,7 +186,7 @@ function render() {
   const shown = reports.filter(r => (!v || r.version === v) && (!s || r.signals.includes(s)));
   $('reports').tBodies[0].replaceChildren(...shown.map(r => { const row = el('tr', { className: r.id === openId ? 'is-open' : '' },
     el('td', { textContent: fmtDate(r.createdAt) }), el('td', { textContent: r.nick, title: r.accountId }), el('td', { textContent: r.version }),
-    el('td', {}, ...r.signals.map(x => el('span', { className: 'chip', textContent: x }))), el('td', { textContent: r.reason === 'manual' ? 'manual' : 'automático' }),
+    el('td', {}, ...r.signals.map(x => el('span', { className: 'chip', textContent: x }))), el('td', { textContent: r.reason === 'server' ? 'servidor' : r.reason === 'manual' ? 'manual' : 'automático' }),
     el('td', { className: 'num', textContent: fmtSize(r.bytes) }));
     row.addEventListener('click', () => open(r)); return row; }));
   $('status').textContent = reports.length + ' relatório(s)';
