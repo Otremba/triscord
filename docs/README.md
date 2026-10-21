@@ -6,7 +6,7 @@ Comece pelo [guia do cliente atual](../desktop/README.md).
 - [Arquitetura e evidências da interface](../desktop/ARQUITETURA_WEBVIEW2.md).
 - [Backend de salas](../cloudflare/README.md) e [implantação](../cloudflare/DEPLOYMENT.md).
 - [Backend de autenticação](../cloudflare-auth/RELEASE_READINESS.md).
-- [Histórico de engenharia](history/README.md): relatórios antigos, sem força de instrução atual.
+- [Design da interface](design/preview.md): documentação do visual e temas.
 
 A `main` contém o cliente C++/Qt com Preact/WebView2. O Electron não é mais compilado nem publicado a partir da árvore atual. As tags anteriores preservam seu código para consulta e para preparar uma futura migração.
 
