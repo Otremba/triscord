@@ -19,6 +19,13 @@ export function TitleBar({ server, bridge }: { server?: Server; bridge: Bridge }
   return (
     <header class="tri-titlebar" onMouseDown={e => { if (e.button === 0 && outside(e)) dragWindow(e, bridge); }}
       onDblClick={e => { if (outside(e)) bridge.send({ name: 'window', action: 'maximize' }); }}>
+      <div class="tri-titlebar__left">
+        <span class="tri-titlebar__brand">
+          <span class="tri-titlebar__logo">Triscord</span>
+          {server && <span class="tri-titlebar__divider">/</span>}
+          {server && <span class="tri-titlebar__server">{server.name}</span>}
+        </span>
+      </div>
       <div class="tri-titlebar__buttons">
         <button class="tri-winbutton" aria-label="Minimizar" onClick={() => bridge.send({ name: 'window', action: 'minimize' })}>
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="0" y="5" width="10" height="1" fill="currentColor" /></svg>

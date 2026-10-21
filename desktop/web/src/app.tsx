@@ -97,7 +97,7 @@ export function App({ store, bridge, workspace = true }: { store: SessionStore; 
       <TitleBar server={server} bridge={bridge} />
       {!session.callFullscreen && <ResizeEdges bridge={bridge} />}
       <div class="tri-content">
-        <aside class="tri-sidebar" style={workspace?{'--tri-account-reserve':session.connectedChannelId?(session.sharing?'238px':'194px'):'90px'}:undefined}>
+        <aside class="tri-sidebar">
           {workspace?<WorkspaceNav session={session} bridge={bridge}/>:<ServerRail servers={session.servers} selectedId={session.selectedServerId} callServerId={session.callServerId} bridge={bridge}
             voice={session.connectedChannelId ? (session.sharing ? 'screen' : 'voice') : undefined} />}
           <ChannelSidebar session={session} bridge={bridge} workspace={workspace} />
