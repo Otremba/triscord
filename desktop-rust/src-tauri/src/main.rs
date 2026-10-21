@@ -84,10 +84,7 @@ async fn dispatch(
                 .map(str::to_owned);
             let film_open = command["filmOpen"].as_bool().unwrap_or(true);
             let focus = key.map(|k| serde_json::json!({ "key": k, "filmOpen": film_open }));
-            let core = state.try_lock().map_err(|_| error::Error {
-                code: "busy",
-                message: "Aguarde a operação atual terminar.",
-            })?;
+            let core = state.lock().await;
             core.model.lock().unwrap_or_else(|e| e.into_inner()).call_focus = focus;
             model::publish(&app, &core.model);
             return Ok(serde_json::Value::Null);
@@ -99,10 +96,7 @@ async fn dispatch(
         Some("window") => return window::action(&app, command["action"].as_str().unwrap_or_default()),
         _ => {}
     }
-    let mut core = state.try_lock().map_err(|_| error::Error {
-        code: "busy",
-        message: "Aguarde a operação atual terminar.",
-    })?;
+    let mut core = state.lock().await;
     let result = if command["name"] == "refreshServers" {
         core.refresh().await
     } else {

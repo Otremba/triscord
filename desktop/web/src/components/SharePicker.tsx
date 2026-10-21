@@ -105,8 +105,13 @@ export function SharePicker({ bridge, store, onClose }: { bridge: Bridge; store:
           {tab !== 'device' && shown.map(source => (
             <button key={source.index} class="tri-share-source" onClick={() => start(source)} aria-label={source.name}>
               <span class="tri-share-source__frame"><span class="tri-share-source__thumb">
-                {thumbs[source.index] ? <img src={thumbs[source.index]} alt="" />
-                  : list && thumbsLate && <span class="tri-share-source__missing"><Icon name={source.kind === 'screen' ? 'ScreenShare' : 'Browser'} size={32} />Prévia indisponível</span>}
+                {thumbs[source.index] ? (
+                  <img src={thumbs[source.index]} alt="" />
+                ) : (
+                  <span class="tri-share-source__preview-placeholder">
+                    <Icon name={source.kind === 'screen' ? 'ScreenShare' : 'Browser'} size={40} />
+                  </span>
+                )}
                 <span class="tri-share-source__overlay"><span class="tri-share-source__cta">Compartilhar tela</span></span>
               </span></span>
               <span class="tri-share-source__caption">

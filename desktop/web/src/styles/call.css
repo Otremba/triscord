@@ -170,6 +170,9 @@
 .tri-share-retry:hover { background: var(--background-mod-strong); }
 .tri-share-retry:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 2px; }
 
-/* Share picker card whose thumbnail did not arrive: icon and "Prévia indisponível" on the black card. */
+/* Share picker card whose thumbnail did not arrive: clean stylized icon placeholder. */
+.tri-share-source__preview-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at center, #1e1f22 0%, #111214 100%); color: var(--text-muted); opacity: 0.85; transition: opacity 0.15s ease; }
+.tri-share-source:hover .tri-share-source__preview-placeholder { opacity: 1; }
 .tri-share-source__missing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
   color: var(--text-muted); font-size: 14px; font-weight: var(--font-weight-medium); }

@@ -213,7 +213,7 @@ impl Pipeline {
             Settings::new(
                 item,
                 CursorCaptureSettings::WithCursor,
-                DrawBorderSettings::Default,
+                DrawBorderSettings::WithoutBorder,
                 SecondaryWindowSettings::Default,
                 MinimumUpdateIntervalSettings::Default,
                 DirtyRegionSettings::Default,
@@ -229,7 +229,7 @@ impl Pipeline {
             Handler::start_free_threaded(Settings::new(
                 Window::from_raw_hwnd(source.handle as *mut _),
                 CursorCaptureSettings::WithCursor,
-                DrawBorderSettings::Default,
+                DrawBorderSettings::WithoutBorder,
                 SecondaryWindowSettings::Default,
                 MinimumUpdateIntervalSettings::Default,
                 DirtyRegionSettings::Default,
@@ -289,7 +289,9 @@ fn encode(
         };
         if encoder.is_none() {
             let device = unsafe { frame.texture.GetDevice()? };
-            encoder = Some(Encoder::new(config, &device)?);
+            let enc = Encoder::new(config, &device)?;
+            let _ = enc.keyframe();
+            encoder = Some(enc);
         }
         let encoder = encoder.as_mut().expect("initialized encoder");
         if sink.take_keyframe_request() {

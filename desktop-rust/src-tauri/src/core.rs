@@ -424,17 +424,27 @@ impl Core {
                     .get(index)
                     .cloned()
                     .ok_or_else(Error::invalid)?;
-                let (generation, epoch) = {
+                let (generation, epoch, room) = {
                     let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
-                    if model.text_room.is_none() {
+                    let room = model.text_room.clone().or_else(|| {
+                        model
+                            .rooms
+                            .first()
+                            .and_then(|r| r["id"].as_str())
+                            .map(str::to_owned)
+                    });
+                    let Some(room) = room else {
                         return Err(Error::invalid());
+                    };
+                    if model.text_room.is_none() {
+                        model.text_room = Some(room.clone());
                     }
                     model.screen_requested = true;
                     model.screen_admitting = false;
                     model.sharing = false;
                     model.sharing_name = source.name.to_string();
                     model.screen_epoch += 1;
-                    (model.generation, model.screen_epoch)
+                    (model.generation, model.screen_epoch, room)
                 };
                 let preferences = self
                     .model
@@ -463,13 +473,6 @@ impl Core {
                         },
                     },
                 )?;
-                let room = self
-                    .model
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .text_room
-                    .clone()
-                    .ok_or_else(Error::invalid)?;
                 self.send("media-refresh", json!({"kind":"screen","roomId":room}))?;
                 if let Some(socket) = &self.socket {
                     let sender = socket.sender();
