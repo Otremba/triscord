@@ -866,15 +866,18 @@
 /* Shared controls retain form semantics, without decorative layers or pointer tracking. */
 :root[data-design="workspace"] .tri-shimmer-btn { display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:8px 18px;font-size:14px;font-weight:600;cursor:pointer; }
 :root[data-design="workspace"] .tri-login__art { display:none; }
-:root[data-design="workspace"] .tri-login__box { border:1px solid var(--ui-border);border-radius:14px;background:var(--ui-panel);color:var(--ui-text);box-shadow:none;animation:none; }
-:root[data-design="workspace"] .tri-login__title { color:var(--ui-text); }
-:root[data-design="workspace"] :is(.tri-login__subtitle,.tri-login__label,.tri-login__hint,.tri-login__divider,.tri-login__reveal) { color:var(--ui-muted); }
+:root[data-design="workspace"] .tri-login__box { width:420px;max-width:100%;padding:36px 32px;border:1px solid var(--ui-border);border-radius:16px;background:var(--ui-panel);color:var(--ui-text);box-shadow:0 16px 40px rgba(0, 0, 0, 0.4);animation:none; }
+:root[data-design="workspace"] .tri-login__title { color:var(--ui-text);font-size:22px;font-weight:600;letter-spacing:-0.02em;margin-bottom:8px; }
+:root[data-design="workspace"] .tri-login__subtitle { color:var(--ui-muted);font-size:14px;line-height:1.5;margin-bottom:28px; }
+:root[data-design="workspace"] :is(.tri-login__label,.tri-login__hint,.tri-login__divider,.tri-login__reveal) { color:var(--ui-muted); }
 :root[data-design="workspace"] .tri-login__input { background:var(--ui-field);border-color:var(--ui-border);color:var(--ui-text); }
 :root[data-design="workspace"] .tri-login__input:focus { border-color:var(--ui-accent);box-shadow:none; }
 :root[data-design="workspace"] .tri-login__button { background:var(--ui-primary);color:var(--ui-primary-text); }
 :root[data-design="workspace"] .tri-login__button:hover:not(:disabled) { background:var(--control-primary-background-hover); }
-:root[data-design="workspace"] .tri-login__google { background:var(--ui-field);border-color:var(--ui-border);color:var(--ui-text); }
-:root[data-design="workspace"] .tri-login__google:hover:not(:disabled) { background:var(--ui-selected);border-color:var(--ui-accent); }
+:root[data-design="workspace"] .tri-login__google { display:flex;align-items:center;justify-content:center;gap:12px;height:44px;width:100%;padding:0 20px;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer;background:var(--ui-field);border:1px solid var(--ui-border);color:var(--ui-text);transition:background 0.15s ease,border-color 0.15s ease,transform 0.15s ease; }
+:root[data-design="workspace"] .tri-login__google:hover:not(:disabled) { background:var(--ui-hover);border-color:var(--ui-border-strong);color:#fff;transform:translateY(-1px); }
+:root[data-design="workspace"] .tri-login__google:active:not(:disabled) { transform:translateY(0); }
+:root[data-design="workspace"] .tri-login__google:disabled { opacity:0.6;cursor:not-allowed; }
 :root[data-design="workspace"] .tri-login__divider::before,
 :root[data-design="workspace"] .tri-login__divider::after { background:var(--ui-border); }
 :root[data-design="workspace"] .tri-login__input.has-error { border-color:var(--ui-critical); }
