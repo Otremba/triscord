@@ -64,10 +64,8 @@ const NAV: { page: Page; label: string; icon: IconName; group?: string; subs: st
 ];
 const TITLES: Record<Page, string> = { account: 'Conta', notifications: 'Notificações', voice: 'Voz e vídeo', appearance: 'Aparência', windows: 'Configurações do Windows' };
 const THEMES: { id: SettingsState['theme']; name: string }[] = [
-  { id: 'light', name: 'Claro' }, { id: 'dark', name: 'Cinza' }, { id: 'darker', name: 'Escuro' }, { id: 'midnight', name: 'Ônix' },
+  { id: 'midnight', name: 'Preto AMOLED' },
 ];
-// The optional pastel theme uses the same solid workspace surfaces and controls.
-const COLOR_THEMES: { id: SettingsState['theme']; name: string }[] = [{ id: 'cotton-candy', name: 'Algodão-doce' }];
 
 function Switch({ checked, label, onChange }: { checked: boolean; label: string; onChange: (on: boolean) => void }) {
   return (
@@ -367,24 +365,16 @@ export function Settings({ session, bridge, store, onClose }: { session: Session
               {page === 'appearance' && s && (
                 <>
                   <h2 class="tri-settings__heading" data-sub>Tema</h2>
-                  <span class="tri-settings__label">Temas padrão</span>
-                  <div class="tri-themes" role="radiogroup" aria-label="Temas padrão">
+                  <span class="tri-settings__label">Tema ativo</span>
+                  <div class="tri-themes" role="radiogroup" aria-label="Tema ativo">
                     {THEMES.map(t => (
-                      <button key={t.id} role="radio" aria-checked={s.theme === t.id} aria-label={t.name} title={t.name}
-                        class={`tri-theme tri-theme--${t.id} ${s.theme === t.id ? 'is-selected' : ''}`} onClick={() => set('theme', t.id)}>
-                        {s.theme === t.id && <span class="tri-theme__check" aria-hidden="true"><Icon name="CircleCheck" size={20} /></span>}
+                      <button key={t.id} role="radio" aria-checked={s.theme === t.id || !s.theme} aria-label={t.name} title={t.name}
+                        class={`tri-theme tri-theme--${t.id} ${s.theme === t.id || !s.theme ? 'is-selected' : ''}`} onClick={() => set('theme', t.id)}>
+                        {(s.theme === t.id || !s.theme) && <span class="tri-theme__check" aria-hidden="true"><Icon name="CircleCheck" size={20} /></span>}
                       </button>
                     ))}
                   </div>
-                  <span class="tri-settings__label">Temas coloridos</span>
-                  <div class="tri-themes" role="radiogroup" aria-label="Temas coloridos">
-                    {COLOR_THEMES.map(t => (
-                      <button key={t.id} role="radio" aria-checked={s.theme === t.id} aria-label={t.name} title={t.name}
-                        class={`tri-theme tri-theme--${t.id} ${s.theme === t.id ? 'is-selected' : ''}`} onClick={() => set('theme', t.id)}>
-                        {s.theme === t.id && <span class="tri-theme__check" aria-hidden="true"><Icon name="CircleCheck" size={20} /></span>}
-                      </button>
-                    ))}
-                  </div>
+                  <p class="tri-settings__description">Tema minimalista com preto puro AMOLED (#000000) e contraste nítido, projetado para máxima imersão e economia de energia.</p>
                 </>
               )}
             </div>

@@ -14,16 +14,27 @@
   --ui-space-hover:#3b4555;
   --ui-border-strong:#657184;
 }
+:root[data-design="workspace"][data-theme="darker"] {
+  --ui-canvas:#141617;
+  --ui-sidebar:#181a1b;
+  --ui-panel:#1e2021;
+  --ui-field:#232526;
+  --ui-border:#2d3032;
+  --ui-hover:#242728;
+  --ui-message-hover:#191b1c;
+  --ui-space-hover:#202224;
+  --ui-border-strong:#3b3e40;
+}
 :root[data-design="workspace"][data-theme="midnight"] {
-  --ui-canvas:#090b0f;
-  --ui-sidebar:#101318;
-  --ui-panel:#181d24;
-  --ui-field:#202630;
-  --ui-border:#343e4e;
-  --ui-hover:#293242;
-  --ui-message-hover:#161d28;
-  --ui-space-hover:#222e42;
-  --ui-border-strong:#52627b;
+  --ui-canvas:#000000;
+  --ui-sidebar:#050505;
+  --ui-panel:#0a0a0a;
+  --ui-field:#101010;
+  --ui-border:#1c1c1c;
+  --ui-hover:#141414;
+  --ui-message-hover:#070707;
+  --ui-space-hover:#161616;
+  --ui-border-strong:#2a2a2a;
 }
 :root[data-design="workspace"][data-theme="light"] {
   color-scheme:light;
@@ -95,4 +106,4 @@
 :root[data-design="workspace"] .tri-theme--cotton-candy { background:#eaddef; }
 :root[data-design="workspace"] .tri-theme--dark { background:#282b30; }
 :root[data-design="workspace"] .tri-theme--darker { background:#1e2021; }
-:root[data-design="workspace"] .tri-theme--midnight { background:#090b0f; }
+:root[data-design="workspace"] .tri-theme--midnight { background:#000000; border:1px solid #333333; }
