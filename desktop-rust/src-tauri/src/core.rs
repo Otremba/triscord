@@ -1248,4 +1248,143 @@ mod tests {
             Command::StopSoundPreview
         ));
     }
+    #[test]
+    fn command_select_channel_alias_deserializes_to_open_text_room() {
+        let cmd: Command = serde_json::from_value(json!({
+            "name": "selectChannel",
+            "channelId": "chan-123"
+        }))
+        .unwrap();
+        assert!(matches!(cmd, Command::OpenTextRoom { channel_id } if channel_id == "chan-123"));
+    }
+    #[test]
+    fn command_open_text_room_deserializes_normally() {
+        let cmd: Command = serde_json::from_value(json!({
+            "name": "openTextRoom",
+            "channelId": "chan-456"
+        }))
+        .unwrap();
+        assert!(matches!(cmd, Command::OpenTextRoom { channel_id } if channel_id == "chan-456"));
+    }
+    #[test]
+    fn command_send_chat_message_deserializes() {
+        let cmd: Command = serde_json::from_value(json!({
+            "name": "sendChatMessage",
+            "text": "Hello Triscord!"
+        }))
+        .unwrap();
+        assert!(matches!(cmd, Command::SendChatMessage { text } if text == "Hello Triscord!"));
+    }
+    #[test]
+    fn command_voice_and_audio_controls_deserialize() {
+        let join: Command = serde_json::from_value(json!({
+            "name": "joinVoice",
+            "channelId": "voice-1"
+        }))
+        .unwrap();
+        assert!(matches!(join, Command::JoinVoice { channel_id } if channel_id == "voice-1"));
+        let leave: Command = serde_json::from_value(json!({"name": "leaveVoice"})).unwrap();
+        assert!(matches!(leave, Command::LeaveVoice));
+        let muted: Command = serde_json::from_value(json!({"name": "setMuted", "muted": true})).unwrap();
+        assert!(matches!(muted, Command::SetMuted { muted: true }));
+        let deaf: Command = serde_json::from_value(json!({"name": "setDeafened", "deafened": false})).unwrap();
+        assert!(matches!(deaf, Command::SetDeafened { deafened: false }));
+    }
+    #[test]
+    fn command_server_management_deserializes() {
+        let create: Command = serde_json::from_value(json!({
+            "name": "createServer",
+            "serverName": "My Community"
+        }))
+        .unwrap();
+        assert!(matches!(create, Command::CreateServer { server_name } if server_name == "My Community"));
+        let delete: Command = serde_json::from_value(json!({
+            "name": "deleteServer",
+            "serverId": "srv-99"
+        }))
+        .unwrap();
+        assert!(matches!(delete, Command::DeleteServer { server_id } if server_id == "srv-99"));
+        let leave: Command = serde_json::from_value(json!({
+            "name": "leaveServer",
+            "serverId": "srv-99"
+        }))
+        .unwrap();
+        assert!(matches!(leave, Command::LeaveServer { server_id } if server_id == "srv-99"));
+    }
+    #[test]
+    fn command_moderation_actions_deserialize() {
+        let server_mute: Command = serde_json::from_value(json!({
+            "name": "setServerMuted",
+            "socketId": "sock-peer",
+            "muted": true
+        }))
+        .unwrap();
+        assert!(matches!(server_mute, Command::SetServerMuted { socket_id, muted: true } if socket_id == "sock-peer"));
+        let kick: Command = serde_json::from_value(json!({
+            "name": "disconnectParticipant",
+            "socketId": "sock-bad"
+        }))
+        .unwrap();
+        assert!(matches!(kick, Command::DisconnectParticipant { socket_id } if socket_id == "sock-bad"));
+    }
+    #[test]
+    fn command_screen_share_actions_deserialize() {
+        let start: Command = serde_json::from_value(json!({
+            "name": "startScreenShare",
+            "generation": "gen-1",
+            "index": 0
+        }))
+        .unwrap();
+        assert!(matches!(start, Command::StartScreenShare { generation, index: 0 } if generation == "gen-1"));
+        let stop: Command = serde_json::from_value(json!({"name": "stopScreenShare"})).unwrap();
+        assert!(matches!(stop, Command::StopScreenShare));
+    }
+    #[test]
+    fn command_profile_media_chunk_deserializes() {
+        let chunk: Command = serde_json::from_value(json!({
+            "name": "appendProfileMedia",
+            "uploadId": "upl-1",
+            "offset": 24576,
+            "data": "aW1hZ2VkYXRh"
+        }))
+        .unwrap();
+        assert!(matches!(chunk, Command::AppendProfileMedia { upload_id, offset: 24576, data } if upload_id == "upl-1" && data == "aW1hZ2VkYXRh"));
+        let finish: Command = serde_json::from_value(json!({
+            "name": "finishProfileMedia",
+            "uploadId": "upl-1"
+        }))
+        .unwrap();
+        assert!(matches!(finish, Command::FinishProfileMedia { upload_id } if upload_id == "upl-1"));
+    }
+    #[test]
+    fn clean_name_rejects_empty_whitespace_and_null_bytes() {
+        assert!(clean_name("", 100).is_err());
+        assert!(clean_name("   ", 100).is_err());
+        assert!(clean_name("\t\n\r", 100).is_err());
+        assert!(clean_name("hello\0world", 100).is_err());
+        assert_eq!(clean_name("  valid name  ", 100).unwrap(), "valid name");
+    }
+    #[test]
+    fn clean_name_exact_utf16_boundary_checks() {
+        let exactly_limit = "a".repeat(64);
+        assert!(clean_name(&exactly_limit, 64).is_ok());
+        let one_over = "a".repeat(65);
+        assert!(clean_name(&one_over, 64).is_err());
+    }
+    #[test]
+    fn public_account_validation_rules() {
+        let valid = json!({"id": "acc-123", "nick": "Alice"});
+        let result = public_account(&valid).unwrap();
+        assert_eq!(result["id"], "acc-123");
+        assert_eq!(result["nick"], "Alice");
+
+        let empty_id = json!({"id": "", "nick": "Bob"});
+        assert!(public_account(&empty_id).is_err());
+
+        let missing_id = json!({"nick": "Charlie"});
+        assert!(public_account(&missing_id).is_err());
+
+        let long_id = json!({"id": "x".repeat(129), "nick": "Dave"});
+        assert!(public_account(&long_id).is_err());
+    }
 }

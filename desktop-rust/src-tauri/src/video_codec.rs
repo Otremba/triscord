@@ -420,4 +420,53 @@ mod tests {
         assert!(!has_nal(&[0, 0, 1], 5));
         assert!(!has_nal(&[1, 2, 3, 4, 5], 5));
     }
+    #[test]
+    fn config_accepts_standard_presets_720p30_and_1080p60() {
+        let p720 = Config {
+            width: 1280,
+            height: 720,
+            fps: 30,
+            bitrate: 2500000,
+        };
+        assert!(p720.valid());
+
+        let p1080 = Config {
+            width: 1920,
+            height: 1080,
+            fps: 60,
+            bitrate: 8000000,
+        };
+        assert!(p1080.valid());
+    }
+    #[test]
+    fn config_rejects_odd_height_or_too_low_bitrate() {
+        let odd_h = Config {
+            width: 1920,
+            height: 1081,
+            fps: 60,
+            bitrate: 8000000,
+        };
+        assert!(!odd_h.valid());
+
+        let low_bitrate = Config {
+            width: 1280,
+            height: 720,
+            fps: 30,
+            bitrate: 32000, // < 64000
+        };
+        assert!(!low_bitrate.valid());
+    }
+    #[test]
+    fn annex_b_parser_distinguishes_nal_types() {
+        // NAL header byte: forbidden_zero_bit (1) + nal_ref_idc (2) + nal_unit_type (5)
+        // 0x27 & 0x1F = 7 (SPS)
+        // 0x28 & 0x1F = 8 (PPS)
+        // 0x25 & 0x1F = 5 (IDR slice)
+        // 0x21 & 0x1F = 1 (non-IDR slice)
+        let stream = [0, 0, 0, 1, 0x27, 0, 0, 0, 1, 0x28, 0, 0, 1, 0x25];
+        assert!(has_nal(&stream, 7), "should detect SPS");
+        assert!(has_nal(&stream, 8), "should detect PPS");
+        assert!(has_nal(&stream, 5), "should detect IDR");
+        assert!(!has_nal(&stream, 1), "non-IDR slice is absent");
+    }
 }

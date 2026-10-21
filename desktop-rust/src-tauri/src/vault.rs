@@ -202,4 +202,30 @@ mod tests {
         vault.clear().unwrap();
         assert!(vault.load().unwrap().is_none());
     }
+    #[test]
+    fn atomic_write_creates_nested_directories_if_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let nested_file = dir.path().join("a").join("b").join("c").join("data.bin");
+        atomic_write(&nested_file, b"deep-payload").unwrap();
+        assert_eq!(std::fs::read(&nested_file).unwrap(), b"deep-payload");
+    }
+    #[test]
+    #[cfg(windows)]
+    fn vault_load_on_empty_file_returns_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let vault = Vault::new(dir.path().to_path_buf());
+        atomic_write(&vault.path, b"").unwrap();
+        assert!(vault.load().is_err());
+    }
+    #[test]
+    fn credential_struct_roundtrips_through_json() {
+        let cred = Credential {
+            session: "test-session-tok-999".into(),
+            expires_at: 1893456000,
+        };
+        let encoded = serde_json::to_string(&cred).unwrap();
+        let decoded: Credential = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded.session, cred.session);
+        assert_eq!(decoded.expires_at, cred.expires_at);
+    }
 }

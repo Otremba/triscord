@@ -72,7 +72,15 @@ mod tests {
             assert!(hit_test(edge).is_some(), "{edge}");
         }
         assert_eq!(hit_test("n"), Some(HTTOP));
+        assert_eq!(hit_test("s"), Some(HTBOTTOM));
+        assert_eq!(hit_test("e"), Some(HTRIGHT));
+        assert_eq!(hit_test("w"), Some(HTLEFT));
+        assert_eq!(hit_test("ne"), Some(HTTOPRIGHT));
+        assert_eq!(hit_test("nw"), Some(HTTOPLEFT));
         assert_eq!(hit_test("se"), Some(HTBOTTOMRIGHT));
+        assert_eq!(hit_test("sw"), Some(HTBOTTOMLEFT));
         assert!(hit_test("up").is_none() && hit_test("").is_none());
+        assert!(hit_test("caption").is_none());
+        assert!(hit_test("center").is_none());
     }
 }

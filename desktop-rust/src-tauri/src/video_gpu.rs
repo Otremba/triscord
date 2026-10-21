@@ -321,4 +321,33 @@ mod tests {
             assert!(rect.right > rect.left && rect.bottom > rect.top);
         }
     }
+    #[test]
+    fn aspect_fit_exact_match_fills_entire_canvas() {
+        let rect = fit_rect((1920, 1080), (1920, 1080));
+        assert_eq!((rect.left, rect.top, rect.right, rect.bottom), (0, 0, 1920, 1080));
+    }
+    #[test]
+    fn aspect_fit_ultrawide_centers_vertically() {
+        // 21:9 source into 16:9 output (e.g. 2560x1080 into 2560x1440)
+        let rect = fit_rect((2560, 1080), (2560, 1440));
+        assert_eq!(rect.left, 0);
+        assert_eq!(rect.right, 2560);
+        assert!(rect.top > 0);
+        assert_eq!(rect.top, 1440 - rect.bottom); // vertically centered
+    }
+    #[test]
+    fn aspect_fit_portrait_centers_horizontally() {
+        // 9:16 phone source into 16:9 output (e.g. 1080x1920 into 2560x1440)
+        let rect = fit_rect((1080, 1920), (2560, 1440));
+        assert_eq!(rect.top, 0);
+        assert_eq!(rect.bottom, 1440);
+        assert!(rect.left > 0);
+        assert!((rect.left as i32 - (2560 - rect.right as i32)).abs() <= 2);
+    }
+    #[test]
+    fn aspect_fit_tiny_and_degenerate_dimensions_clamp_safely() {
+        let rect = fit_rect((0, 0), (1280, 720));
+        assert!(rect.right > rect.left && rect.bottom > rect.top);
+        assert!(rect.left % 2 == 0 && rect.top % 2 == 0);
+    }
 }

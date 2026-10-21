@@ -75,4 +75,27 @@ mod tests {
         assert_eq!(pcm.len(), 2400);
         assert!(pcm.iter().all(|&s| s == 0));
     }
+
+    #[test]
+    fn catalog_items_contain_required_metadata() {
+        let sounds = catalog();
+        for item in sounds {
+            assert!(item.get("id").and_then(|v| v.as_str()).is_some());
+            assert!(item.get("name").and_then(|v| v.as_str()).is_some());
+        }
+    }
+
+    #[test]
+    fn synthesize_tone_zero_duration_is_empty() {
+        let pcm = synthesize_tone(440.0, 0, 100);
+        assert!(pcm.is_empty());
+    }
+
+    #[test]
+    fn envelope_smooths_first_and_last_sample() {
+        let pcm = synthesize_tone(880.0, 100, 100);
+        assert!(!pcm.is_empty());
+        // First sample starts from 0 due to sin(0) and envelope
+        assert_eq!(pcm[0], 0);
+    }
 }

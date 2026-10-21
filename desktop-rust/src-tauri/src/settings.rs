@@ -252,4 +252,52 @@ mod tests {
             assert!(page.get(key).is_some(), "missing {key}");
         }
     }
+    #[test]
+    fn all_valid_themes_can_be_set_and_invalid_themes_rejected() {
+        let mut preferences = Preferences::default();
+        for theme in ["light", "dark", "darker", "midnight", "cotton-candy"] {
+            assert!(preferences.set("theme", json!(theme)).is_ok());
+            assert_eq!(preferences.theme, theme);
+        }
+        assert!(preferences.set("theme", json!("neon")).is_err());
+        assert!(preferences.set("theme", json!("")).is_err());
+        assert!(preferences.set("theme", json!(123)).is_err());
+    }
+    #[test]
+    fn all_boolean_preference_toggles_accept_booleans_only() {
+        let mut preferences = Preferences::default();
+        for key in [
+            "shareHd", "noiseSuppression", "automaticGainControl", "callSounds",
+            "desktopNotifications", "taskbarAlert", "closeToTray", "startMinimized",
+        ] {
+            assert!(preferences.set(key, json!(true)).is_ok(), "{key} should accept true");
+            assert!(preferences.set(key, json!(false)).is_ok(), "{key} should accept false");
+            assert!(preferences.set(key, json!("true")).is_err(), "{key} should reject string");
+            assert!(preferences.set(key, json!(1)).is_err(), "{key} should reject int");
+        }
+    }
+    #[test]
+    fn soundboard_and_noise_strength_volumes_are_bounded_zero_to_hundred() {
+        let mut preferences = Preferences::default();
+        assert!(preferences.set("soundboardVolume", json!(0)).is_ok());
+        assert!(preferences.set("soundboardVolume", json!(100)).is_ok());
+        assert!(preferences.set("soundboardVolume", json!(101)).is_err());
+        assert!(preferences.set("soundboardVolume", json!(-1)).is_err());
+
+        assert!(preferences.set("noiseSuppressionStrength", json!(0)).is_ok());
+        assert!(preferences.set("noiseSuppressionStrength", json!(100)).is_ok());
+        assert!(preferences.set("noiseSuppressionStrength", json!(101)).is_err());
+    }
+    #[test]
+    fn device_id_selection_sanitizes_id() {
+        let mut preferences = Preferences::default();
+        assert!(preferences.set("inputDevice", json!("mic-default-guid-123")).is_ok());
+        assert_eq!(preferences.input_device, "mic-default-guid-123");
+        assert!(preferences.set("outputDevice", json!("speaker-guid-456")).is_ok());
+        assert_eq!(preferences.output_device, "speaker-guid-456");
+
+        // Reject null bytes and oversize
+        assert!(preferences.set("inputDevice", json!("mic\0evil")).is_err());
+        assert!(preferences.set("inputDevice", json!("x".repeat(513))).is_err());
+    }
 }

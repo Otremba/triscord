@@ -145,4 +145,37 @@ mod tests {
         assert!(invite(&format!("a{code}")).is_err());
         assert!(invite(&format!("{code}/{code}")).is_err());
     }
+    #[test]
+    fn id_boundary_at_64_characters() {
+        let exactly_64 = "a".repeat(64);
+        assert!(id(&exactly_64).is_ok());
+        let over_64 = "a".repeat(65);
+        assert!(id(&over_64).is_err());
+    }
+    #[test]
+    fn id_character_whitelist_validation() {
+        assert!(id("valid_id-123_ABC").is_ok());
+        assert!(id("has space").is_err());
+        assert!(id("has/slash").is_err());
+        assert!(id("has.dot").is_err());
+        assert!(id("has#hash").is_err());
+        assert!(id("has@at").is_err());
+    }
+    #[test]
+    fn invite_extracts_code_case_insensitively_and_lowercases() {
+        let upper_code = "0123456789ABCDEF0123456789ABCDEF";
+        let parsed = invite(&format!("https://triscord.pages.dev/invite/{upper_code}")).unwrap();
+        assert_eq!(parsed, "0123456789abcdef0123456789abcdef");
+    }
+    #[test]
+    fn invite_rejects_oversized_url_or_invalid_candidate_count() {
+        let code = "0123456789abcdef0123456789abcdef";
+        let oversized = format!("https://example.com/{}?x={}", code, "a".repeat(2050));
+        assert!(invite(&oversized).is_err());
+
+        // Zero candidate 32-hex codes
+        assert!(invite("https://triscord.pages.dev/invite/shortcode").is_err());
+        // Exactly 31 hex chars (one short)
+        assert!(invite("0123456789abcdef0123456789abcde").is_err());
+    }
 }

@@ -552,4 +552,92 @@ mod tests {
         assert!(model.self_socket.is_empty() && model.speaking.is_empty() && model.rooms.is_empty());
         assert_eq!(model.connected_at, 0);
     }
+    #[test]
+    fn selected_channel_id_falls_back_to_first_room_when_no_room_is_selected() {
+        let mut model = signed_in();
+        model.desired_room = None;
+        model.text_room = None;
+        let snapshot = model.snapshot();
+        assert_eq!(
+            snapshot["session"]["selectedChannelId"], "geral",
+            "must fall back to first room in rooms list, preventing black screen"
+        );
+    }
+    #[test]
+    fn server_selection_updates_selected_server_in_snapshot() {
+        let mut model = signed_in();
+        model.selected_server = "custom-server-42".into();
+        let snapshot = model.snapshot();
+        assert_eq!(snapshot["session"]["selectedServerId"], "custom-server-42");
+    }
+    #[test]
+    fn chat_message_deletion_removes_target_message_from_history() {
+        let mut model = signed_in();
+        model.text_room = Some("geral".into());
+        model.update(0, "new-chat-message", message(10, "geral"));
+        model.update(0, "new-chat-message", message(20, "geral"));
+        assert_eq!(model.chat.len(), 2);
+        assert!(model.update(
+            0,
+            "chat-message-deleted",
+            json!({"roomId": "geral", "messageId": "10"})
+        ));
+        assert_eq!(model.chat.len(), 1);
+        assert_eq!(model.chat[0]["id"], "20");
+        assert!(!model.update(
+            0,
+            "chat-message-deleted",
+            json!({"roomId": "wrong-room", "messageId": "20"})
+        ));
+    }
+    #[test]
+    fn multiple_reactions_can_be_updated_and_cleared() {
+        let mut model = signed_in();
+        model.text_room = Some("geral".into());
+        model.update(0, "new-chat-message", message(1, "geral"));
+        model.update(
+            0,
+            "message-reaction-updated",
+            json!({"messageId": "1", "reactions": {"🔥": ["acc-a"]}}),
+        );
+        let snap1 = model.snapshot();
+        assert_eq!(snap1["session"]["chat"][0]["reactions"][0]["emoji"], "🔥");
+        // Clear reactions
+        model.update(
+            0,
+            "message-reaction-updated",
+            json!({"messageId": "1", "reactions": {}}),
+        );
+        let snap2 = model.snapshot();
+        assert_eq!(snap2["session"]["chat"][0]["reactions"].as_array().unwrap().len(), 0);
+    }
+    #[test]
+    fn empty_rooms_update_clears_directory_without_panic() {
+        let mut model = signed_in();
+        assert!(model.update(0, "rooms-update", json!([])));
+        assert!(model.rooms.is_empty());
+        let snapshot = model.snapshot();
+        assert_eq!(snapshot["session"]["categories"][0]["channels"].as_array().unwrap().len(), 0);
+    }
+    #[test]
+    fn peer_muted_state_tracks_and_clears_per_socket() {
+        let mut model = signed_in();
+        assert!(!model.peer_muted.contains("s2"));
+        model.peer_muted.insert("s2".into());
+        assert!(model.peer_muted.contains("s2"));
+        model.peer_muted.remove("s2");
+        assert!(!model.peer_muted.contains("s2"));
+    }
+    #[test]
+    fn custom_status_updates_on_user_state_change() {
+        let mut model = signed_in();
+        model.update(
+            0,
+            "user-state-updated",
+            json!({"socketId": "s2", "state": {"status": "ouvindo musica"}}),
+        );
+        let snap = model.snapshot();
+        let s2 = &snap["session"]["categories"][0]["channels"][0]["users"][1];
+        assert_eq!(s2["customStatus"], "ouvindo musica");
+    }
 }

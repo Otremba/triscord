@@ -70,4 +70,22 @@ mod tests {
         assert_eq!(pcm[5], i16::MAX);
         assert_eq!(pcm[6], i16::MAX);
     }
+
+    #[test]
+    fn float_to_i16_pcm_handles_empty_and_preserves_size() {
+        assert!(float_to_i16_pcm(&[]).is_empty());
+        let frames = vec![0.1f32; 960];
+        assert_eq!(float_to_i16_pcm(&frames).len(), 960);
+    }
+
+    #[test]
+    fn loopback_config_sample_rate_and_channel_boundaries() {
+        // Allowed: 8000..=192000 Hz, 1 or 2 channels
+        assert!(LoopbackConfig::new(9999, 8000, 1).is_ok());
+        assert!(LoopbackConfig::new(9999, 192000, 2).is_ok());
+        assert!(LoopbackConfig::new(9999, 7999, 2).is_err());
+        assert!(LoopbackConfig::new(9999, 192001, 2).is_err());
+        assert!(LoopbackConfig::new(9999, 48000, 0).is_err());
+        assert!(LoopbackConfig::new(9999, 48000, 3).is_err());
+    }
 }
