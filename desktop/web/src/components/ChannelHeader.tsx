@@ -2,6 +2,7 @@ import type { Channel } from '../protocol';
 import type { callTiles } from './CallView';
 import { Icon } from './Icon';
 import { Tooltip } from './Tooltip';
+import { soundEngine } from '../sound-engine';
 
 export function ChannelHeader({ channel, focused, quality, showChat, chatOpen, showMembers, membersOpen, onToggleChat, onToggleMembers }: {
   channel?: Channel;
@@ -25,10 +26,10 @@ export function ChannelHeader({ channel, focused, quality, showChat, chatOpen, s
     </div>}
     <div class="tri-channel-header__toolbar">
       {showChat && <Tooltip text={chatOpen ? 'Ocultar chat' : 'Mostrar chat'} position="bottom">
-        <button type="button" class={`tri-icon-button ${chatOpen ? 'is-active' : ''}`} aria-label={chatOpen ? 'Ocultar chat' : 'Mostrar chat'} aria-expanded={chatOpen} onClick={onToggleChat}><Icon name="Chat" size={20}/></button>
+        <button type="button" class={`tri-icon-button ${chatOpen ? 'is-active' : ''}`} aria-label={chatOpen ? 'Ocultar chat' : 'Mostrar chat'} aria-expanded={chatOpen} onClick={() => { soundEngine.play('click'); onToggleChat(); }}><Icon name="Chat" size={20}/></button>
       </Tooltip>}
       {showMembers && <Tooltip text={membersOpen ? 'Ocultar lista de membros' : 'Mostrar lista de membros'} position="bottom">
-        <button type="button" class={`tri-icon-button ${membersOpen ? 'is-active' : ''}`} aria-label="Lista de membros" aria-expanded={membersOpen} onClick={onToggleMembers}><Icon name="Group" size={20}/></button>
+        <button type="button" class={`tri-icon-button ${membersOpen ? 'is-active' : ''}`} aria-label="Lista de membros" aria-expanded={membersOpen} onClick={() => { soundEngine.play('click'); onToggleMembers(); }}><Icon name="Group" size={20}/></button>
       </Tooltip>}
     </div>
   </header>;

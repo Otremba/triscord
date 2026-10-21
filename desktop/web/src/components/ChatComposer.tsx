@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hook
 import type { Bridge } from '../bridge';
 import { Icon } from './Icon';
 import { Tooltip } from './Tooltip';
+import { soundEngine } from '../sound-engine';
 
 /** Owns drafts and submission independently of history and message presentation. */
 export function ChatComposer({ channelName, bridge, onSent }: {
@@ -48,6 +49,7 @@ export function ChatComposer({ channelName, bridge, onSent }: {
     setSending(true);
     setSendError(false);
     bridge.request({ name: 'sendChatMessage', text: value }).then(() => {
+      soundEngine.play('messageSent');
       if (!mounted.current) return;
       // Preserve text entered while the previous submission is in flight.
       if (draftRevision.current === revision) setText('');

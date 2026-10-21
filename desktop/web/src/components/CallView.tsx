@@ -14,6 +14,7 @@ import { Tooltip } from './Tooltip';
 import { openSoundboard } from './Soundboard';
 import { openAudioMenu } from './AudioMenu';
 import { AudioRipple } from './ui/AudioRipple';
+import { soundEngine } from '../sound-engine';
 
 // Call view of the connected voice channel (CALLS.md, discord-call-view-client.png):
 //   black stage; 16:9 cards (radius 8) with an 80px avatar in the middle; a 32px pill with the name in the
@@ -87,7 +88,10 @@ function ControlsBar({ session, bridge, onShare, invite, inPopout, showNonVideo,
         <div class="tri-call-attached">
           <button class={`tri-call-button tri-call-button--mic ${session.muted ? 'is-red' : ''}`}
             aria-label={session.muted ? 'Dessilenciar' : 'Silenciar'} aria-pressed={session.muted}
-            onClick={() => bridge.send({ name: 'setMuted', muted: !session.muted })}>
+            onClick={() => {
+              soundEngine.play(session.muted ? 'unmute' : 'mute');
+              bridge.send({ name: 'setMuted', muted: !session.muted });
+            }}>
             <Icon name={session.muted ? 'MicrophoneMuted' : 'Microphone'} size={20} />
           </button>
           <button class={`tri-call-button tri-call-button--caret ${session.muted ? 'is-red' : ''}`} aria-label="Opções de entrada"
@@ -98,7 +102,10 @@ function ControlsBar({ session, bridge, onShare, invite, inPopout, showNonVideo,
         <div class="tri-call-attached">
           <Tooltip text={session.deafened ? 'Reativar áudio' : 'Desativar áudio'}>
             <button type="button" class={`tri-call-button ${session.deafened ? 'is-red' : ''}`} aria-label={session.deafened ? 'Reativar áudio' : 'Desativar áudio'} aria-pressed={session.deafened}
-              onClick={() => bridge.send({ name: 'setDeafened', deafened: !session.deafened })}>
+              onClick={() => {
+                soundEngine.play(session.deafened ? 'undeafen' : 'deafen');
+                bridge.send({ name: 'setDeafened', deafened: !session.deafened });
+              }}>
               <Icon name={session.deafened ? 'HeadphonesDeafened' : 'Headphones'} size={20}/>
             </button>
           </Tooltip>
@@ -128,7 +135,7 @@ function ControlsBar({ session, bridge, onShare, invite, inPopout, showNonVideo,
           onClick={e => moreMenu(e, invite, showNonVideo, setShowNonVideo)}><Icon name="MoreHorizontal" size={20} /></button></Tooltip>
       </div>
       <Tooltip text="Desconectar">
-        <button class="tri-call-disconnect" aria-label="Desconectar" onClick={() => bridge.send({ name: 'leaveVoice' })}>
+        <button class="tri-call-disconnect" aria-label="Desconectar" onClick={() => { soundEngine.play('leave'); bridge.send({ name: 'leaveVoice' }); }}>
           <Icon name="Disconnect" size={20} />
         </button>
       </Tooltip>

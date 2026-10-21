@@ -3,6 +3,7 @@ import type { Session } from '../protocol';
 import { Icon } from './Icon';
 import { openContextMenu, type MenuEntry } from './ContextMenu';
 import { ServerIcon, serverMenuEntries } from './ServerRail';
+import { soundEngine } from '../sound-engine';
 
 export function workspaceMenuEntries(session: Session, bridge: Bridge): MenuEntry[] {
   const current = session.servers.find(server => server.id === session.selectedServerId);
@@ -74,7 +75,10 @@ export function workspaceMenuEntries(session: Session, bridge: Bridge): MenuEntr
 export function WorkspaceNav({ session, bridge }: { session: Session; bridge: Bridge }) {
   const current = session.servers.find(server => server.id === session.selectedServerId);
   const recent = session.servers.filter(server => server.id !== current?.id).slice(0, 3);
-  const select = (serverId: string) => bridge.send({ name: 'selectServer', serverId });
+  const select = (serverId: string) => {
+    soundEngine.play('channelSwitch');
+    bridge.send({ name: 'selectServer', serverId });
+  };
 
   const openDropdown = (e: MouseEvent) => {
     const el = (e.currentTarget as HTMLElement).closest('.tri-workspace-current') as HTMLElement | null;

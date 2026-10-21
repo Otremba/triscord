@@ -24,7 +24,8 @@ import { AudioMenuHost } from './components/AudioMenu';
 import { ServerRemovalModal } from './components/ServerRemovalModal';
 import { DeleteMessageModal } from './components/DeleteMessageModal';
 import type { ChatMessage } from './protocol';
-import { useEffect, useLayoutEffect, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { soundEngine } from './sound-engine';
 
 // The call popout window loads this page with ?popout=call: title bar and the call only (Discord's
 // PopoutWindowChannelCall), with the menus and cards the call opens.
@@ -59,6 +60,23 @@ export function App({ store, bridge, workspace = true }: { store: SessionStore; 
   // Theme chosen in Aparência (core setting); the URL may still force one for fixtures and comparisons.
   const theme = session?.settings?.theme;
   useEffect(() => { if (theme && !new URLSearchParams(location.search).has('theme')) document.documentElement.dataset.theme = theme; }, [theme]);
+  useEffect(() => {
+    if (session?.settings) {
+      soundEngine.setEnabled(session.settings.callSounds ?? true);
+      soundEngine.setVolume(session.settings.soundboardVolume ?? 70);
+    }
+  }, [session?.settings?.callSounds, session?.settings?.soundboardVolume]);
+  const prevChannelRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (prevChannelRef.current !== undefined) {
+      if (!prevChannelRef.current && session?.connectedChannelId) {
+        soundEngine.play('join');
+      } else if (prevChannelRef.current && !session?.connectedChannelId) {
+        soundEngine.play('leave');
+      }
+    }
+    prevChannelRef.current = session?.connectedChannelId;
+  }, [session?.connectedChannelId]);
   // Core events the components listen to as DOM events.
   useEffect(() => store.onEvent(event => { if (event.name === 'chatRateLimited') dispatchEvent(new Event('tri-chat-rate-limited')); if(event.name==='callActivity')dispatchEvent(new Event('tri-call-activity')); }), [store]);
   // Modals opened from the sidebar ("+" of a category, invite button of the server header).

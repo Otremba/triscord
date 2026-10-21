@@ -7,6 +7,7 @@ import { Icon } from './Icon';
 import { Tooltip } from './Tooltip';
 import { openContextMenu, type MenuEntry } from './ContextMenu';
 import { AudioRipple } from './ui/AudioRipple';
+import { soundEngine } from '../sound-engine';
 
 // Server header dropdown menu options.
 function serverDropdown(server: Server): MenuEntry[] {
@@ -139,7 +140,7 @@ function CategoryList({ category, session, bridge }: { category: Category; sessi
                 <div class="tri-channel__link"
                   onContextMenu={e => openContextMenu(e, channelMenu(bridge, server, channel.id, channel.name, connected, category.name), { label: channel.name })}>
                   <button type="button" class="tri-channel__select" aria-current={selected?'page':undefined} aria-label={channel.name}
-                    onClick={() => bridge.send({ name: 'openTextRoom', channelId: channel.id })}>
+                    onClick={() => { soundEngine.play('channelSwitch'); bridge.send({ name: 'openTextRoom', channelId: channel.id }); }}>
                   {(() => {
                     const isText = channel.kind === 'text';
                     return <Icon name={isText ? 'TextChannel' : 'VoiceSpeaker'} size={20} className="tri-channel__icon" />;

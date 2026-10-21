@@ -8,6 +8,7 @@ import type { IconName } from '../icons.generated';
 import { Icon } from './Icon';
 import { Tooltip } from './Tooltip';
 import { callStatus } from '../call-status';
+import { soundEngine } from '../sound-engine';
 
 // Split button with main toggle action and chevron menu.
 function SplitAudioButton({ red, icon, label, menuLabel, onToggle, onMenu }:
@@ -62,7 +63,7 @@ export function AccountPanel({ session, bridge }: { session: Session; bridge: Br
               <span class="tri-voice-panel__room">{channel.name} / {server?.name ?? 'Triscord'}</span>
             </div>
             <Tooltip text="Desconectar">
-              <button class="tri-account__button" aria-label="Desconectar" onClick={() => bridge.send({ name: 'leaveVoice' })}>
+              <button class="tri-account__button" aria-label="Desconectar" onClick={() => { soundEngine.play('leave'); bridge.send({ name: 'leaveVoice' }); }}>
                 <Icon name="Disconnect" size={20} />
               </button>
             </Tooltip>
@@ -96,10 +97,16 @@ export function AccountPanel({ session, bridge }: { session: Session; bridge: Br
         </button>
         <div class="tri-account__buttons">
           <SplitAudioButton red={muted} icon={muted ? 'MicrophoneMuted' : 'Microphone'} label={muted ? 'Dessilenciar' : 'Silenciar'}
-            menuLabel="Opções de entrada" onToggle={() => bridge.send({ name: 'setMuted', muted: !muted })}
+            menuLabel="Opções de entrada" onToggle={() => {
+              soundEngine.play(muted ? 'unmute' : 'mute');
+              bridge.send({ name: 'setMuted', muted: !muted });
+            }}
             onMenu={e => openAudioMenu(e.currentTarget as HTMLElement,'input')} />
           <SplitAudioButton red={deafened} icon={deafened ? 'HeadphonesDeafened' : 'Headphones'} label={deafened ? 'Reativar áudio' : 'Desativar áudio'}
-            menuLabel="Opções de saída" onToggle={() => bridge.send({ name: 'setDeafened', deafened: !deafened })}
+            menuLabel="Opções de saída" onToggle={() => {
+              soundEngine.play(deafened ? 'undeafen' : 'deafen');
+              bridge.send({ name: 'setDeafened', deafened: !deafened });
+            }}
             onMenu={e => openAudioMenu(e.currentTarget as HTMLElement,'output')} />
           <Tooltip text="Configurações de usuário">
             <button class="tri-account__button" aria-label="Configurações de usuário" onClick={() => dispatchEvent(new Event('tri-open-settings'))}>

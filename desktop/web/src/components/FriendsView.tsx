@@ -6,6 +6,7 @@ import { Tooltip } from './Tooltip';
 import { BentoGrid, BentoCard } from './ui/BentoGrid';
 import { ShimmerButton } from './ui/ShimmerButton';
 import { TriscordLogo } from './ui/TriscordLogo';
+import { soundEngine } from '../sound-engine';
 import '../styles/friends-view.css';
 
 type Tab = 'online' | 'all' | 'pending' | 'blocked' | 'add';
@@ -28,31 +29,31 @@ export function FriendsView({ session, bridge }: { session: Session; bridge: Bri
           <nav class="tri-friends-header__tabs flex items-center gap-1.5" aria-label="Abas de amigos">
             <button
               class={`tri-friends-tab ${tab === 'online' ? 'is-active' : ''}`}
-              onClick={() => setTab('online')}
+              onClick={() => { soundEngine.play('channelSwitch'); setTab('online'); }}
             >
               Disponível
             </button>
             <button
               class={`tri-friends-tab ${tab === 'all' ? 'is-active' : ''}`}
-              onClick={() => setTab('all')}
+              onClick={() => { soundEngine.play('channelSwitch'); setTab('all'); }}
             >
               Todos
             </button>
             <button
               class={`tri-friends-tab ${tab === 'pending' ? 'is-active' : ''}`}
-              onClick={() => setTab('pending')}
+              onClick={() => { soundEngine.play('channelSwitch'); setTab('pending'); }}
             >
               Pendente
             </button>
             <button
               class={`tri-friends-tab ${tab === 'blocked' ? 'is-active' : ''}`}
-              onClick={() => setTab('blocked')}
+              onClick={() => { soundEngine.play('channelSwitch'); setTab('blocked'); }}
             >
               Bloqueado
             </button>
             <button
               class={`tri-friends-tab tri-friends-tab--add ${tab === 'add' ? 'is-active' : ''}`}
-              onClick={() => setTab('add')}
+              onClick={() => { soundEngine.play('channelSwitch'); setTab('add'); }}
             >
               Adicionar amigo
             </button>
