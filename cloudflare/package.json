@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "wrangler deploy --dry-run --outdir out",
-    "test": "node --test ../shared/sanitize.test.cjs && node tests/control-rate.test.mjs && npm run build && node tests/control.test.mjs && node tests/error-reports.test.mjs",
-    "test:unit": "node tests/control-rate.test.mjs",
+    "test": "npm run test:unit && npm run build && node tests/control.test.mjs && node tests/error-reports.test.mjs",
+    "test:unit": "node --test ../shared/sanitize.test.cjs tests/media-tokens.test.mjs tests/control-diagnostics.test.mjs && node tests/control-rate.test.mjs",
     "test:e2e": "npm run build && npm --prefix ../cloudflare-auth run build && node tests/e2e.test.mjs",
     "test:e2e:native": "npm run build && npm --prefix ../cloudflare-auth run build && node tests/e2e.test.mjs --native",
     "test:recovery": "wrangler deploy --dry-run --outdir out/recovery && wrangler --cwd ../cloudflare-auth deploy --dry-run --outdir out/recovery && node tests/recovery.test.mjs && node tests/turn-recovery.test.mjs",
