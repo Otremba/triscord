@@ -22,21 +22,7 @@ export function TitleBar({ server, bridge }: { server?: Server; bridge: Bridge }
       <div class="tri-titlebar__left">
         <span class="tri-titlebar__brand">
           <span class="tri-titlebar__logo">Triscord</span>
-          {server && <span class="tri-titlebar__divider">/</span>}
-          {server && <span class="tri-titlebar__server">{server.name}</span>}
         </span>
-      </div>
-      <div class="tri-titlebar__center">
-        <button
-          type="button"
-          class="tri-titlebar__search-trigger"
-          aria-label="Abrir busca rápida (Ctrl+K)"
-          onClick={() => dispatchEvent(new Event('tri-open-quick-switcher'))}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          <span class="tri-titlebar__search-text">Buscar ou ir para...</span>
-          <kbd class="tri-titlebar__search-kbd">Ctrl K</kbd>
-        </button>
       </div>
       <div class="tri-titlebar__buttons">
         <button class="tri-winbutton" aria-label="Minimizar" onClick={() => bridge.send({ name: 'window', action: 'minimize' })}>

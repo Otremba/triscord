@@ -79,14 +79,7 @@ function ChannelContent({ session, bridge, store, popout = false, workspace=fals
       {inRoom ? (
         <CallView session={session} bridge={bridge} store={store} idle={idle} inPopout={popout} focus={focus} onFocus={setFocus} />
       ) : channel ? (
-        <>
-          {!isText && <section class="tri-prejoin tri-prejoin--compact" aria-label="Chamada deste canal">
-            <div><h2 class="tri-prejoin__title">Voz em {channel.name}</h2>
-              <p class="tri-prejoin__subtitle">{channel.users.length ? channel.users.map(u => u.name).join(', ') : 'Ninguém está em voz'}</p></div>
-            <button type="button" class="tri-prejoin__join" onClick={() => bridge.send({ name: 'joinVoice', channelId: channel.id })}>Entrar na chamada</button>
-          </section>}
-          <ChatPanel key={`${session.selectedServerId}:${channel.id}`} channelName={channel.name} messages={session.chat ?? []} avatars={session.avatars} bridge={bridge} full />
-        </>
+        <ChatPanel key={`${session.selectedServerId}:${channel.id}`} channelName={channel.name} messages={session.chat ?? []} avatars={session.avatars} bridge={bridge} full />
       ) : workspace?<StatePanel title="Escolha uma conversa" description={session.connection==='connected'?'Selecione um canal na lateral ou crie o primeiro canal deste espaço.':'Aguardando a conexão com o servidor para carregar os canais.'} busy={session.connection!=='connected'}>
         {session.connection==='connected'&&<button type="button" onClick={()=>dispatchEvent(new CustomEvent('tri-open-modal',{detail:{kind:'createChannel',categoryName:'Canais de Voz'}}))}>Criar canal</button>}
       </StatePanel>:<div class="tri-chat" />}
