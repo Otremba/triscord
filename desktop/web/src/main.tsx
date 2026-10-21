@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import { App } from './app';
-import { createBridge } from './bridge';
+import { createBridge, TauriBridge } from './bridge';
+import { RustPreview } from './rust-preview';
 import { fixtureSession } from './fixtures';
 import { SessionStore } from './store';
 import { startVideo } from './video';
@@ -34,7 +35,7 @@ document.documentElement.dataset.theme = params.get('theme') ?? 'darker';
 const bridge = createBridge(() => fixtureSession(params.get('fixture') ?? 'default'));
 const store = new SessionStore(() => bridge.send({ name: 'requestSnapshot' }));
 bridge.onMessage(message => store.receive(message));
-startVideo(bridge);
+if (!(bridge instanceof TauriBridge)) startVideo(bridge);
 bridge.send({ name: 'requestSnapshot' }); // the core answers with the current session
-render(<App store={store} bridge={bridge} />, document.getElementById('app')!);
+render(bridge instanceof TauriBridge ? <RustPreview store={store} bridge={bridge} /> : <App store={store} bridge={bridge} />, document.getElementById('app')!);
 (window as unknown as { __triscord?: unknown }).__triscord = { bridge, store };

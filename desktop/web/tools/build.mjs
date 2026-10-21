@@ -7,9 +7,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const web = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-execFileSync(process.execPath, [resolve(web, 'tools/icons-from-cpp.mjs')], { stdio: 'inherit' });
-execFileSync(process.execPath, [resolve(web, 'tools/spring-easing.mjs')], { stdio: 'inherit' });
-const dist = resolve(web, 'dist');
+const tauri = process.argv.includes('--tauri');
+if (!tauri) {
+  execFileSync(process.execPath, [resolve(web, 'tools/icons-from-cpp.mjs')], { stdio: 'inherit' });
+  execFileSync(process.execPath, [resolve(web, 'tools/spring-easing.mjs')], { stdio: 'inherit' });
+}
+const dist = resolve(web, tauri ? 'dist-rust' : 'dist');
 mkdirSync(dist, { recursive: true });
 await build({
   entryPoints: [resolve(web, 'src/main.tsx')], bundle: true, minify: true, sourcemap: true,
@@ -22,7 +25,7 @@ await build({
 const fontsDir = resolve(web, '../assets/fonts-local');
 const weights = { normal: 400, medium: 500, semibold: 600, bold: 700, extrabold: 800 };
 const weightOf = file => weights[file.slice('ggsans-'.length, -'.ttf'.length)];
-const fonts = existsSync(fontsDir) ? readdirSync(fontsDir).filter(f => /^ggsans-\w+\.ttf$/.test(f) && weightOf(f)) : [];
+const fonts = !tauri && existsSync(fontsDir) ? readdirSync(fontsDir).filter(f => /^ggsans-\w+\.ttf$/.test(f) && weightOf(f)) : [];
 rmSync(resolve(dist, 'fonts'), { recursive: true, force: true });
 rmSync(resolve(dist, 'fonts.css'), { force: true });
 if (fonts.length) {
@@ -37,7 +40,7 @@ writeFileSync(resolve(dist, 'index.html'), `<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+${tauri ? '' : '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; script-src \'self\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:; font-src \'self\' data:; connect-src \'none\'; media-src \'none\'; frame-src \'none\'; object-src \'none\'; base-uri \'none\'; form-action \'none\'">'}
 <title>Triscord</title>
 ${fonts.length ? '<link rel="stylesheet" href="fonts.css">\n' : ''}<link rel="stylesheet" href="app.css">
 </head>

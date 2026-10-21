@@ -153,6 +153,9 @@ export interface PublicParticipantProfile {
   banner_color?: string; profile_theme_start?: string; profile_theme_end?: string;
 }
 export interface Session {
+  runtime?: { name: 'tauri'; preview: boolean; voice: boolean; screen: boolean; camera: boolean; googleLogin: boolean };
+  rooms?: { id: string; name: string; userCount: number }[];
+  textRoomId?: string | null;
   avatars?: Record<string, { still?: string; animated?: string }>;   // by account id; animated = GIF
   cameraPending?: boolean;
   callFullscreen?: boolean;
@@ -217,6 +220,10 @@ export type Command =
   | { name: 'previewSound'; soundId: string }
   | { name: 'stopSoundPreview' }
   | { name: 'requestSnapshot' }
+  | { name: 'refreshServers' }
+  | { name: 'openTextRoom'; channelId: string }
+  | { name: 'createTextRoom'; channelName: string }
+  | { name: 'leaveTextRoom' }
   | { name: 'signIn' }                                // the core runs the Google flow in the browser
   | { name: 'setNick'; nick: string }
   | { name: 'signInNick'; nick: string; password?: string }   // value: { created }; no Google account needed

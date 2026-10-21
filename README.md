@@ -4,11 +4,14 @@ Aplicativo para Windows com voz, câmera, compartilhamento de tela, chat e sound
 
 **[Baixar para Windows](https://triscord.pages.dev/download)** · [Releases nativas](https://github.com/Otremba/triscord/releases)
 
+Uma [reescrita em Tauri 2/Rust](desktop-rust/README.md) está em desenvolvimento, com dados locais separados e recursos ainda incompletos. A versão pública acima continua sendo o cliente C++/Qt.
+
 ## Organização
 
 | Pasta | Conteúdo |
 | --- | --- |
 | `desktop/src/` | Núcleo C++, áudio, vídeo, autenticação e integração com WebView2 |
+| `desktop-rust/` | Prévia da reescrita Tauri/Rust, sem substituir a versão pública |
 | `desktop/web/` | Interface Preact/TypeScript e estilos |
 | `desktop/scripts/` e `desktop/packaging/` | Compilação e instaladores |
 | `desktop/tests/` | Testes nativos e ferramentas de validação |

@@ -89,6 +89,43 @@ export class FixtureBridge implements Bridge {
 }
 
 export function createBridge(fixture: () => Session): Bridge {
+  const tauri = (window as unknown as { __TAURI__?: TauriHost }).__TAURI__;
+  if (tauri) return new TauriBridge(tauri);
   const host = (window as unknown as { chrome?: { webview?: WebViewHost } }).chrome?.webview;
   return host ? new WebView2Bridge(host) : new FixtureBridge(fixture());
+}
+
+interface TauriHost {
+  core: { invoke<T>(command: string, args: unknown): Promise<T> };
+  event: { listen<T>(event: string, handler: (event: { payload: T }) => void): Promise<() => void> };
+}
+
+export function previewNotice(message: string): void {
+  dispatchEvent(new CustomEvent('tri-preview-notice', { detail: message }));
+}
+
+// Register listeners before invoking the first command: the core can emit a snapshot before invoke resolves.
+// Native failure never selects fixture data. Session tokens stay in Rust and never cross this bridge.
+export class TauriBridge implements Bridge {
+  private ready: Promise<unknown> = Promise.resolve();
+  constructor(private readonly host: TauriHost) {}
+  onMessage(handler: (message: CoreMessage) => void): void {
+    this.ready = Promise.all([
+      this.host.event.listen<CoreMessage>('triscord-core', event => handler(event.payload)),
+      this.host.event.listen<string>('triscord-notice', event => previewNotice(event.payload)),
+    ]);
+  }
+  send(command: Command): string {
+    const id = nextRequestId();
+    void this.request(command).catch((error: Error) => previewNotice(error.message));
+    return id;
+  }
+  async request<T>(command: Command): Promise<T> {
+    try {
+      await this.ready;
+      return await this.host.core.invoke<T>('dispatch', { command });
+    } catch (error) {
+      throw new Error(error && typeof error === 'object' && 'message' in error ? String(error.message) : 'Não foi possível concluir a operação.');
+    }
+  }
 }
