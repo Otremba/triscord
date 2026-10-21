@@ -41,6 +41,7 @@ function ParticipantCard({ user, session, bridge, role = 'grid', style, onFocus 
       <span class="tri-call-card__pill">
         {user.deafened ? <Icon name="HeadphonesDeafened" size={20} /> : user.serverMuted || user.muted || user.localMuted ? <Icon name="MicrophoneMuted" size={20} className={user.serverMuted ? 'is-server' : undefined} /> : null}
         <span>{user.name}</span>
+        {user.live && <span class="tri-live-badge">AO VIVO</span>}
       </span>
     </div>
   );

@@ -171,10 +171,38 @@
 :root[data-design="workspace"] :is(.tri-glass-panel,.tri-floating-dock,.tri-bento-card,.tri-spotlight,.tri-message-action-dock,.tri-composer-floating) {
   background:var(--ui-panel);border-color:var(--ui-border);box-shadow:none;backdrop-filter:none;filter:none;
 }
-:root[data-design="workspace"] :is(.tri-border-beam,.tri-audio-ripple,.tri-audio-equalizer),
+:root[data-design="workspace"] :is(.tri-border-beam,.tri-audio-equalizer),
 :root[data-design="workspace"] .tri-spotlight::before,
 :root[data-design="workspace"] .tri-shimmer-btn::before,
 :root[data-design="workspace"] .tri-shimmer-btn::after { display:none; }
+
+/* Dynamic audio ripple indicator for active speakers (low latency, 60fps/120fps smooth) */
+:root[data-design="workspace"] .tri-audio-ripple-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+:root[data-design="workspace"] .tri-audio-ripple {
+  display: block;
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ui-positive);
+  opacity: 0.7;
+  pointer-events: none;
+  animation: tri-voice-ripple-wave 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+:root[data-design="workspace"] .tri-audio-ripple:nth-child(2) {
+  animation-delay: 0.5s;
+}
+:root[data-design="workspace"] .tri-audio-ripple:nth-child(3) {
+  animation-delay: 1.0s;
+}
+@keyframes tri-voice-ripple-wave {
+  0% { transform: scale(0.98); opacity: 0.75; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
 :root[data-design="workspace"] :is(.tri-logo,.tri-magnetic-item,.tri-bento-card,.tri-shimmer-btn) { filter:none;box-shadow:none;transform:none;animation:none; }
 :root[data-design="workspace"] .tri-logo path[stroke] { stroke:var(--ui-accent); }
 :root[data-design="workspace"] .tri-logo circle { fill:var(--ui-accent); }
