@@ -4,6 +4,7 @@ import type { ShareSource } from '../protocol';
 import type { SessionStore } from '../store';
 import { Icon } from './Icon';
 import { ModalLayer, useModalClose } from './ModalLayer';
+import { loadShareSources, type ShareSourceState } from '../share-sources';
 
 // Screen and window share source picker modal.
 type Mode = 'game' | 'screen';
@@ -14,11 +15,13 @@ function quality(mode: Mode, hd: boolean, parenthesised: boolean) {
 }
 export function SharePicker({ bridge, store, onClose }: { bridge: Bridge; store: SessionStore; onClose: () => void }) {
   const [tab, setTab] = useState<'window' | 'screen' | 'device'>('window');
-  const [list, setList] = useState<{ generation: string; sources: ShareSource[] } | null>(null);
+  const [sourceState, setSourceState] = useState<ShareSourceState>({ status: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+  const list = sourceState.status === 'ready' ? sourceState : null;
   const [thumbs, setThumbs] = useState<Record<number, string>>({});
   // After 4 s without a thumbnail the card says so (it can still be shared) instead of staying black.
   const [thumbsLate, setThumbsLate] = useState(false);
-  useEffect(() => { const timer = setTimeout(() => setThumbsLate(true), 4000); return () => clearTimeout(timer); }, []);
+  useEffect(() => { setThumbsLate(false); const timer = setTimeout(() => setThumbsLate(true), 4000); return () => clearTimeout(timer); }, [attempt]);
   const { closing, close } = useModalClose(onClose);
   const settings = store.current?.settings;
   const [mode, setMode] = useState<Mode>(settings?.shareMode ?? 'game');
@@ -36,21 +39,12 @@ export function SharePicker({ bridge, store, onClose }: { bridge: Bridge; store:
     return () => { removeEventListener('pointerdown', outside, true); removeEventListener('keydown', key, true); };
   }, [modeMenu]);
   useEffect(() => {
-    // Thumbnails can arrive before the list's reply (fast captures: the monitors come first). They are kept by
-    // generation and applied once the reply says which one is current (18/10: Tela 1 and Tela 2 stayed black).
-    let generation = '';
-    const early = new Map<string, Record<number, string>>();
-    const off = store.onEvent(event => {
-      if (event.name !== 'shareThumbnail') return;
-      if (event.generation === generation) setThumbs(t => ({ ...t, [event.index]: event.image }));
-      else if (!generation) early.set(event.generation, { ...early.get(event.generation), [event.index]: event.image });
-    });
-    bridge.request<{ generation: string; sources: ShareSource[] }>({ name: 'listShareSources' })
-      .then(value => { generation = value.generation; setThumbs(t => ({ ...early.get(generation), ...t })); early.clear(); setList(value); })
-      .catch(() => setList({ generation: '', sources: [] }));
+    setThumbs({});
+    const off = loadShareSources(bridge, store, setSourceState,
+      (index, image) => setThumbs(t => ({ ...t, [index]: image })));
     bridge.send({ name: 'requestDevices' });
     return off;
-  }, [bridge, store]);
+  }, [bridge, store, attempt]);
   const devices = settings?.cameraDevices ?? [];
   const hasDeviceTab = store.current?.runtime?.camera !== false && (devices.length > 0);
   const shown = (list?.sources ?? []).filter(source => source.kind === tab);
@@ -76,7 +70,23 @@ export function SharePicker({ bridge, store, onClose }: { bridge: Bridge; store:
             </button>
           )}
         </div>
-        <div class="tri-share-grid">
+        <div class="tri-share-grid" aria-busy={tab !== 'device' && sourceState.status === 'loading'}>
+          {tab !== 'device' && sourceState.status === 'loading' && (
+            <div class="tri-share-empty" role="status"><strong>Buscando telas e aplicativos…</strong></div>
+          )}
+          {tab !== 'device' && sourceState.status === 'error' && (
+            <div class="tri-share-empty">
+              <div role="alert"><strong>Não foi possível listar telas e aplicativos.</strong><span>{sourceState.message}</span></div>
+              <button type="button" class="tri-share-retry" onClick={() => setAttempt(value => value + 1)}>Tentar novamente</button>
+            </div>
+          )}
+          {tab !== 'device' && list && shown.length === 0 && (
+            <div class="tri-share-empty" role="status">
+              <strong>{tab === 'window' ? 'Nenhum aplicativo disponível.' : 'Nenhuma tela disponível.'}</strong>
+              <span>{tab === 'window' ? 'Abra o aplicativo que deseja compartilhar ou escolha Tela Inteira.' : 'Confira os monitores conectados e tente novamente.'}</span>
+              <button type="button" class="tri-share-retry" onClick={() => setAttempt(value => value + 1)}>Atualizar lista</button>
+            </div>
+          )}
           {tab === 'device' && devices.length === 0 && (
             <div class="tri-share-empty">
               <Icon name="Video" size={24} />

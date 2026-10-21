@@ -4,6 +4,57 @@ import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
 const bundle=await build({stdin:{contents:`export {WorkspaceNav,workspaceMenuEntries} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';export {modalTabTarget} from './focus-policy';export {MemberList} from './components/MemberList';export {FixtureBridge} from './bridge';export {fixtureSession} from './fixtures';export {participantMenuEntries} from './components/ParticipantMenu';export {callTiles} from './components/CallView';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,define:{'location.search':'""'},loader:{'.png':'dataurl','.css':'empty'},platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
 const {WorkspaceNav,workspaceMenuEntries,ShimmerButton,DeviceSelect,deviceChoices,modalTabTarget,MemberList,FixtureBridge,fixtureSession,participantMenuEntries,callTiles}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
+const sourceBundle=await build({entryPoints:[fileURLToPath(new URL('../src/share-sources.ts',import.meta.url))],bundle:true,write:false,platform:'node',format:'esm'});
+const {loadShareSources}=await import(`data:text/javascript;base64,${Buffer.from(sourceBundle.outputFiles[0].contents).toString('base64')}`);
+const events=new Set();
+const sourceStore={onEvent:handler=>{events.add(handler);return()=>events.delete(handler);}};
+const emitThumbnail=(generation,index,image)=>{for(const handler of events)handler({name:'shareThumbnail',generation,index,image});};
+const flush=()=>new Promise(resolve=>setImmediate(resolve));
+const states=[],images=[];
+let resolveSources;
+const sourceBridge={request:command=>{
+  assert.deepEqual(command,{name:'listShareSources'});
+  return new Promise(resolve=>{resolveSources=resolve;});
+}};
+const disposeSources=loadShareSources(sourceBridge,sourceStore,state=>states.push(state),(index,image)=>images.push([index,image]));
+assert.equal(states.at(-1).status,'loading');
+emitThumbnail('old',0,'old-image');
+emitThumbnail('current',0,'current-image');
+assert.deepEqual(images,[],'early thumbnails wait for the matching list generation');
+resolveSources({generation:'current',sources:[{index:0,kind:'screen',name:'Tela 1'}]});
+await flush();
+assert.equal(states.at(-1).status,'ready');
+assert.deepEqual(images,[[0,'current-image']]);
+emitThumbnail('old',1,'stale-image');
+emitThumbnail('current',1,'new-image');
+assert.deepEqual(images,[[0,'current-image'],[1,'new-image']]);
+disposeSources();
+assert.equal(events.size,0);
+
+const errors=[];
+const failed=loadShareSources({request:()=>Promise.reject(new Error('Capture unavailable'))},sourceStore,state=>errors.push(state),()=>assert.fail('failed requests cannot publish thumbnails'));
+await flush();
+assert.deepEqual(errors.at(-1),{status:'error',message:'Capture unavailable'},'list errors remain actionable rather than becoming an empty successful list');
+assert.equal(events.size,0,'a failed attempt releases its thumbnail subscription');
+failed();
+const recovered=[];
+const retry=loadShareSources({request:()=>Promise.resolve({generation:'retry',sources:[]})},sourceStore,state=>recovered.push(state),()=>{});
+await flush();
+assert.deepEqual(recovered.map(state=>state.status),['loading','ready']);
+assert.deepEqual(recovered.at(-1).sources,[],'a genuinely empty result remains distinct from failure');
+retry();
+
+for(const reject of [false,true]){
+  let settle;
+  const cancelled=[];
+  const dispose=loadShareSources({request:()=>new Promise((resolve,rejectPromise)=>{settle=reject?rejectPromise:resolve;})},sourceStore,state=>cancelled.push(state),()=>assert.fail('cancelled requests cannot publish thumbnails'));
+  dispose();
+  settle(reject?new Error('late failure'):{generation:'cancelled',sources:[]});
+  await flush();
+  assert.deepEqual(cancelled,[{status:'loading'}],'late success and failure must not update a closed or superseded picker');
+}
+assert.equal(events.size,0);
+console.log('Share source loading: errors, retry, empty results, early thumbnails, generations and cancellation passed without capture or DOM');
 function nodes(root){if(!root||typeof root!=='object')return [];const children=[root.props?.children].flat(Infinity);return [root,...children.flatMap(nodes)];}
 const sent=[];
 const servers=Array.from({length:8},(_,i)=>({id:`server-${i}`,name:`Espaço ${i}`,owned:i===0}));
