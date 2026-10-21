@@ -1,4 +1,4 @@
-param([switch]$CheckOnly, [switch]$Release)
+param([switch]$CheckOnly, [switch]$Release, [switch]$LintOnly)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $toolchain = if ($env:TRISCORD_TOOLCHAIN_DIR) { $env:TRISCORD_TOOLCHAIN_DIR } else { Join-Path $repo '.toolchain' }
@@ -51,6 +51,12 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Workspace theme tests failed' }
     & node desktop/web/tools/build.mjs --tauri
     if ($LASTEXITCODE -ne 0) { throw 'UI build failed' }
+    if ($LintOnly) {
+        & $cargo clippy --offline --all-targets --all-features --locked --target x86_64-pc-windows-msvc --manifest-path desktop-rust/src-tauri/Cargo.toml -j 2 -- -D warnings
+        if ($LASTEXITCODE -ne 0) { throw 'Rust lint failed' }
+        Write-Output 'runtimeVerified=false; static analysis only; no app, installer or E2E was executed'
+        return
+    }
     # UI automation is intentionally not part of this build, including headless browsers.
     & $cargo test --offline --target x86_64-pc-windows-msvc --manifest-path desktop-rust/src-tauri/Cargo.toml -j 2
     if ($LASTEXITCODE -ne 0) { throw 'Rust unit tests failed' }

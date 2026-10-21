@@ -16,6 +16,7 @@ pub struct Reader {
     task: JoinHandle<()>,
 }
 impl Reader {
+    #[expect(clippy::too_many_arguments, reason = "Admission identity, track metadata and UI owners must remain explicit at this actor boundary")]
     pub fn start(
         track: RemoteVideoTrack,
         title: String,

@@ -16,7 +16,7 @@ impl LoopbackConfig {
         if target_pid == 0 || target_pid == std::process::id() {
             return Err(Error::invalid());
         }
-        if sample_rate < 8000 || sample_rate > 192000 {
+        if !(8000..=192000).contains(&sample_rate) {
             return Err(Error::invalid());
         }
         if channels != 1 && channels != 2 {

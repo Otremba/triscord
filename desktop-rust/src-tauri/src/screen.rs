@@ -120,6 +120,7 @@ impl Session {
             .await;
         }
     }
+    #[expect(clippy::too_many_arguments, reason = "The actor passes admission epochs, capture settings and its bounded failure channel together")]
     async fn publish(
         &mut self,
         generation: u64,

@@ -121,7 +121,7 @@ pub fn play_dynamic_wav(wav: Vec<u8>) {
                     fn PlaySoundW(pszSound: *const u16, hmod: usize, fdwSound: u32) -> i32;
                 }
                 // SND_MEMORY (0x4) | SND_SYNC (0x0) | SND_NODEFAULT (0x2)
-                PlaySoundW(wav.as_ptr() as *const u16, 0, 0x0004 | 0x0000 | 0x0002);
+                PlaySoundW(wav.as_ptr() as *const u16, 0, 0x0004 | 0x0002);
             }
         });
     }

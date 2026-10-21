@@ -133,11 +133,9 @@ impl Socket {
                                                 if !current {continue;}
                                                 if payload["mediaTransport"]=="livekit" && screen.watch(generation,payload["roomId"].as_str().unwrap_or_default().to_owned(),&payload["media"]["screen"]).is_err() {notice(&app,"A sala não forneceu uma admissão válida para receber transmissões. Entre novamente na sala.");}
                                                 let (voice_requested,muted,deafened)={let m=model.lock().unwrap_or_else(|e|e.into_inner());(m.voice_requested,m.muted||m.server_muted||!m.voice_requested,m.deafened)};
-                                                if voice_requested {
-                                                    if payload["mediaTransport"]!="livekit" || media.connect(generation,payload["roomId"].as_str().unwrap_or_default().to_owned(),&payload["media"]["voice"]).is_err() {
-                                                        {let mut m=model.lock().unwrap_or_else(|e|e.into_inner());if m.generation==generation {m.voice_state="error".into();}}
-                                                        notice(&app,"Esta sala não forneceu uma admissão de voz válida. Atualize os clientes ou entre em uma sala nova.");
-                                                    }
+                                                if voice_requested && (payload["mediaTransport"]!="livekit" || media.connect(generation,payload["roomId"].as_str().unwrap_or_default().to_owned(),&payload["media"]["voice"]).is_err()) {
+                                                    {let mut m=model.lock().unwrap_or_else(|e|e.into_inner());if m.generation==generation {m.voice_state="error".into();}}
+                                                    notice(&app,"Esta sala não forneceu uma admissão de voz válida. Atualize os clientes ou entre em uma sala nova.");
                                                 }
                                                 if !send(&mut socket,Message::Text(format!("42{}",json!(["user-state-change",{"isMuted":muted,"isDeafened":deafened}])).into())).await { break; }
                                             }
@@ -201,6 +199,30 @@ async fn send<S: Sink<Message> + Unpin>(socket: &mut S, message: Message) -> boo
         .is_ok_and(|result| result.is_ok())
 }
 
+fn set_status(app: &tauri::AppHandle, model: &Shared, generation: u64, status: &'static str) {
+    {
+        let mut model = model.lock().unwrap_or_else(|e| e.into_inner());
+        if model.generation != generation {
+            return;
+        }
+        model.connection = status;
+    }
+    publish(app, model);
+}
+fn clear_membership(app: &tauri::AppHandle, model: &Shared, generation: u64) {
+    {
+        let mut model = model.lock().unwrap_or_else(|e| e.into_inner());
+        if model.generation != generation {
+            return;
+        }
+        model.text_room = None;
+        model.membership_epoch += 1;
+        model.streams.clear();
+        model.chat.clear();
+    }
+    publish(app, model);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239,27 +261,4 @@ mod tests {
         assert!(!send(&mut Blocked, Message::Text("3".into())).await);
         assert_eq!(started.elapsed(), Duration::from_secs(5));
     }
-}
-fn set_status(app: &tauri::AppHandle, model: &Shared, generation: u64, status: &'static str) {
-    {
-        let mut model = model.lock().unwrap_or_else(|e| e.into_inner());
-        if model.generation != generation {
-            return;
-        }
-        model.connection = status;
-    }
-    publish(app, model);
-}
-fn clear_membership(app: &tauri::AppHandle, model: &Shared, generation: u64) {
-    {
-        let mut model = model.lock().unwrap_or_else(|e| e.into_inner());
-        if model.generation != generation {
-            return;
-        }
-        model.text_room = None;
-        model.membership_epoch += 1;
-        model.streams.clear();
-        model.chat.clear();
-    }
-    publish(app, model);
 }

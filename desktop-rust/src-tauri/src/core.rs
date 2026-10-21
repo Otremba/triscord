@@ -907,10 +907,11 @@ impl Core {
             }
             Command::JoinVoice { channel_id } => {
                 // A second click on the room we are in (or joining) must not tear the call down and start it again.
-                if {
+                let joining = {
                     let m = self.model.lock().unwrap_or_else(|e| e.into_inner());
                     m.voice_join_in_progress(&channel_id)
-                } {
+                };
+                if joining {
                     return Ok(Value::Null);
                 }
                 let name = self

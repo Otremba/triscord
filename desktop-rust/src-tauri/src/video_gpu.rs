@@ -51,8 +51,8 @@ impl Converter {
             || height < 2
             || width > 8192
             || height > 8192
-            || width % 2 != 0
-            || height % 2 != 0
+            || !width.is_multiple_of(2)
+            || !height.is_multiple_of(2)
         {
             return Err(Error::from_hresult(E_INVALIDARG));
         }
@@ -298,8 +298,8 @@ pub fn fit_rect(source: (u32, u32), output: (u32, u32)) -> RECT {
         (output.0 as f64 / source.0.max(1) as f64).min(output.1 as f64 / source.1.max(1) as f64);
     let width = ((source.0 as f64 * scale) as u32 & !1).max(2).min(output.0);
     let height = ((source.1 as f64 * scale) as u32 & !1).max(2).min(output.1);
-    let left = (output.0 - width) / 2 & !1;
-    let top = (output.1 - height) / 2 & !1;
+    let left = ((output.0 - width) / 2) & !1;
+    let top = ((output.1 - height) / 2) & !1;
     RECT {
         left: left as i32,
         top: top as i32,
@@ -342,7 +342,7 @@ mod tests {
         assert_eq!(rect.top, 0);
         assert_eq!(rect.bottom, 1440);
         assert!(rect.left > 0);
-        assert!((rect.left as i32 - (2560 - rect.right as i32)).abs() <= 2);
+        assert!((rect.left - (2560 - rect.right)).abs() <= 2);
     }
     #[test]
     fn aspect_fit_tiny_and_degenerate_dimensions_clamp_safely() {

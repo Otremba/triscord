@@ -27,8 +27,8 @@ impl Config {
     pub fn valid(self) -> bool {
         (64..=2560).contains(&self.width)
             && (64..=1440).contains(&self.height)
-            && self.width % 2 == 0
-            && self.height % 2 == 0
+            && self.width.is_multiple_of(2)
+            && self.height.is_multiple_of(2)
             && (1..=60).contains(&self.fps)
             && (64000..=30000000).contains(&self.bitrate)
     }

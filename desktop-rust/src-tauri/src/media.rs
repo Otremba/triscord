@@ -343,10 +343,8 @@ impl Voice {
         }
         for participant in self.room.remote_participants().values() {
             for publication in participant.track_publications().values() {
-                if publication.kind() == TrackKind::Audio {
-                    if publication.is_desired() == deafened {
-                        publication.set_subscribed(!deafened);
-                    }
+                if publication.kind() == TrackKind::Audio && publication.is_desired() == deafened {
+                    publication.set_subscribed(!deafened);
                 }
             }
         }

@@ -477,7 +477,7 @@ fn nv12(
     strides: (u32, u32, u32),
     planes: (&[u8], &[u8], &[u8]),
 ) -> Option<Vec<u8>> {
-    if width < 2 || height < 2 || width > 4096 || height > 4096 || width % 2 != 0 || height % 2 != 0
+    if width < 2 || height < 2 || width > 4096 || height > 4096 || !width.is_multiple_of(2) || !height.is_multiple_of(2)
     {
         return None;
     }
