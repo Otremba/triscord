@@ -10,6 +10,7 @@ use crate::{
 };
 use reqwest::Method;
 use serde::Deserialize;
+use tauri::Manager;
 use serde_json::{json, Value};
 use std::{
     path::PathBuf,
@@ -120,6 +121,57 @@ pub enum Command {
     DeleteChatMessage {
         #[serde(rename = "messageId")]
         message_id: String,
+    },
+    SelectChannel {
+        #[serde(rename = "channelId")]
+        channel_id: String,
+    },
+    CreateChannel {
+        #[serde(rename = "channelName")]
+        channel_name: String,
+    },
+    SetCustomStatus {
+        text: String,
+    },
+    SetServerMuted {
+        #[serde(rename = "socketId")]
+        socket_id: String,
+        muted: bool,
+    },
+    DisconnectParticipant {
+        #[serde(rename = "socketId")]
+        socket_id: String,
+    },
+    ToggleReaction {
+        #[serde(rename = "messageId")]
+        message_id: String,
+        emoji: String,
+    },
+    CopyInvite {
+        code: String,
+    },
+    CopyMessageText {
+        #[serde(rename = "messageId")]
+        message_id: String,
+    },
+    SetCallFullscreen {
+        on: bool,
+    },
+    SetStreamHidden {
+        #[serde(rename = "streamId")]
+        stream_id: String,
+        hidden: bool,
+    },
+    SetPeerAudio {
+        #[serde(rename = "socketId")]
+        socket_id: String,
+        volume: Option<u32>,
+        pan: Option<i32>,
+        muted: Option<bool>,
+        #[serde(rename = "streamVolume")]
+        stream_volume: Option<u32>,
+        #[serde(rename = "streamMuted")]
+        stream_muted: Option<bool>,
     },
     #[serde(other)]
     Unsupported,
@@ -345,7 +397,8 @@ impl Core {
             .desired_room = Some(id.clone());
         // This preview joins membership/chat only, never claims to publish/receive audio.
         // The hub uses the LiveKit admission format for compatibility with native SFU rooms.
-        self.send("join-room",json!({"roomId":id,"roomName":name,"mediaTransport":"livekit","userData":{"isMuted":true,"isDeafened":true}}))
+        let status = self.model.lock().unwrap_or_else(|e| e.into_inner()).preferences.custom_status.clone();
+        self.send("join-room",json!({"roomId":id,"roomName":name,"mediaTransport":"livekit","userData":{"isMuted":true,"isDeafened":true,"status":status}}))
     }
     pub async fn dispatch(&mut self, app: &tauri::AppHandle, command: Command) -> Result<Value> {
         let deleting = matches!(&command, Command::DeleteServer { .. });
@@ -374,6 +427,7 @@ impl Core {
                     model.screen_requested = true;
                     model.screen_admitting = false;
                     model.sharing = false;
+                    model.sharing_name = source.name.to_string();
                     model.screen_epoch += 1;
                     (model.generation, model.screen_epoch)
                 };
@@ -809,7 +863,7 @@ impl Core {
                 )?;
                 Ok(Value::Null)
             }
-            Command::LeaveTextRoom => {
+            Command::LeaveTextRoom | Command::LeaveVoice => {
                 let generation = {
                     let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
                     m.voice_requested = false;
@@ -829,9 +883,27 @@ impl Core {
                 let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
                 model.text_room = None;
                 model.chat.clear();
+                model.speaking.clear();
+                model.peer_muted.clear();
+                model.connected_at = 0;
+                if std::mem::take(&mut model.call_fullscreen) {
+                    drop(model);
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.set_fullscreen(false);
+                    }
+                }
                 Ok(Value::Null)
             }
-            Command::JoinVoice { channel_id } => {
+            Command::JoinVoice { channel_id } | Command::SelectChannel { channel_id } => {
+                // A second click on the room we are in (or joining) must not tear the call down and start it again.
+                if {
+                    let m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    m.voice_requested
+                        && (m.text_room.as_deref() == Some(channel_id.as_str())
+                            || m.desired_room.as_deref() == Some(channel_id.as_str()))
+                } {
+                    return Ok(Value::Null);
+                }
                 let name = self
                     .model
                     .lock()
@@ -856,19 +928,6 @@ impl Core {
                         .voice_requested = false;
                     return Err(error);
                 }
-                Ok(Value::Null)
-            }
-            Command::LeaveVoice => {
-                let generation = {
-                    let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
-                    m.voice_requested = false;
-                    m.generation
-                };
-                self.media.stop(generation)?;
-                let _ = self.send(
-                    "user-state-change",
-                    json!({"isMuted":true,"isDeafened":true}),
-                );
                 Ok(Value::Null)
             }
             Command::SetMuted { muted } => {
@@ -953,6 +1012,149 @@ impl Core {
                     "delete-chat-message",
                     json!({"messageId":message_id,"roomId":room}),
                 )?;
+                Ok(Value::Null)
+            }
+            Command::CreateChannel { channel_name } => {
+                let name = clean_name(&channel_name, 64)?;
+                let generation = {
+                    let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    m.voice_requested = true;
+                    m.voice_state = "connecting".into();
+                    m.generation
+                };
+                self.media.stop(generation)?;
+                if let Err(error) = self.join_text(format!("room_{}", uuid::Uuid::new_v4()), name) {
+                    self.model
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .voice_requested = false;
+                    return Err(error);
+                }
+                Ok(Value::Null)
+            }
+            Command::SetCustomStatus { text } => {
+                let (account, mut preferences) = {
+                    let model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    (
+                        model
+                            .account
+                            .as_ref()
+                            .and_then(|a| a["id"].as_str())
+                            .ok_or_else(Error::unauthorized)?
+                            .to_owned(),
+                        model.preferences.clone(),
+                    )
+                };
+                preferences.set_status(&text)?;
+                self.preferences.save(account, preferences.clone())?;
+                let status = preferences.custom_status.clone();
+                let joined = {
+                    let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    model.preferences = preferences;
+                    model.text_room.is_some()
+                };
+                if joined {
+                    // Partial state: the hub merges it into the user's row for everyone in the room.
+                    let _ = self.send("user-state-change", json!({"status": status}));
+                }
+                Ok(Value::Null)
+            }
+            Command::SetServerMuted { socket_id, muted } => {
+                api::id(&socket_id)?;
+                self.send("force-mute-user", json!({"socketId":socket_id,"muted":muted}))?;
+                Ok(Value::Null)
+            }
+            Command::DisconnectParticipant { socket_id } => {
+                api::id(&socket_id)?;
+                self.send("kick-user", json!({"socketId":socket_id}))?;
+                Ok(Value::Null)
+            }
+            Command::ToggleReaction { message_id, emoji } => {
+                api::id(&message_id)?;
+                if emoji.is_empty() || emoji.chars().count() > 16 || emoji.contains('\0') {
+                    return Err(Error::invalid());
+                }
+                self.send("add-reaction", json!({"messageId":message_id,"emoji":emoji}))?;
+                Ok(Value::Null)
+            }
+            Command::CopyInvite { code } => {
+                crate::clipboard::set_text(&api::invite(&code)?)?;
+                Ok(Value::Null)
+            }
+            Command::CopyMessageText { message_id } => {
+                api::id(&message_id)?;
+                let text = {
+                    let model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    model
+                        .chat
+                        .iter()
+                        .find(|m| m["id"].as_str() == Some(message_id.as_str()))
+                        .and_then(|m| m["text"].as_str())
+                        .map(str::to_owned)
+                }
+                .ok_or_else(Error::invalid)?;
+                crate::clipboard::set_text(&text)?;
+                Ok(Value::Null)
+            }
+            Command::SetCallFullscreen { on } => {
+                {
+                    let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    if on && !(model.voice_requested && model.text_room.is_some()) {
+                        return Err(Error::invalid());
+                    }
+                    model.call_fullscreen = on;
+                }
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_fullscreen(on);
+                }
+                Ok(Value::Null)
+            }
+            Command::SetStreamHidden { stream_id, hidden } => {
+                api::id(&stream_id)?;
+                let known = {
+                    let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    match model.streams.iter_mut().find(|s| s["id"].as_str() == Some(stream_id.as_str())) {
+                        Some(stream) => {
+                            stream["hidden"] = json!(hidden);
+                            true
+                        }
+                        None => false,
+                    }
+                };
+                if !known {
+                    return Err(Error::invalid());
+                }
+                app.state::<crate::presenter::Presenter>().hide(&stream_id, hidden);
+                Ok(Value::Null)
+            }
+            Command::SetPeerAudio {
+                socket_id,
+                volume,
+                pan,
+                muted,
+                stream_volume,
+                stream_muted,
+            } => {
+                api::id(&socket_id)?;
+                // Silencing someone is a track switch. Volume and pan need our own mixing, which this core does not
+                // have yet: say so instead of showing a slider that changes nothing.
+                if volume.is_some() || pan.is_some() || stream_volume.is_some() || stream_muted.is_some() {
+                    return Err(Error::unavailable(
+                        "O volume individual ainda não está disponível nesta versão. Você pode silenciar a pessoa.",
+                    ));
+                }
+                if let Some(muted) = muted {
+                    let generation = {
+                        let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                        if muted {
+                            model.peer_muted.insert(socket_id);
+                        } else {
+                            model.peer_muted.remove(&socket_id);
+                        }
+                        model.generation
+                    };
+                    self.media.configure(generation)?;
+                }
                 Ok(Value::Null)
             }
             Command::Unsupported => Err(Error::unsupported()),

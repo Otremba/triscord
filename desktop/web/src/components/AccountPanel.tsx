@@ -76,15 +76,15 @@ export function AccountPanel({ session, bridge }: { session: Session; bridge: Br
             </Tooltip>
           </div>
           <div class="tri-voice-panel__buttons">
-            <Tooltip text={session.cameraPending ? 'Cancelar ativação da câmera' : session.camera ? 'Desativar câmera' : 'Ativar câmera'}>
+            {session.runtime?.camera !== false && <Tooltip text={session.cameraPending ? 'Cancelar ativação da câmera' : session.camera ? 'Desativar câmera' : 'Ativar câmera'}>
               <button class={`tri-voice-panel__button ${session.camera ? 'is-green' : ''}`} aria-label={session.cameraPending ? 'Cancelar ativação da câmera' : session.camera ? 'Desativar câmera' : 'Ativar câmera'}
                 onClick={() => bridge.send({ name: 'setCamera', on: !(session.camera || session.cameraPending) })}><Icon name={session.camera ? 'Video' : 'VideoSlash'} size={20} /></button>
-            </Tooltip>
+            </Tooltip>}
             <Tooltip text={session.sharing ? 'Parar de transmitir' : 'Compartilhar tela'}>
               <button class={`tri-voice-panel__button ${session.sharing ? 'is-green' : ''}`} aria-label={session.sharing ? 'Parar de transmitir' : 'Compartilhar tela'}
                 onClick={share}><Icon name={session.sharing ? 'ScreenX' : 'ScreenArrow'} size={20} /></button>
             </Tooltip>
-            <Tooltip text="Abrir efeitos sonoros"><button class="tri-voice-panel__button" aria-label="Abrir efeitos sonoros" onClick={e => openSoundboard(e.currentTarget)}><Icon name="Soundboard" size={20} /></button></Tooltip>
+            {session.runtime?.soundboard !== false && <Tooltip text="Abrir efeitos sonoros"><button class="tri-voice-panel__button" aria-label="Abrir efeitos sonoros" onClick={e => openSoundboard(e.currentTarget)}><Icon name="Soundboard" size={20} /></button></Tooltip>}
           </div>
         </div>
       )}

@@ -19,6 +19,7 @@ impl Reader {
     pub fn start(
         track: RemoteVideoTrack,
         title: String,
+        owner: String,
         generation: u64,
         epoch: u64,
         model: Shared,
@@ -36,7 +37,7 @@ impl Reader {
                 presenter.remove(&id);
                 return Err(Error::invalid());
             }
-            state.streams.push(json!({"id":id,"kind":"screen","title":title,"width":0,"height":0,"loading":true,"path":"native-overlay"}));
+            state.streams.push(json!({"id":id,"kind":"screen","ownerId":owner,"title":title,"width":0,"height":0,"loading":true,"hidden":false,"path":"native-overlay"}));
         }
         publish(&app, &model);
         let (frame_id, frame_model, frame_presenter, frame_app) =

@@ -31,6 +31,18 @@ impl Error {
             message: "Entre novamente na sua conta.",
         }
     }
+    pub fn unavailable(message: &'static str) -> Self {
+        Self {
+            code: "unavailable",
+            message,
+        }
+    }
+    pub fn clipboard() -> Self {
+        Self {
+            code: "clipboard",
+            message: "Não foi possível copiar para a área de transferência.",
+        }
+    }
     pub fn unsupported() -> Self {
         Self {
             code: "unavailable",

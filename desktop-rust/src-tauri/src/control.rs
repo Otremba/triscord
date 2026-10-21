@@ -4,7 +4,8 @@ use std::time::Duration;
 
 pub enum Packet {
     Open { heartbeat: Duration },
-    Ready,
+    /// The Socket.IO namespace connected; carries the hub's id for this connection (how the user list names our row).
+    Ready(String),
     Pong(String),
     Event(String, Value),
     Closed,
@@ -36,10 +37,10 @@ pub fn parse(text: &str) -> Result<Packet> {
     }
     if let Some(value) = text.strip_prefix("40") {
         let value: Value = serde_json::from_str(value).map_err(|_| Error::invalid())?;
-        if value["sid"].as_str().is_none_or(|s| s.is_empty()) {
+        let Some(sid) = value["sid"].as_str().filter(|s| !s.is_empty() && s.len() <= 64) else {
             return Err(Error::invalid());
-        }
-        return Ok(Packet::Ready);
+        };
+        return Ok(Packet::Ready(sid.to_owned()));
     }
     if let Some(value) = text.strip_prefix("42") {
         let args: Value = serde_json::from_str(value).map_err(|_| Error::invalid())?;
@@ -83,6 +84,11 @@ mod tests {
         assert!(
             matches!(parse(r#"42["rooms-update",[]]"#).unwrap(), Packet::Event(name,_) if name=="rooms-update")
         );
+    }
+    #[test]
+    fn the_namespace_ack_names_our_connection() {
+        assert!(matches!(parse(r#"40{"sid":"abc-123"}"#).unwrap(), Packet::Ready(sid) if sid == "abc-123"));
+        assert!(parse(&format!(r#"40{{"sid":"{}"}}"#, "x".repeat(65))).is_err());
     }
     #[test]
     fn backoff_is_bounded() {

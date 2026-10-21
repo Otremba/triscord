@@ -17,6 +17,18 @@ pub struct Preferences {
     pub theme: String,
     pub share_hd: bool,
     pub share_mode: String,
+    /// "Status personalizado" of the account menu, shown to the room and beside the name.
+    pub custom_status: String,
+    pub input_volume: u32,
+    pub output_volume: u32,
+    pub soundboard_volume: u32,
+    pub noise_suppression_strength: u32,
+    pub noise_suppression_mode: String,
+    pub call_sounds: bool,
+    pub desktop_notifications: bool,
+    pub taskbar_alert: bool,
+    pub close_to_tray: bool,
+    pub start_minimized: bool,
 }
 impl Default for Preferences {
     fn default() -> Self {
@@ -28,13 +40,42 @@ impl Default for Preferences {
             theme: "darker".into(),
             share_hd: false,
             share_mode: "game".into(),
+            custom_status: String::new(),
+            input_volume: 100,
+            output_volume: 100,
+            soundboard_volume: 70,
+            noise_suppression_strength: 100,
+            noise_suppression_mode: "high".into(),
+            call_sounds: true,
+            desktop_notifications: true,
+            taskbar_alert: true,
+            close_to_tray: true,
+            start_minimized: false,
         }
     }
 }
+fn boolean(value: &Value) -> Result<bool> {
+    value.as_bool().ok_or_else(Error::invalid)
+}
+fn percent(value: &Value, max: u32) -> Result<u32> {
+    value
+        .as_f64()
+        .filter(|n| n.fract() == 0. && (0. ..=max as f64).contains(n))
+        .map(|n| n as u32)
+        .ok_or_else(Error::invalid)
+}
 impl Preferences {
+    pub fn set_status(&mut self, text: &str) -> Result<()> {
+        let text = text.trim();
+        if text.chars().count() > 64 || text.contains('\0') {
+            return Err(Error::invalid());
+        }
+        self.custom_status = text.to_owned();
+        Ok(())
+    }
     pub fn set(&mut self, key: &str, value: Value) -> Result<()> {
         match key {
-            "shareHd" => self.share_hd = value.as_bool().ok_or_else(Error::invalid)?,
+            "shareHd" => self.share_hd = boolean(&value)?,
             "shareMode" => {
                 self.share_mode = value
                     .as_str()
@@ -42,12 +83,25 @@ impl Preferences {
                     .ok_or_else(Error::invalid)?
                     .to_owned()
             }
+            // The screen's own audio is not ported yet; keeping it off is the only state this core can honour.
             "shareAudio" if value == false => {}
-            "noiseSuppression" => {
-                self.noise_suppression = value.as_bool().ok_or_else(Error::invalid)?
-            }
-            "automaticGainControl" => {
-                self.automatic_gain_control = value.as_bool().ok_or_else(Error::invalid)?
+            "noiseSuppression" => self.noise_suppression = boolean(&value)?,
+            "automaticGainControl" => self.automatic_gain_control = boolean(&value)?,
+            "callSounds" => self.call_sounds = boolean(&value)?,
+            "desktopNotifications" => self.desktop_notifications = boolean(&value)?,
+            "taskbarAlert" => self.taskbar_alert = boolean(&value)?,
+            "closeToTray" => self.close_to_tray = boolean(&value)?,
+            "startMinimized" => self.start_minimized = boolean(&value)?,
+            "inputVolume" => self.input_volume = percent(&value, 100)?,
+            "outputVolume" => self.output_volume = percent(&value, 200)?,
+            "soundboardVolume" => self.soundboard_volume = percent(&value, 100)?,
+            "noiseSuppressionStrength" => self.noise_suppression_strength = percent(&value, 100)?,
+            "noiseSuppressionMode" => {
+                self.noise_suppression_mode = value
+                    .as_str()
+                    .filter(|mode| ["standard", "high"].contains(mode))
+                    .ok_or_else(Error::invalid)?
+                    .to_owned()
             }
             "inputDevice" | "outputDevice" => {
                 let id = value
@@ -72,10 +126,18 @@ impl Preferences {
         }
         Ok(())
     }
+    /// The settings page's state. Fields for features this core does not have yet (camera, start with Windows, the log
+    /// upload) say so, and the page leaves their controls out or disabled.
     pub fn snapshot(&self, inputs: &[Value], outputs: &[Value]) -> Value {
         json!({"inputDevices":inputs,"outputDevices":outputs,"cameraDevices":[],"inputDevice":self.input_device,"outputDevice":self.output_device,"cameraDevice":"",
-            "noiseSuppression":self.noise_suppression,"automaticGainControl":self.automatic_gain_control,"theme":self.theme,
-            "inputVolume":100,"outputVolume":100,"soundboardVolume":100,"desktopNotifications":false,"taskbarAlert":false,"shareMode":self.share_mode,"shareHd":self.share_hd,"shareAudio":false})
+            "inputVolume":self.input_volume,"outputVolume":self.output_volume,"soundboardVolume":self.soundboard_volume,
+            "noiseSuppression":self.noise_suppression,"noiseSuppressionStrength":self.noise_suppression_strength,
+            "noiseSuppressionMode":self.noise_suppression_mode,"noiseSuppressionHighAvailable":false,
+            "automaticGainControl":self.automatic_gain_control,"theme":self.theme,"callSounds":self.call_sounds,
+            "desktopNotifications":self.desktop_notifications,"taskbarAlert":self.taskbar_alert,
+            "closeToTray":self.close_to_tray,"startMinimized":self.start_minimized,"openAtLogin":false,"loginSupported":false,
+            "errorReports":false,"errorReportsAvailable":false,
+            "shareMode":self.share_mode,"shareHd":self.share_hd,"shareAudio":false})
     }
 }
 pub struct Store {
@@ -130,10 +192,23 @@ mod tests {
         let mut store = Store::new(directory.path().to_path_buf()).unwrap();
         let mut preferences = Preferences::default();
         preferences.set("noiseSuppression", json!(false)).unwrap();
+        preferences.set("outputVolume", json!(150)).unwrap();
+        preferences.set_status("jogando").unwrap();
         store.save("alice".into(), preferences).unwrap();
         let restored = Store::new(directory.path().to_path_buf()).unwrap();
         assert!(!restored.account("alice").noise_suppression);
+        assert_eq!(restored.account("alice").output_volume, 150);
+        assert_eq!(restored.account("alice").custom_status, "jogando");
         assert!(restored.account("bob").noise_suppression);
+        assert!(restored.account("bob").custom_status.is_empty());
+    }
+    #[test]
+    fn preferences_written_by_an_older_preview_still_load() {
+        let old: Preferences = serde_json::from_value(json!({"noiseSuppression":false,"theme":"dark"})).unwrap();
+        assert!(!old.noise_suppression);
+        assert_eq!(old.theme, "dark");
+        assert_eq!((old.input_volume, old.output_volume, old.soundboard_volume), (100, 100, 70));
+        assert!(old.close_to_tray && old.call_sounds);
     }
     #[test]
     fn settings_reject_unknown_keys_and_invalid_values() {
@@ -141,5 +216,40 @@ mod tests {
         assert!(preferences.set("mediaUrl", json!("wss://evil")).is_err());
         assert!(preferences.set("noiseSuppression", json!("false")).is_err());
         assert!(preferences.set("theme", json!("invalid")).is_err());
+        assert!(preferences.set("shareAudio", json!(true)).is_err());
+        assert!(preferences.set("shareAudio", json!(false)).is_ok());
+    }
+    #[test]
+    fn volumes_are_whole_numbers_inside_their_ranges() {
+        let mut preferences = Preferences::default();
+        assert!(preferences.set("inputVolume", json!(100)).is_ok());
+        assert!(preferences.set("inputVolume", json!(101)).is_err());
+        assert!(preferences.set("inputVolume", json!(-1)).is_err());
+        assert!(preferences.set("inputVolume", json!(50.5)).is_err());
+        assert!(preferences.set("outputVolume", json!(200)).is_ok());
+        assert!(preferences.set("outputVolume", json!(201)).is_err());
+        assert!(preferences.set("noiseSuppressionMode", json!("standard")).is_ok());
+        assert!(preferences.set("noiseSuppressionMode", json!("ultra")).is_err());
+    }
+    #[test]
+    fn status_is_trimmed_and_bounded() {
+        let mut preferences = Preferences::default();
+        preferences.set_status("  na call  ").unwrap();
+        assert_eq!(preferences.custom_status, "na call");
+        assert!(preferences.set_status(&"x".repeat(65)).is_err());
+        assert!(preferences.set_status("a\0b").is_err());
+        preferences.set_status("").unwrap();
+        assert!(preferences.custom_status.is_empty());
+    }
+    #[test]
+    fn the_settings_page_gets_every_field_it_reads() {
+        let page = Preferences::default().snapshot(&[], &[]);
+        for key in [
+            "inputDevices", "outputDevices", "cameraDevices", "inputDevice", "outputDevice", "cameraDevice", "inputVolume", "outputVolume",
+            "noiseSuppression", "automaticGainControl", "desktopNotifications", "taskbarAlert", "soundboardVolume", "theme", "shareMode",
+            "shareHd", "shareAudio",
+        ] {
+            assert!(page.get(key).is_some(), "missing {key}");
+        }
     }
 }

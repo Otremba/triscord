@@ -68,7 +68,7 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
   }, []);
   if (!session) return <div class="tri-app tri-app--loading"><PopoutBar bridge={bridge} className="tri-titlebar--overlay" /><ResizeEdges bridge={bridge} /></div>;
   if (session.auth && session.auth.state !== 'signedIn') return <>
-    <LoginScreen auth={session.auth} bridge={bridge} />
+    <LoginScreen auth={session.auth} bridge={bridge} googleLogin={session.runtime?.googleLogin ?? true} />
     <PopoutBar bridge={bridge} className="tri-titlebar--overlay" /><ResizeEdges bridge={bridge} />
   </>;
   const server = session.servers.find(s => s.id === session.selectedServerId);

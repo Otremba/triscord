@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod api;
 mod capture;
+mod clipboard;
 mod control;
 mod core;
 mod error;
@@ -16,6 +17,7 @@ mod socket;
 mod vault;
 mod video_codec;
 mod video_gpu;
+mod window;
 
 use tauri::Manager;
 use tokio::sync::Mutex;
@@ -29,33 +31,54 @@ async fn dispatch(
     if command.to_string().len() > 65536 {
         return Err(error::Error::invalid());
     }
-    // Geometry must not contend with a slow login or REST request holding the core lock.
+    // Geometry, window moves and the page's telemetry must not contend with a slow login or REST request holding the
+    // core lock (they come many times a second and an "operation busy" answer to them would be an error toast).
     let presenter = app.state::<presenter::Presenter>();
-    if command["name"] == "videoSurface" {
-        let id = command["streamId"]
-            .as_str()
-            .filter(|id| id.len() <= 64)
-            .ok_or_else(error::Error::invalid)?;
-        let rect =
-            serde_json::from_value(command["rect"].clone()).map_err(|_| error::Error::invalid())?;
-        presenter.layout(
-            id,
-            rect,
-            command["scale"]
-                .as_f64()
-                .ok_or_else(error::Error::invalid)?,
-        )?;
-        return Ok(serde_json::Value::Null);
-    }
-    if command["name"] == "videoOccluders" {
-        presenter.occluders(
-            serde_json::from_value(command["rects"].clone())
-                .map_err(|_| error::Error::invalid())?,
-        )?;
-        return Ok(serde_json::Value::Null);
-    }
-    if command["name"] == "videoRole" {
-        return Ok(serde_json::Value::Null);
+    match command["name"].as_str() {
+        Some("videoSurface") => {
+            let id = command["streamId"]
+                .as_str()
+                .filter(|id| id.len() <= 64)
+                .ok_or_else(error::Error::invalid)?;
+            let rect = serde_json::from_value(command["rect"].clone())
+                .map_err(|_| error::Error::invalid())?;
+            presenter.layout(
+                id,
+                rect,
+                command["scale"]
+                    .as_f64()
+                    .ok_or_else(error::Error::invalid)?,
+            )?;
+            return Ok(serde_json::Value::Null);
+        }
+        Some("videoOccluders") => {
+            presenter.occluders(
+                serde_json::from_value(command["rects"].clone())
+                    .map_err(|_| error::Error::invalid())?,
+            )?;
+            return Ok(serde_json::Value::Null);
+        }
+        Some("videoStageOccluders") => {
+            presenter.stage_occluders(
+                serde_json::from_value(command["rects"].clone())
+                    .map_err(|_| error::Error::invalid())?,
+            )?;
+            return Ok(serde_json::Value::Null);
+        }
+        Some("videoRole") => {
+            let id = command["streamId"]
+                .as_str()
+                .filter(|id| id.len() <= 64)
+                .ok_or_else(error::Error::invalid)?;
+            presenter.role(id, command["role"].as_str().unwrap_or_default())?;
+            return Ok(serde_json::Value::Null);
+        }
+        // Frame-pacing telemetry of the C++ overlays and the focused-card hint: the GPU presenter needs neither.
+        Some("videoIdle" | "videoStats" | "videoAck" | "setCallFocus") => {
+            return Ok(serde_json::Value::Null)
+        }
+        Some("window") => return window::action(&app, command["action"].as_str().unwrap_or_default()),
+        _ => {}
     }
     let mut core = state.try_lock().map_err(|_| error::Error {
         code: "busy",

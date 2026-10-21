@@ -61,12 +61,17 @@ struct Slot {
     rect: Rect,
     scale: f64,
     failed: bool,
+    /// The card is the focused stage: the stage's own menus cut it too.
+    stage: bool,
+    /// "Ocultar transmissão": the card stays but its native window is hidden and its frames dropped.
+    hidden: bool,
 }
 #[derive(Default)]
 struct State {
     dirty: bool,
     slots: HashMap<String, Slot>,
     occluders: Vec<Rect>,
+    stage_occluders: Vec<Rect>,
 }
 #[derive(Clone)]
 pub struct Presenter {
@@ -83,27 +88,35 @@ impl Presenter {
             let mut surfaces: HashMap<String, Surface> = HashMap::new();
             loop {
                 let Some(state) = weak.upgrade() else { break };
-                let (frames, occluders, ids) = {
+                let (frames, ids) = {
                     let mut state = state.lock().unwrap_or_else(|e| e.into_inner());
                     state.dirty = false;
                     let ids = state.slots.keys().cloned().collect::<Vec<_>>();
+                    let base = state.occluders.clone();
+                    let stage = state.stage_occluders.clone();
                     let frames = state
                         .slots
                         .iter_mut()
                         .map(|(id, slot)| {
+                            let mut cuts = base.clone();
+                            if slot.stage {
+                                cuts.extend(stage.iter().copied());
+                            }
                             (
                                 id.clone(),
-                                slot.frame.take(),
-                                slot.rect,
+                                // A hidden stream draws nothing and keeps no frame waiting.
+                                slot.frame.take().filter(|_| !slot.hidden),
+                                if slot.hidden { Rect::default() } else { slot.rect },
                                 slot.scale,
                                 slot.failed,
+                                cuts,
                             )
                         })
                         .collect::<Vec<_>>();
-                    (frames, state.occluders.clone(), ids)
+                    (frames, ids)
                 };
                 surfaces.retain(|id, _| ids.contains(id));
-                for (id, frame, rect, scale, failed) in frames {
+                for (id, frame, rect, scale, failed, occluders) in frames {
                     if failed {
                         continue;
                     }
@@ -208,6 +221,37 @@ impl Presenter {
             slot.rect = physical;
             slot.scale = scale;
         }
+        state.dirty = true;
+        self.wake.notify_one();
+        Ok(())
+    }
+    /// "grid", "stage" or "film": where the page shows this card (only the stage is cut by the stage's menus).
+    pub fn role(&self, id: &str, role: &str) -> Result<()> {
+        if !["grid", "stage", "film"].contains(&role) {
+            return Err(Error::invalid());
+        }
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(slot) = state.slots.get_mut(id) {
+            slot.stage = role == "stage";
+        }
+        state.dirty = true;
+        self.wake.notify_one();
+        Ok(())
+    }
+    pub fn hide(&self, id: &str, hidden: bool) {
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(slot) = state.slots.get_mut(id) {
+            slot.hidden = hidden;
+        }
+        state.dirty = true;
+        self.wake.notify_one();
+    }
+    pub fn stage_occluders(&self, rects: Vec<Rect>) -> Result<()> {
+        if rects.len() > 8 || rects.iter().any(|r| r.physical(1.).is_none()) {
+            return Err(Error::invalid());
+        }
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        state.stage_occluders = rects;
         state.dirty = true;
         self.wake.notify_one();
         Ok(())

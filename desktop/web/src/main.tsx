@@ -2,6 +2,7 @@ import { render } from 'preact';
 import { App } from './app';
 import { createBridge, TauriBridge } from './bridge';
 import { RustPreview } from './rust-preview';
+import { NoticeToast } from './components/NoticeToast';
 import { fixtureSession } from './fixtures';
 import { SessionStore } from './store';
 import { startVideo } from './video';
@@ -37,5 +38,7 @@ const store = new SessionStore(() => bridge.send({ name: 'requestSnapshot' }));
 bridge.onMessage(message => store.receive(message));
 startVideo(bridge);
 bridge.send({ name: 'requestSnapshot' }); // the core answers with the current session
-render(bridge instanceof TauriBridge ? <RustPreview store={store} bridge={bridge} /> : <App store={store} bridge={bridge} />, document.getElementById('app')!);
+// The Rust core runs the real interface; ?preview opens the bare development page it started with.
+const tauri = bridge instanceof TauriBridge;
+render(tauri && params.has('preview') ? <RustPreview store={store} bridge={bridge} /> : <><App store={store} bridge={bridge} />{tauri && <NoticeToast />}</>, document.getElementById('app')!);
 (window as unknown as { __triscord?: unknown }).__triscord = { bridge, store };

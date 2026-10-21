@@ -83,7 +83,8 @@ function moreMenu(event: MouseEvent, invite: (() => void) | undefined, showNonVi
 function ControlsBar({ session, bridge, onShare, invite, inPopout, showNonVideo, setShowNonVideo }: { session: Session; bridge: Bridge; onShare: () => void; invite?: () => void;
   inPopout: boolean; showNonVideo: boolean; setShowNonVideo: (on: boolean) => void }) {
   const popoutOpen = !!session.callPopout, onTop = !!session.callPopoutOnTop;
-  const canPopout = true;
+  const canPopout = session.runtime?.popout !== false;
+  const hasCamera = session.runtime?.camera !== false, hasSoundboard = session.runtime?.soundboard !== false;
   const fullscreen = inPopout ? !!session.callPopoutFullscreen : !!session.callFullscreen;
   return (
     <div class="tri-call-bottom">
@@ -107,7 +108,7 @@ function ControlsBar({ session, bridge, onShare, invite, inPopout, showNonVideo,
             <Icon name="ChevronSmallDown" size={16} />
           </button>
         </div>
-        <Tooltip text={session.cameraPending ? 'Cancelar ativação da câmera' : session.camera ? 'Desativar câmera' : 'Ativar câmera'}>
+        {hasCamera && <><Tooltip text={session.cameraPending ? 'Cancelar ativação da câmera' : session.camera ? 'Desativar câmera' : 'Ativar câmera'}>
           <button class={`tri-call-button ${session.camera ? 'is-green' : ''}`} aria-label={session.cameraPending ? 'Cancelar ativação da câmera' : session.camera ? 'Desativar câmera' : 'Ativar câmera'}
             aria-pressed={!!session.camera} onClick={() => bridge.send({ name: 'setCamera', on: !(session.camera || session.cameraPending) })}>
             <Icon name={session.camera ? 'Video' : 'VideoSlash'} size={20} />
@@ -115,7 +116,7 @@ function ControlsBar({ session, bridge, onShare, invite, inPopout, showNonVideo,
         </Tooltip>
         <button class="tri-call-button tri-call-button--caret" aria-label="Opções de vídeo" onClick={e => cameraMenu(e, session, bridge)}>
           <Icon name="ChevronSmallDown" size={16} />
-        </button>
+        </button></>}
       </div>
       <div class="tri-call-capsule">
         <Tooltip text={session.sharing ? 'Parar de transmitir' : 'Compartilhar tela'}>
@@ -124,7 +125,7 @@ function ControlsBar({ session, bridge, onShare, invite, inPopout, showNonVideo,
             <Icon name={session.sharing ? 'ScreenX' : 'ScreenArrow'} size={20} />
           </button>
         </Tooltip>
-        <Tooltip text="Abrir efeitos sonoros"><button class="tri-call-button" aria-label="Abrir efeitos sonoros" onClick={e => openSoundboard(e.currentTarget)}><Icon name="Soundboard" size={20} /></button></Tooltip>
+        {hasSoundboard && <Tooltip text="Abrir efeitos sonoros"><button class="tri-call-button" aria-label="Abrir efeitos sonoros" onClick={e => openSoundboard(e.currentTarget)}><Icon name="Soundboard" size={20} /></button></Tooltip>}
         <Tooltip text="Mais opções"><button class="tri-call-button" aria-label="Mais opções" aria-haspopup="menu"
           onClick={e => moreMenu(e, invite, showNonVideo, setShowNonVideo)}><Icon name="MoreHorizontal" size={20} /></button></Tooltip>
       </div>

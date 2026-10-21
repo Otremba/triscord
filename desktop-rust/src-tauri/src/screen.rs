@@ -237,7 +237,7 @@ impl Screen {
                             Some(RoomEvent::TrackSubscribed {track:RemoteTrack::Video(track),participant,publication})=>{
                                 let sid=publication.sid().to_string();
                                 if !session.readers.contains_key(&sid)&&session.readers.len()<8&&publication.source()==TrackSource::Screenshare {
-                                    if let Ok(reader)=Reader::start(track,participant.name(),session.generation,session.membership,model.clone(),app.clone(),presenter.clone()){session.readers.insert(sid,reader);}
+                                    if let Ok(reader)=Reader::start(track,participant.name(),crate::media::socket_of(&participant.identity().to_string()).unwrap_or_default(),session.generation,session.membership,model.clone(),app.clone(),presenter.clone()){session.readers.insert(sid,reader);}
                                 }
                             },
                             Some(RoomEvent::TrackUnsubscribed {publication,..})=>{session.readers.remove(&publication.sid().to_string());},
@@ -497,6 +497,7 @@ fn set_sharing(app: &tauri::AppHandle, model: &Shared, generation: u64, epoch: u
         model.sharing = on;
         if !on {
             model.screen_requested = false;
+            model.sharing_name.clear();
         }
         model.user_state_notify.notify_one();
     }

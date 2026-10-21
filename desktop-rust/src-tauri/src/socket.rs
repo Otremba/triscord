@@ -89,7 +89,7 @@ impl Socket {
                     loop {
                         tokio::select! {
                             _=state_notify.notified(), if ready=> {
-                                let payload={let model=model.lock().unwrap_or_else(|e|e.into_inner());json!({"isMuted":model.muted||model.server_muted||model.deafened||!model.voice_requested||model.voice_state!="connected","isDeafened":model.deafened,"isScreenSharing":model.sharing})};
+                                let payload={let model=model.lock().unwrap_or_else(|e|e.into_inner());json!({"isMuted":model.muted||model.server_muted||model.deafened||!model.voice_requested||model.voice_state!="connected","isDeafened":model.deafened,"isScreenSharing":model.sharing,"status":model.preferences.custom_status})};
                                 if !send(&mut socket,Message::Text(format!("42{}",json!(["user-state-change",payload])).into())).await {break;}
                             }
                             _=sleep_until(deadline) => break,
@@ -112,7 +112,8 @@ impl Socket {
                                             deadline=Instant::now()+heartbeat;
                                             if !send(&mut socket,Message::Text(value.into())).await { break; }
                                         }
-                                        Ok(Packet::Ready) if opened && !ready => {
+                                        Ok(Packet::Ready(sid)) if opened && !ready => {
+                                            { let mut m=model.lock().unwrap_or_else(|e|e.into_inner()); if m.generation==generation { m.self_socket=sid; } }
                                             ready=true;
                                             set_status(&app,&model,generation,"connected");
                                             if let Some(payload)=&desired_room {

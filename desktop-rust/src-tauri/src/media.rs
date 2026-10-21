@@ -73,9 +73,14 @@ impl Media {
                         if let Some(event)=event {
                             if let Some(voice)=&mut active {
                                 match event {
-                                    RoomEvent::TrackSubscribed {track:RemoteTrack::Audio(track),..}=> {
-                                        voice.remote.insert(track.sid().to_string(),track);
+                                    RoomEvent::TrackSubscribed {track:RemoteTrack::Audio(track),participant,..}=> {
+                                        let socket=socket_of(&participant.identity().to_string()).unwrap_or_default();
+                                        voice.remote.insert(track.sid().to_string(),(socket,track));
                                         voice.configure(&model);
+                                    }
+                                    RoomEvent::ActiveSpeakersChanged {speakers}=> {
+                                        let heard=speakers.iter().filter_map(|speaker|socket_of(&speaker.identity().to_string())).collect();
+                                        if speaking(&model,voice.generation,heard) {publish(&app,&model);}
                                     }
                                     RoomEvent::TrackUnsubscribed {track:RemoteTrack::Audio(track),..}=> {voice.remote.remove(&track.sid().to_string());}
                                     RoomEvent::TrackPublished {..}=> {voice.configure(&model);}
@@ -191,7 +196,8 @@ struct Voice {
     events: mpsc::UnboundedReceiver<RoomEvent>,
     audio: PlatformAudio,
     microphone: LocalAudioTrack,
-    remote: HashMap<String, RemoteAudioTrack>,
+    /// Remote audio tracks by track id, with the hub socket id of whoever publishes each one.
+    remote: HashMap<String, (String, RemoteAudioTrack)>,
     input_device: String,
     output_device: String,
 }
@@ -240,13 +246,14 @@ impl Voice {
         })
     }
     fn configure(&mut self, model: &Shared) -> bool {
-        let (muted, deafened, ns, agc) = {
+        let (muted, deafened, ns, agc, silenced) = {
             let model = model.lock().unwrap_or_else(|e| e.into_inner());
             (
                 model.muted || model.server_muted || model.deafened || !model.voice_requested,
                 model.deafened,
                 model.preferences.noise_suppression,
                 model.preferences.automatic_gain_control,
+                model.peer_muted.clone(),
             )
         };
         let preferences = model
@@ -302,8 +309,8 @@ impl Voice {
             }
             self.microphone.unmute();
         }
-        for track in self.remote.values() {
-            if deafened {
+        for (socket, track) in self.remote.values() {
+            if deafened || silenced.contains(socket) {
                 track.disable();
             } else {
                 track.enable();
@@ -356,11 +363,26 @@ fn devices(app: &tauri::AppHandle, model: &Shared, audio: &PlatformAudio) {
     }
     publish(app, model);
 }
+/// The hub socket id inside a LiveKit identity (`<socket>/<uuid>/<kind>`, media_tokens.js), or None for anything else.
+pub fn socket_of(identity: &str) -> Option<String> {
+    identity
+        .split('/')
+        .next()
+        .filter(|id| !id.is_empty() && id.len() <= 64)
+        .map(str::to_owned)
+}
+fn speaking(model: &Shared, generation: u64, heard: std::collections::HashSet<String>) -> bool {
+    let mut model = model.lock().unwrap_or_else(|e| e.into_inner());
+    model.generation == generation && model.set_speaking(heard)
+}
 fn status(app: &tauri::AppHandle, model: &Shared, generation: u64, value: &str) {
     {
         let mut model = model.lock().unwrap_or_else(|e| e.into_inner());
         if model.generation != generation {
             return;
+        }
+        if value != "connected" {
+            model.speaking.clear();
         }
         model.voice_state = value.to_owned();
         model.user_state_notify.notify_one();
@@ -385,6 +407,23 @@ mod tests {
         ] {
             assert!(Credentials::parse(&json!({"url":url,"token":"synthetic"})).is_err());
         }
+    }
+    #[test]
+    fn a_livekit_identity_names_the_hub_socket_that_owns_it() {
+        assert_eq!(socket_of("sock-1/9f1c/voice").as_deref(), Some("sock-1"));
+        assert_eq!(socket_of("sock-1").as_deref(), Some("sock-1"));
+        assert_eq!(socket_of("/9f1c/voice"), None);
+        assert_eq!(socket_of(&"x".repeat(65)), None);
+    }
+    #[test]
+    fn speaking_updates_only_for_the_current_connection() {
+        let model = std::sync::Arc::new(std::sync::Mutex::new(crate::model::Model {
+            generation: 3,
+            ..Default::default()
+        }));
+        assert!(!speaking(&model, 2, ["a".to_string()].into()));
+        assert!(speaking(&model, 3, ["a".to_string()].into()));
+        assert!(!speaking(&model, 3, ["a".to_string()].into()), "unchanged: nothing to publish");
     }
     #[test]
     fn stale_admission_cannot_start_audio_after_leave() {
