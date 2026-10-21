@@ -29,7 +29,7 @@ function ChannelContent({ session, bridge, store, popout = false, workspace=fals
   const inRoom = !!channel && channel.id === session.connectedChannelId && (popout || session.selectedServerId === (session.callServerId ?? session.selectedServerId));
   const [chatOpen, setChatOpen] = useState(workspace);
   const [membersOpen, setMembersOpen] = useState(true);
-  const isText = channel ? (channel.kind === 'text' || channel.name.startsWith('#') || channel.name.toLowerCase().includes('chat') || channel.name.toLowerCase().includes('geral') || !channel.name.toLowerCase().includes('jogos')) : false;
+  const isText = channel ? (channel.kind === 'text') : false;
 
   // The core keeps the focus so the popout opens on the same card (observed); it clears it when the call changes.
   const focus: CallFocus = { key: session.callFocus?.key ?? null, filmOpen: session.callFocus?.filmOpen ?? true };
@@ -79,7 +79,7 @@ function ChannelContent({ session, bridge, store, popout = false, workspace=fals
           </Tooltip>
           {!popout && (
             <Tooltip text={membersOpen ? 'Ocultar lista de membros' : 'Mostrar lista de membros'} position="bottom">
-              <button class={`tri-icon-button ${membersOpen ? 'is-active' : ''}`} aria-label="Lista de membros" onClick={() => setMembersOpen(!membersOpen)}><Icon name="Group" size={20} /></button>
+              <button class={`tri-icon-button ${membersOpen ? 'is-active' : ''}`} aria-label="Lista de membros" aria-expanded={membersOpen} onClick={() => setMembersOpen(!membersOpen)}><Icon name="Group" size={20} /></button>
             </Tooltip>
           )}
           <div class="tri-channel-header__search">
@@ -94,21 +94,22 @@ function ChannelContent({ session, bridge, store, popout = false, workspace=fals
       </section>}
       {inRoom ? (
         <CallView session={session} bridge={bridge} store={store} idle={idle} inPopout={popout} focus={focus} onFocus={setFocus} />
-      ) : isText && channel ? (
-        <ChatPanel channelName={channel.name} messages={session.chat ?? []} avatars={session.avatars} bridge={bridge} full />
       ) : channel ? (
-        <div class="tri-prejoin">
-          <h2 class="tri-prejoin__title">{channel.name}</h2>
-          <p class="tri-prejoin__subtitle">{channel.users.length ? channel.users.map(u => u.name).join(', ') : 'Ninguém está em voz'}</p>
-          <button class="tri-prejoin__join" onClick={() => bridge.send({ name: 'joinVoice', channelId: channel.id })}>Entrar na chamada de voz</button>
-        </div>
+        <>
+          {!isText && <section class="tri-prejoin tri-prejoin--compact" aria-label="Chamada deste canal">
+            <div><h2 class="tri-prejoin__title">Voz em {channel.name}</h2>
+              <p class="tri-prejoin__subtitle">{channel.users.length ? channel.users.map(u => u.name).join(', ') : 'Ninguém está em voz'}</p></div>
+            <button type="button" class="tri-prejoin__join" onClick={() => bridge.send({ name: 'joinVoice', channelId: channel.id })}>Entrar na chamada</button>
+          </section>}
+          <ChatPanel key={`${session.selectedServerId}:${channel.id}`} channelName={channel.name} messages={session.chat ?? []} avatars={session.avatars} bridge={bridge} full />
+        </>
       ) : workspace?<StatePanel title="Escolha uma conversa" description={session.connection==='connected'?'Selecione um canal na lateral ou crie o primeiro canal deste espaço.':'Aguardando a conexão com o servidor para carregar os canais.'} busy={session.connection!=='connected'}>
         {session.connection==='connected'&&<button type="button" onClick={()=>dispatchEvent(new CustomEvent('tri-open-modal',{detail:{kind:'createChannel',categoryName:'Canais de Voz'}}))}>Criar canal</button>}
       </StatePanel>:<div class="tri-chat" />}
-      {workspace&&inRoom&&chatOpen&&channel&&<ChatPanel channelName={channel.name} messages={session.chat??[]} avatars={session.avatars} bridge={bridge} full/>}
+      {workspace&&inRoom&&chatOpen&&channel&&<ChatPanel key={`${session.selectedServerId}:${channel.id}`} channelName={channel.name} messages={session.chat??[]} avatars={session.avatars} bridge={bridge} full/>}
       </div>
       {!workspace&&inRoom && chatOpen && channel && (
-        <ChatPanel channelName={channel.name} messages={session.chat ?? []} avatars={session.avatars} bridge={bridge} onClose={() => setChatOpen(false)} />
+        <ChatPanel key={`${session.selectedServerId}:${channel.id}`} channelName={channel.name} messages={session.chat ?? []} avatars={session.avatars} bridge={bridge} onClose={() => setChatOpen(false)} />
       )}
       {!popout && membersOpen && (
         <MemberList session={session} bridge={bridge} />

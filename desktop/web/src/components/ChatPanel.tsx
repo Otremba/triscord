@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useId, useRef, useState } from 'preact/hooks';
 import type { Bridge } from '../bridge';
 import type { ChatMessage } from '../protocol';
 import { Icon } from './Icon';
@@ -122,6 +122,14 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose, ful
   const composer = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState('');
   const [rateLimited, setRateLimited] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState(false);
+  const feedbackId = useId();
+  const pending = useRef(false);
+  const mounted = useRef(true);
+  const draftRevision = useRef(0);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const edit = (value: string) => { draftRevision.current++; setText(value); setSendError(false); };
   // REA composer module __74017: 56px minimum, growing to the 50vh limit.
   useLayoutEffect(() => {
     const input = composer.current;
@@ -138,16 +146,34 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose, ful
   const atBottom = useRef(true);
   useLayoutEffect(() => { const el = list.current; if (el && atBottom.current) el.scrollTop = el.scrollHeight; }, [messages.length]);
   useEffect(() => {
-    const on = () => { setRateLimited(true); setTimeout(() => setRateLimited(false), 1500); };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const on = () => {
+      setRateLimited(true);
+      clearTimeout(timer);
+      timer = setTimeout(() => setRateLimited(false), 1500);
+    };
     addEventListener('tri-chat-rate-limited', on);
-    return () => removeEventListener('tri-chat-rate-limited', on);
+    return () => { removeEventListener('tri-chat-rate-limited', on); clearTimeout(timer); };
   }, []);
   const send = (event: Event) => {
     event.preventDefault();
-    const input = (event.currentTarget as HTMLFormElement).elements.namedItem('message') as HTMLTextAreaElement;
-    const value = input.value.trim();
-    if (!value) return;
-    bridge.request({ name: 'sendChatMessage', text: value }).then(() => { setText(''); input.value = ''; atBottom.current = true; }).catch(() => {});
+    const value = text.trim();
+    if (!value || pending.current) return;
+    const revision = draftRevision.current;
+    pending.current = true;
+    setSending(true);
+    setSendError(false);
+    bridge.request({ name: 'sendChatMessage', text: value }).then(() => {
+      if (!mounted.current) return;
+      // Typing while the request is in flight must not lose the next message.
+      if (draftRevision.current === revision) setText('');
+      atBottom.current = true;
+    }).catch(() => {
+      if (mounted.current) setSendError(true);
+    }).finally(() => {
+      pending.current = false;
+      if (mounted.current) setSending(false);
+    });
   };
   const items: preact.JSX.Element[] = [];
   messages.forEach((m, i) => {
@@ -180,7 +206,12 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose, ful
           <ol class="tri-messages">{items}</ol>
         </div>
       </div>
-      <form class="tri-composer" onSubmit={send}>
+      <form class="tri-composer" onSubmit={send} aria-busy={sending}>
+        <div id={feedbackId} class="tri-composer__feedback">
+          {sendError ? <p role="alert">Não foi possível enviar. Seu rascunho foi mantido. Tente novamente.</p>
+            : rateLimited ? <p role="status">Muitas mensagens em sequência. Aguarde um instante antes de reenviar.</p>
+            : sending ? <p role="status">Enviando mensagem…</p> : null}
+        </div>
         <div class={`tri-composer__box tri-composer-floating ${rateLimited ? 'is-rate-limited' : ''}`}>
           <Tooltip text="Enviar um arquivo">
             <button type="button" class="tri-composer__attach" aria-label="Enviar um arquivo" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Envio de arquivos em desenvolvimento.' }))}>
@@ -188,8 +219,8 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose, ful
             </button>
           </Tooltip>
           <textarea ref={composer} class="tri-composer__input" name="message" rows={1}
-            placeholder={`Conversar em ${channelName}`} aria-label={`Conversar em ${channelName}`} aria-multiline="true"
-            maxLength={2000} autoComplete="off" value={text} onInput={e => setText((e.target as HTMLTextAreaElement).value)}
+            placeholder={`Conversar em ${channelName}`} aria-label={`Conversar em ${channelName}`} aria-multiline="true" aria-describedby={feedbackId}
+            maxLength={2000} autoComplete="off" value={text} onInput={e => edit((e.target as HTMLTextAreaElement).value)}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
                 e.preventDefault();
@@ -213,10 +244,13 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose, ful
               </button>
             </Tooltip>
             <Tooltip text="Selecione um emoji">
-              <button type="button" class="tri-composer__action" aria-label="Selecione um emoji" onClick={() => setText(current => current + ' 😄 ')}>
+              <button type="button" class="tri-composer__action" aria-label="Selecione um emoji" onClick={() => edit(text + ' 😄 ')}>
                 <Icon name="Reaction" size={24} />
               </button>
             </Tooltip>
+            <button type="submit" class="tri-composer__send" disabled={sending || !text.trim()} aria-label={sendError ? 'Tentar enviar novamente' : 'Enviar mensagem'}>
+              {sendError ? 'Tentar novamente' : sending ? 'Enviando…' : 'Enviar'}
+            </button>
           </div>
         </div>
       </form>

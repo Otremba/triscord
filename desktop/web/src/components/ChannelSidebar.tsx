@@ -163,7 +163,7 @@ function CategoryList({ category, session, bridge }: { category: Category; sessi
                   <button type="button" class="tri-channel__select" aria-current={selected?'page':undefined} aria-label={channel.name}
                     onClick={() => { bridge.send({ name: 'openTextRoom', channelId: channel.id }); bridge.send({ name: 'selectChannel', channelId: channel.id }); }}>
                   {(() => {
-                    const isText = channel.kind === 'text' || channel.name.startsWith('#') || channel.name.toLowerCase().includes('chat') || channel.name.toLowerCase().includes('geral') || !channel.name.toLowerCase().includes('jogos');
+                    const isText = channel.kind === 'text';
                     return <Icon name={isText ? 'TextChannel' : 'VoiceSpeaker'} size={20} className="tri-channel__icon" />;
                   })()}
                   <span class="tri-channel__name">{channel.name}</span>

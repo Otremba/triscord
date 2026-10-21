@@ -24,3 +24,11 @@ O aviso não fatal `corrupt .drectve` continua no build script do host. `runtime
 ## Limites restantes
 
 A direção visual foi aprovada e aplicada ao código. Ainda falta conferir a aparência e interação das telas reais quando a validação visual for permitida, incluindo larguras menores, popouts, vídeo nativo, menus sobre vídeo, foco e estados de formulário. As imagens SVG/PNG anteriores são propostas estáticas; a revisão 02 registra a alternativa cobre, substituída pela escolha de azul. Não afirmar paridade funcional completa ou resolução dos problemas de mídia da reescrita por esta mudança visual.
+
+## Continuação — orientação e envio de mensagens
+
+O tipo do canal agora vem exclusivamente do campo `kind` do snapshot; nomes como “Geral” deixam de converter visualmente um canal de voz em canal de texto. A conversa permanece disponível antes de entrar na voz, junto a um painel compacto de participantes e entrada explícita. O botão da lista de membros anuncia seu estado expandido.
+
+O compositor ganhou ação de envio visível, aviso de envio em andamento e erro acessível com nova tentativa. Um pedido pendente bloqueia submits duplicados. Em falha do comando IPC, o rascunho permanece; uma resposta de sucesso não limpa texto editado durante o pedido. Trocas de servidor/canal remontam o painel por identidade, descartando feedback de outra sala. O temporizador de limite de mensagens é cancelado no unmount. A aceitação do comando pelo núcleo não é comprovante de entrega ao servidor; o protocolo atual não oferece confirmação individual de entrega.
+
+TypeScript, unidades Node existentes, 104 unidades Rust, build frontend e compilação MSVC passaram após essa continuação. Não foram exercitados envio real, teclado, layout ou dispositivos. runtimeVerified=false. Conferência visual permanece pendente.

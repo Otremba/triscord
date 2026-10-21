@@ -287,3 +287,23 @@
 :root[data-design="workspace"] .tri-login__divider::after { background:var(--ui-border); }
 :root[data-design="workspace"] .tri-login__input.has-error { border-color:var(--ui-critical); }
 :root[data-design="workspace"] :is(.tri-login__error,.tri-required) { color:var(--ui-critical); }
+
+:root[data-design="workspace"] .tri-composer__feedback:empty { display:none; }
+:root[data-design="workspace"] .tri-composer__feedback { padding:0 16px; }
+:root[data-design="workspace"] .tri-composer__feedback p { margin:8px 0;color:var(--ui-muted);font-size:13px;line-height:1.5; }
+:root[data-design="workspace"] .tri-composer__feedback [role="alert"] { color:var(--ui-critical); }
+:root[data-design="workspace"] .tri-composer__send { flex:none;min-height:34px;padding:6px 12px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-primary);color:var(--ui-primary-text);font-size:13px;font-weight:600; }
+:root[data-design="workspace"] .tri-composer__send:hover:not(:disabled) { background:var(--control-primary-background-hover); }
+
+:root[data-design="workspace"] .tri-prejoin--compact { flex:none;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:20px;padding:20px;margin:16px 16px 0;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel);text-align:start; }
+:root[data-design="workspace"] .tri-prejoin--compact>div { min-width:0; }
+:root[data-design="workspace"] .tri-prejoin--compact .tri-prejoin__title { color:var(--ui-text);font-size:18px;line-height:1.4;font-weight:600;overflow-wrap:anywhere; }
+:root[data-design="workspace"] .tri-prejoin--compact .tri-prejoin__subtitle { margin:6px 0 0;color:var(--ui-muted);line-height:1.5;overflow-wrap:anywhere; }
+:root[data-design="workspace"] .tri-prejoin--compact .tri-prejoin__join { flex:none;background:var(--ui-primary);color:var(--ui-primary-text);border-radius:8px;font-size:14px; }
+:root[data-design="workspace"] .tri-prejoin--compact .tri-prejoin__join:hover { background:var(--control-primary-background-hover); }
+@media (max-width:900px) {
+  :root[data-design="workspace"] .tri-prejoin--compact { align-items:flex-start;flex-direction:column;gap:12px; }
+  :root[data-design="workspace"] .tri-composer__box { flex-wrap:wrap; }
+  :root[data-design="workspace"] .tri-composer__buttons { flex:1;justify-content:flex-end;flex-wrap:wrap;margin-bottom:8px; }
+  :root[data-design="workspace"] .tri-composer__input { min-width:140px; }
+}
