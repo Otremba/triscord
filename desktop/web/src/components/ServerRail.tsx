@@ -78,8 +78,24 @@ function RailItem({ server, selected, onSelect, voice }: { server: Server; selec
 }
 
 export function ServerRail({ servers, selectedId, callServerId, bridge, voice }: { servers: Server[]; selectedId: string; callServerId?: string; bridge: Bridge; voice?: 'voice' | 'screen' }) {
+  const [homeHovered, setHomeHovered] = useState(false);
+  const homeSelected = !selectedId || selectedId === '@me';
   return (
     <nav class="tri-rail" aria-label="Servidores">
+      <div class="tri-rail__item">
+        <div class="tri-rail__pill-wrapper">
+          <span class={`tri-rail__pill ${homeSelected ? 'tri-rail__pill--selected' : homeHovered ? 'tri-rail__pill--hovered' : ''}`} />
+        </div>
+        <Tooltip text="Mensagens diretas" position="right" spacing={12} guild>
+          <button class={`tri-rail__button tri-rail__home-button ${homeSelected ? 'is-selected' : ''}`} aria-label="Mensagens diretas"
+            onMouseEnter={() => setHomeHovered(true)} onMouseLeave={() => setHomeHovered(false)}
+            onClick={() => bridge.send({ name: 'selectServer', serverId: '' })}>
+            <Icon name="DiscordLogo" size={26} />
+          </button>
+        </Tooltip>
+      </div>
+      <div class="tri-rail__separator" role="separator" />
+
       {servers.map(server => (
         <RailItem key={server.id} server={server} selected={server.id === selectedId} voice={server.id === (callServerId ?? selectedId) ? voice : undefined}
           onSelect={() => bridge.send({ name: 'selectServer', serverId: server.id })} />

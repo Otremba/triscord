@@ -24,15 +24,30 @@ await build({
 // --font-primary falls back to Noto Sans / Helvetica / Arial.
 const fontsDir = resolve(web, '../assets/fonts-local');
 const weights = { normal: 400, medium: 500, semibold: 600, bold: 700, extrabold: 800 };
-const weightOf = file => weights[file.slice('ggsans-'.length, -'.ttf'.length)];
-const fonts = !tauri && existsSync(fontsDir) ? readdirSync(fontsDir).filter(f => /^ggsans-\w+\.ttf$/.test(f) && weightOf(f)) : [];
+const weightOf = file => {
+  const m = file.match(/^ggsans-(\d+)/) || file.match(/^ggsans-([a-z]+)/);
+  if (!m) return undefined;
+  if (/^\d+$/.test(m[1])) return Number(m[1]);
+  return weights[m[1]];
+};
+const fonts = existsSync(fontsDir) ? readdirSync(fontsDir).filter(f => /^ggsans-.*\.(woff2|ttf)$/.test(f)) : [];
 rmSync(resolve(dist, 'fonts'), { recursive: true, force: true });
 rmSync(resolve(dist, 'fonts.css'), { force: true });
 if (fonts.length) {
   mkdirSync(resolve(dist, 'fonts'), { recursive: true });
   for (const f of fonts) copyFileSync(resolve(fontsDir, f), resolve(dist, 'fonts', f));
-  writeFileSync(resolve(dist, 'fonts.css'), fonts.map(f =>
-    `@font-face{font-family:"gg sans";font-style:normal;font-weight:${weightOf(f)};font-display:block;src:url(fonts/${f}) format("truetype")}`).join('\n') + '\n');
+  const rules = [];
+  if (fonts.includes('ggsans-vf.woff2')) {
+    rules.push('@font-face{font-family:"gg sans";font-style:normal;font-weight:300 800;font-display:swap;src:url(fonts/ggsans-vf.woff2) format("woff2-variations"),url(fonts/ggsans-vf.woff2) format("woff2");}');
+  }
+  for (const f of fonts) {
+    if (f === 'ggsans-vf.woff2') continue;
+    const w = weightOf(f);
+    if (!w) continue;
+    const fmt = f.endsWith('.woff2') ? 'woff2' : 'truetype';
+    rules.push(`@font-face{font-family:"gg sans";font-style:normal;font-weight:${w};font-display:swap;src:url(fonts/${f}) format("${fmt}");}`);
+  }
+  writeFileSync(resolve(dist, 'fonts.css'), rules.join('\n') + '\n');
 }
 console.log(`fonts: ${fonts.length ? fonts.join(', ') : 'gg sans not found, using the fallback stack'}`);
 // CSP: no network from the renderer (the core does all I/O); images only from the app origin/data.

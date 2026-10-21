@@ -60,6 +60,17 @@
   transition: border-radius .2s cubic-bezier(0.4, 0, 0.2, 1), color .15s ease-out, background-color .15s ease-out;
 }
 .tri-rail__circle:hover { background: var(--background-brand); color: var(--white); }
+.tri-rail__home-button {
+  align-items: center; justify-content: center;
+  background: var(--background-mod-subtle); color: var(--text-default);
+}
+.tri-rail__home-button:hover, .tri-rail__home-button.is-selected {
+  background: var(--background-brand); color: var(--white);
+}
+.tri-rail__separator {
+  width: 32px; height: 2px; margin: 0 auto var(--space-8); border-radius: 1px;
+  background: var(--background-mod-accent, rgba(255, 255, 255, 0.08));
+}
 
 /* Server header: module _f37cb1 */
 .tri-server-header {
@@ -159,15 +170,36 @@
 .tri-video-tile__canvas { display: block; width: 100%; height: 100%; }
 .tri-composer { flex: 0 0 auto; padding: 0 var(--space-8) var(--space-8); }
 .tri-composer__box {
-  display: flex; align-items: center; height: calc(var(--custom-channel-textarea-text-area-height) + 2px);
-  padding-inline-start: calc(var(--space-16) - 1px); border: 1px solid var(--border-muted); border-radius: var(--radius-sm);
+  display: flex; align-items: center; min-height: calc(var(--custom-channel-textarea-text-area-height) + 2px);
+  padding-inline: 10px 10px; border: 1px solid var(--border-muted); border-radius: var(--radius-sm);
   background: var(--channeltextarea-background);
 }
+.tri-composer__attach {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; margin-inline-end: 8px; flex: none;
+  border-radius: 50%; color: var(--interactive-icon-default);
+  transition: color .15s ease, background-color .15s ease;
+}
+.tri-composer__attach:hover {
+  color: var(--interactive-icon-hover); background: var(--interactive-background-hover);
+}
 .tri-composer__input {
-  flex: 1 1 auto; height: var(--custom-channel-textarea-text-area-height); padding-inline: 0 10px; border: 0; outline: 0;
+  flex: 1 1 auto; min-height: var(--custom-channel-textarea-text-area-height); padding-inline: 0 8px; border: 0; outline: 0;
   background: transparent; color: var(--text-default); font-size: 1rem; line-height: 1.375rem;
 }
 .tri-composer__input::placeholder { color: var(--text-muted); }
+.tri-composer__buttons {
+  display: flex; align-items: center; gap: 4px; margin-inline-start: 8px; flex: none;
+}
+.tri-composer__action {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: var(--radius-xs);
+  color: var(--interactive-icon-default);
+  transition: color .15s ease, background-color .15s ease;
+}
+.tri-composer__action:hover {
+  color: var(--interactive-icon-hover); background: var(--interactive-background-hover);
+}
 
 /* Call popout window: 24px bar with the window buttons only (observed 17/10), 4px resize edges on the frameless window. */
 .tri-app--popout { grid-template-rows: 24px 1fr; }

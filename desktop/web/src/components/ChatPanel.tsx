@@ -173,6 +173,11 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose }: {
       </div>
       <form class="tri-composer" onSubmit={send}>
         <div class={`tri-composer__box ${rateLimited ? 'is-rate-limited' : ''}`}>
+          <Tooltip text="Enviar um arquivo">
+            <button type="button" class="tri-composer__attach" aria-label="Enviar um arquivo" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Envio de arquivos em desenvolvimento.' }))}>
+              <Icon name="CirclePlus" size={24} />
+            </button>
+          </Tooltip>
           <textarea ref={composer} class="tri-composer__input" name="message" rows={1}
             placeholder={`Conversar em ${channelName}`} aria-label={`Conversar em ${channelName}`} aria-multiline="true"
             maxLength={2000} autoComplete="off" value={text} onInput={e => setText((e.target as HTMLTextAreaElement).value)}
@@ -182,6 +187,28 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose }: {
                 e.currentTarget.form?.requestSubmit();
               }
             }} />
+          <div class="tri-composer__buttons">
+            <Tooltip text="Enviar um presente">
+              <button type="button" class="tri-composer__action" aria-label="Enviar um presente" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Presentes Nitro em desenvolvimento.' }))}>
+                <Icon name="Gift" size={24} />
+              </button>
+            </Tooltip>
+            <Tooltip text="Abrir seletor de GIF">
+              <button type="button" class="tri-composer__action" aria-label="Abrir seletor de GIF" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Seletor de GIF em desenvolvimento.' }))}>
+                <Icon name="Gif" size={24} />
+              </button>
+            </Tooltip>
+            <Tooltip text="Abrir seletor de figurinhas">
+              <button type="button" class="tri-composer__action" aria-label="Abrir seletor de figurinhas" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Figurinhas em desenvolvimento.' }))}>
+                <Icon name="Sticker" size={24} />
+              </button>
+            </Tooltip>
+            <Tooltip text="Selecione um emoji">
+              <button type="button" class="tri-composer__action" aria-label="Selecione um emoji" onClick={() => setText(current => current + ' 😄 ')}>
+                <Icon name="Reaction" size={24} />
+              </button>
+            </Tooltip>
+          </div>
         </div>
       </form>
     </aside>
