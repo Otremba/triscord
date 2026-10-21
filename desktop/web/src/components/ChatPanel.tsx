@@ -60,15 +60,8 @@ function Message({ message, groupStart, bridge, avatars }: { message: ChatMessag
   const avatar = avatars?.[message.authorId];
   const [picker, setPicker] = useState(false);
   const react = (emoji: string) => { setPicker(false); bridge.send({ name: 'toggleReaction', messageId: message.id, emoji }); };
-  const handleMouseMove = (e: MouseEvent) => {
-    const el = e.currentTarget as HTMLElement;
-    const rect = el.getBoundingClientRect();
-    el.style.setProperty('--mouse-x', `${e.clientX - rect.left}`);
-    el.style.setProperty('--mouse-y', `${e.clientY - rect.top}`);
-  };
-
   return (
-    <li class={`tri-message tri-spotlight ${groupStart ? 'is-group-start' : ''}`} onMouseMove={handleMouseMove} onMouseLeave={() => setPicker(false)}
+    <li class={`tri-message ${groupStart ? 'is-group-start' : ''}`} onMouseLeave={() => setPicker(false)}
       onContextMenu={e => openContextMenu(e, messageMenu(message, bridge), { width: 'fixed', label: 'Ações da mensagem' })}>
       {groupStart ? (
         <>

@@ -56,3 +56,13 @@ Cores de seleção, hover, mensagens, alertas e botões passam por tokens semân
 A política de escolha do próximo foco é testada com listas de objetos, sem DOM: bordas, interior, foco externo, lista vazia e um único controle. Filtragem dos elementos reais, restauração, múltiplos modais, menus e interação de teclado não foram executados; esses testes unitários não comprovam a integração visual.
 
 O perfil oferece “Tentar carregar novamente” quando a consulta falha. O formulário anuncia carregamento/ocupação e as respostas de tentativas antigas continuam descartadas pelo ciclo do efeito. TypeScript, unidades Node, 104 unidades Rust e compilação MSVC passaram; runtimeVerified=false.
+
+## Revisão visual autorizada e anotações do usuário
+
+Em 21/10, o usuário liberou revisão visual isolada e depois E2E e áudio nesta tarefa. A interface compilada foi servida somente em localhost com `FixtureBridge`, sem sessão real, núcleo nativo ou dispositivos. A revisão revelou e corrigiu fundos de card indevidos nas mensagens e identificação de participantes oculta por inatividade na chamada integrada.
+
+Aplicadas as cinco anotações: removidos o bloco de marca e o rótulo “Seu espaço” no topo; seletor permanece acessível com o nome “Servidor”, e “Início” mantém seu comando. Contagens de membros não usam traços. A seleção de canal usa só o fundo, sem faixa lateral. Configurações passam a usar títulos de 18 px, rótulos de 14 px e descrições de 13 px.
+
+Na página real do navegador, observados o ciclo Shift+Tab do primeiro controle para o último e Tab de volta ao primeiro; fechar configurações restaurou foco ao botão de origem. Evidências ignoradas pelo Git em `desktop/out/design-review/`: `settings-compact.png`, `call-simplified.png` e `call-logo-gray.png`. São renders do frontend com dados de demonstração, não screenshots de uma chamada real nem prova de mídia nativa. A largura/tamanho da prévia foi ajustada temporariamente para avaliar a composição; nenhuma preferência real do usuário foi alterada.
+
+Após as mudanças, TypeScript, unidades Node, 104 unidades Rust e compilação MSVC passaram. `nativeRuntimeVerified=false`: o executável/instalador não foi aberto, nenhum E2E contra Workers/contas reais ou áudio foi executado nesta etapa. Restam as demais telas/estados e integração com janelas de vídeo nativas; a autorização nova remove o bloqueio anterior de validação.

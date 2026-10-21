@@ -13,7 +13,7 @@ const picker=tree.find(node=>node.type==='select');
 assert.deepEqual(nodes(picker).filter(node=>node.type==='option').map(node=>node.props.value),['@me',...servers.map(server=>server.id)],'every server remains reachable even when recent shortcuts are bounded');
 picker.props.onChange({currentTarget:{value:'server-7'}});
 assert.deepEqual(sent.pop(),{name:'selectServer',serverId:'server-7'});
-const home=tree.find(node=>node.props?.['aria-label']==='Triscord, ir para o início');
+const home=tree.find(node=>node.props?.['aria-label']==='Ir para o início');
 home.props.onClick();assert.deepEqual(sent.pop(),{name:'selectServer',serverId:'@me'});
 const empty=WorkspaceNav({session:{servers:[],selectedServerId:''},bridge:{send:()=>{}}});
 assert.equal(nodes(empty).find(node=>node.type==='select').props.value,'@me');

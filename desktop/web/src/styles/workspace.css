@@ -170,9 +170,7 @@
 
 /* A single named workspace navigation replaces the circular server rail. */
 :root[data-design="workspace"] .tri-app--workspace .tri-sidebar { flex-direction:column;width:var(--tri-sidebar-width);background:var(--ui-sidebar);border-right:1px solid var(--ui-border); }
-:root[data-design="workspace"] .tri-workspace-nav { padding:24px 16px 16px;flex:none; }
-:root[data-design="workspace"] .tri-workspace-brand { display:flex;align-items:center;gap:12px;padding:0 4px 24px;font-size:25px;font-weight:700;letter-spacing:-.6px; }
-:root[data-design="workspace"] .tri-workspace-mark { display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--ui-primary);color:var(--ui-primary-text); }
+:root[data-design="workspace"] .tri-workspace-nav { padding:16px;flex:none; }
 :root[data-design="workspace"] .tri-workspace-label { display:block;margin:0 4px 10px;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ui-muted); }
 :root[data-design="workspace"] .tri-workspace-current { display:flex;align-items:center;gap:10px;min-height:62px;padding:10px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel); }
 :root[data-design="workspace"] .tri-workspace-current__icon { display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;overflow:hidden;background:var(--ui-selected);color:var(--ui-accent); }
@@ -189,7 +187,7 @@
 :root[data-design="workspace"] .tri-category { padding-top:12px; }
 :root[data-design="workspace"] .tri-channel { margin:3px 0; }
 :root[data-design="workspace"] .tri-channel__link { min-height:40px;margin:0;border-radius:8px;padding:8px 10px; }
-:root[data-design="workspace"] .tri-channel.is-selected>.tri-channel__link { background:var(--ui-selected);color:var(--ui-selected-text);box-shadow:inset 3px 0 var(--ui-accent); }
+:root[data-design="workspace"] .tri-channel.is-selected>.tri-channel__link { background:var(--ui-selected);color:var(--ui-selected-text);box-shadow:none; }
 :root[data-design="workspace"] .tri-channel__name { font-size:14px; }
 :root[data-design="workspace"] .tri-voice-user.is-speaking .tri-avatar { outline:2px solid var(--ui-positive);outline-offset:2px;box-shadow:none;animation:none; }
 
@@ -370,3 +368,18 @@
 :root[data-design="workspace"] .tri-voice-panel__title { color:var(--ui-text); }
 :root[data-design="workspace"] .tri-voice-panel__room { color:var(--ui-muted); }
 :root[data-design="workspace"] .tri-switch.is-on .tri-switch__knob { background:var(--ui-primary-text); }
+
+:root[data-design="workspace"] .tri-call-card { background:var(--ui-field);border:1px solid var(--ui-border); }
+:root[data-design="workspace"] .tri-message { background:transparent; }
+:root[data-design="workspace"] .tri-message:hover { background:var(--ui-message-hover); }
+
+/* Review feedback: quiet navigation, compact settings, no ornamental selection stripe. */
+:root[data-design="workspace"] .tri-members-group__title { gap:8px;text-transform:none;font-size:12px;letter-spacing:0;font-weight:600;color:var(--ui-muted); }
+:root[data-design="workspace"] .tri-members-group__count { color:var(--ui-subtle);font-weight:400; }
+:root[data-design="workspace"] .tri-settings__column { max-width:640px;padding-top:28px; }
+:root[data-design="workspace"] .tri-settings__heading { font-size:18px;line-height:24px;font-weight:600;margin-bottom:20px; }
+:root[data-design="workspace"] .tri-settings__label { font-size:14px;line-height:20px;font-weight:600; }
+:root[data-design="workspace"] .tri-settings__description { font-size:13px;line-height:19px;color:var(--ui-muted); }
+:root[data-design="workspace"] :is(.tri-settings__item,.tri-settings__sub) { font-size:14px;line-height:20px; }
+:root[data-design="workspace"] .tri-settings__group { font-size:12px; }
+:root[data-design="workspace"] .tri-device-select select { font-size:14px; }

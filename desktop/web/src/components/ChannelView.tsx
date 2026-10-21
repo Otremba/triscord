@@ -40,7 +40,8 @@ function ChannelContent({ session, bridge, store, popout = false, workspace=fals
   const quality = focused?.kind === 'stream' && focused.stream
     ? focused.user?.self && settings ? `${settings.shareHd ? 1080 : 720}p ${settings.shareMode === 'screen' ? 15 : settings.shareHd ? 60 : 30}FPS` : `${focused.stream.height}p`
     : '';
-  const { idle, active, leave } = useCallIdle();
+  const { idle: inactive, active, leave } = useCallIdle();
+  const idle = inactive && (!workspace || !!session.callFullscreen);
   useEffect(()=>{if(!inRoom)return;addEventListener('tri-call-activity',active);return()=>removeEventListener('tri-call-activity',active);},[inRoom,active]);
   useEffect(() => { if (!session.connectedChannelId) setChatOpen(false);else if(workspace)setChatOpen(true); }, [session.connectedChannelId,workspace]);
   useEffect(() => {

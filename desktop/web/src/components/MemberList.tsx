@@ -59,7 +59,7 @@ export function MemberList({ session, bridge }: { session: Session; bridge: Brid
         {onlineMembers.length > 0 && (
           <div class="tri-members-group">
             <h3 class="tri-members-group__title">
-              DISPONÍVEL — {onlineMembers.length}
+              Disponíveis <span class="tri-members-group__count">{onlineMembers.length}</span>
             </h3>
             <ul class="tri-members-list">
               {onlineMembers.map(m => (
@@ -88,7 +88,7 @@ export function MemberList({ session, bridge }: { session: Session; bridge: Brid
         {offlineMembers.length > 0 && (
           <div class="tri-members-group">
             <h3 class="tri-members-group__title">
-              OFFLINE — {offlineMembers.length}
+              Offline <span class="tri-members-group__count">{offlineMembers.length}</span>
             </h3>
             <ul class="tri-members-list">
               {offlineMembers.map(m => (

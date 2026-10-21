@@ -1,6 +1,6 @@
 # Auditoria do objetivo de redesign
 
-Esta auditoria mantém o escopo original. Estado em 21/10/2026: implementação em desenvolvimento, sem publicação/substituição da instalação. A avaliação visual completa ainda não é comprovada, pois abrir o aplicativo, automatizar interface ou capturar tela para validação continua proibido pelo usuário.
+Esta auditoria mantém o escopo original. Estado em 21/10/2026: implementação em desenvolvimento, sem publicação/substituição da instalação. O usuário liberou revisão visual isolada e depois E2E/áudio. Tela principal e configurações já foram observadas no navegador com fixtures; isso não comprova as demais telas nem a integração nativa.
 
 | Requisito | Evidência atual | Estado e limite |
 | --- | --- | --- |
@@ -20,6 +20,6 @@ Esta auditoria mantém o escopo original. Estado em 21/10/2026: implementação 
 
 ## Próximas verificações
 
-Contenção de foco e nova tentativa de carregamento de perfil foram implementadas, com os limites registrados em `preview.md`. Quando houver autorização para validação visual, conferir telas reais nas larguras suportadas, navegação por teclado, formulários, popouts, estados de erro/reconexão e recorte de menus/vídeo. Não abrir o app para preencher esta lacuna enquanto a restrição vigente permanecer.
+Contenção de foco e nova tentativa de carregamento de perfil foram implementadas, com os limites registrados em `preview.md`. Quando houver autorização para validação visual, conferir telas reais nas larguras suportadas, navegação por teclado, formulários, popouts, estados de erro/reconexão e recorte de menus/vídeo. A autorização atual permite avançar nessa validação em ambiente isolado.
 
-Os builds seguem sequenciais com `-j 2`, sem E2E, dispositivos ou instalação. Evidências e limitações por etapa estão em `preview.md`; resultados históricos não validam alterações posteriores.
+Os builds seguem sequenciais com `-j 2`; nesta etapa não foram executados E2E de backend, dispositivos ou instalação. Evidências e limitações por etapa estão em `preview.md`; resultados históricos não validam alterações posteriores.
