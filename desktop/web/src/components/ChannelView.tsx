@@ -13,20 +13,31 @@ import { callStatus } from '../call-status';
 import { useEffect, useState } from 'preact/hooks';
 
 // Channel header layout.
-type ChannelViewProps={ session: Session; bridge: Bridge; store: SessionStore; popout?: boolean; workspace?:boolean };
+type ChannelViewProps={ session: Session; bridge: Bridge; store: SessionStore; popout?: boolean; workspace?:boolean; sidebarOpen?: boolean; onToggleSidebar?: () => void };
 export function ChannelView(props:ChannelViewProps) {
   const {session,bridge,popout}=props;
   const isHome = !popout && (!session.selectedServerId || session.selectedServerId === '@me');
   return isHome?(props.workspace?<WorkspaceHome session={session} bridge={bridge}/>:<FriendsView session={session} bridge={bridge}/>):<ChannelContent {...props}/>;
 }
 // Keeping the room view mounted as its own component gives its hooks/listeners a real unmount on Home.
-function ChannelContent({ session, bridge, store, popout = false, workspace=false }:ChannelViewProps) {
+function ChannelContent({ session, bridge, store, popout = false, workspace=false, sidebarOpen, onToggleSidebar }:ChannelViewProps) {
   const allChannels = session.categories.flatMap(c => c.channels);
   const channel = popout ? callChannelOf(session) : (allChannels.find(c => c.id === session.selectedChannelId) ?? allChannels[0]);
   const inRoom = !!channel && channel.id === session.connectedChannelId && (popout || session.selectedServerId === (session.callServerId ?? session.selectedServerId));
   const [chatOpen, setChatOpen] = useState(workspace);
   const [membersOpen, setMembersOpen] = useState(() => matchMedia('(min-width: 1200px)').matches);
   const isText = channel ? (channel.kind === 'text') : false;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'u' || e.key === ']')) {
+        e.preventDefault();
+        setMembersOpen(open => !open);
+      }
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, []);
 
   // The core keeps the focus so the popout opens on the same card (observed); it clears it when the call changes.
   const [localFocus, setLocalFocus] = useState<CallFocus>(() => ({
@@ -71,6 +82,7 @@ function ChannelContent({ session, bridge, store, popout = false, workspace=fals
       <ChannelHeader channel={channel} focused={focused} quality={quality}
         showChat={inRoom && (!chatOpen || workspace)} chatOpen={chatOpen}
         showMembers={!popout} membersOpen={membersOpen}
+        sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar}
         onToggleChat={() => setChatOpen(open => !open)} onToggleMembers={() => setMembersOpen(open => !open)}/>
       {workspace&&inRoom&&voiceStatus.state!=='connected'&&<section class="tri-connection-note" data-tone={voiceStatus.tone}>
         <span role={voiceStatus.state==='error'?'alert':'status'}>{voiceStatus.label}</span>
@@ -89,7 +101,7 @@ function ChannelContent({ session, bridge, store, popout = false, workspace=fals
         <ChatPanel key={`${session.selectedServerId}:${channel.id}`} channelName={channel.name} messages={session.chat ?? []} avatars={session.avatars} bridge={bridge} onClose={() => setChatOpen(false)} />
       )}
       {!popout && membersOpen && (
-        <MemberList session={session} bridge={bridge} />
+        <MemberList session={session} bridge={bridge} onClose={() => setMembersOpen(false)} />
       )}
     </main>
   );

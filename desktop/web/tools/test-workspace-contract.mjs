@@ -182,14 +182,14 @@ for(const count of [1,2,3,8]){
   }
 }
 const headerActions=[];
-const channelHeader=ChannelHeader({channel:{id:'general',name:'Geral',kind:'voice',users:[{id:'a'},{id:'b'}]},quality:'',showChat:true,chatOpen:true,showMembers:true,membersOpen:false,onToggleChat:()=>headerActions.push('chat'),onToggleMembers:()=>headerActions.push('members')});
+const channelHeader=ChannelHeader({channel:{id:'general',name:'Geral',kind:'voice',users:[{id:'a'},{id:'b'}]},quality:'',showChat:true,chatOpen:true,showMembers:true,membersOpen:false,onToggleSidebar:()=>headerActions.push('sidebar'),onToggleChat:()=>headerActions.push('chat'),onToggleMembers:()=>headerActions.push('members')});
 const headerNodes=nodes(channelHeader);
 const headerButtons=headerNodes.filter(node=>node.type==='button');
-assert.deepEqual(headerButtons.map(node=>node.props['aria-label']),['Ocultar chat','Lista de membros'],'channel header exposes implemented controls');
-assert.equal(headerButtons[0].props['aria-expanded'],true);
-assert.equal(headerButtons[1].props['aria-expanded'],false);
+assert.deepEqual(headerButtons.map(node=>node.props['aria-label']),['Recolher barra lateral','Ocultar chat','Lista de membros'],'channel header exposes implemented controls');
+assert.equal(headerButtons[1].props['aria-expanded'],true);
+assert.equal(headerButtons[2].props['aria-expanded'],false);
 headerButtons.forEach(node=>node.props.onClick());
-assert.deepEqual(headerActions,['chat','members']);
+assert.deepEqual(headerActions,['sidebar','chat','members']);
 assert.ok(headerNodes.some(node=>node.type==='h1'&&node.props.children==='Geral'));
 const workspaceSwitch=tree.find(node=>node.type==='button'&&/\btri-workspace-switch\b/.test(node.props.class));
 assert.ok(workspaceSwitch,'space switching uses a native button');

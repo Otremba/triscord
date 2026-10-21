@@ -62,6 +62,22 @@ export function App({ store, bridge, workspace = true }: { store: SessionStore; 
   useEffect(() => { const open = () => setCameraPreviewOpen(true); addEventListener('tri-open-camera-preview',open); return () => removeEventListener('tri-open-camera-preview',open); }, []);
   const [profileOpen,setProfileOpen]=useState(false);
   useEffect(()=>{const open=()=>setProfileOpen(true);addEventListener('tri-open-profile',open);return()=>removeEventListener('tri-open-profile',open);},[]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  useEffect(() => {
+    const toggle = () => setSidebarOpen(open => !open);
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'b' || e.key === '[')) {
+        e.preventDefault();
+        setSidebarOpen(open => !open);
+      }
+    };
+    addEventListener('tri-toggle-sidebar', toggle);
+    addEventListener('keydown', onKey);
+    return () => {
+      removeEventListener('tri-toggle-sidebar', toggle);
+      removeEventListener('keydown', onKey);
+    };
+  }, []);
   useEffect(() => { const open = () => setSettingsOpen(true); addEventListener('tri-open-settings', open); return () => removeEventListener('tri-open-settings', open); }, []);
   // Each window has its own fullscreen: the main one (callFullscreen) and the call popout (callPopoutFullscreen).
   const fullscreen = POPOUT ? session?.callPopoutFullscreen : session?.callFullscreen;
@@ -127,7 +143,7 @@ export function App({ store, bridge, workspace = true }: { store: SessionStore; 
     </div>
   );
   return (
-    <div class={`tri-app ${workspace?'tri-app--workspace':''} ${session.callFullscreen ? 'tri-app--call-fullscreen' : ''}`}>
+    <div class={`tri-app ${workspace?'tri-app--workspace':''} ${!sidebarOpen ? 'tri-app--sidebar-collapsed' : ''} ${session.callFullscreen ? 'tri-app--call-fullscreen' : ''}`}>
       {session.callFullscreen && <FullscreenHint/>}
       <TitleBar server={server} bridge={bridge} />
       {!session.callFullscreen && <ResizeEdges bridge={bridge} />}
@@ -138,7 +154,7 @@ export function App({ store, bridge, workspace = true }: { store: SessionStore; 
           <ChannelSidebar session={session} bridge={bridge} workspace={workspace} />
           <AccountPanel session={session} bridge={bridge} />
         </aside>
-        <ChannelView session={session} bridge={bridge} store={store} workspace={workspace} />
+        <ChannelView session={session} bridge={bridge} store={store} workspace={workspace} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(open => !open)} />
       </div>
       {modal?.kind === 'createChannel' && <CreateChannelModal bridge={bridge} categoryName={modal.categoryName} onClose={() => setModal(null)} />}
       {modal?.kind === 'deleteMessage' && <DeleteMessageModal bridge={bridge} message={modal.message} onClose={() => setModal(null)} />}
