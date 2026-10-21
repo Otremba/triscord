@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useId, useRef, useState } from 'preact/hooks';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { Bridge } from '../bridge';
 import type { ChatMessage } from '../protocol';
 import { Icon } from './Icon';
 import { Tooltip } from './Tooltip';
 import { Markdown } from './Markdown';
 import { openContextMenu, type MenuEntry } from './ContextMenu';
+import { ChatComposer } from './ChatComposer';
 
 // Voice and text channel chat panel.
 const REACTIONS = ['\u{1F44D}', '❤️', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F389}'];
@@ -96,64 +97,11 @@ function Message({ message, groupStart, bridge, avatars }: { message: ChatMessag
   );
 }
 
-export function ChatPanel({ channelName, messages, avatars, bridge, onClose, full = false }: { channelName: string; messages: ChatMessage[]; avatars?: Avatars; bridge: Bridge; onClose?: () => void; full?: boolean }) {
+export function ChatPanel({ channelName, messages, avatars, bridge, onClose, full = false, conversation = false }: { channelName: string; messages: ChatMessage[]; avatars?: Avatars; bridge: Bridge; onClose?: () => void; full?: boolean; conversation?: boolean }) {
   const list = useRef<HTMLDivElement>(null);
-  const composer = useRef<HTMLTextAreaElement>(null);
-  const [text, setText] = useState('');
-  const [rateLimited, setRateLimited] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState(false);
-  const feedbackId = useId();
-  const pending = useRef(false);
-  const mounted = useRef(true);
-  const draftRevision = useRef(0);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const edit = (value: string) => { draftRevision.current++; setText(value); setSendError(false); };
-  // Auto-resize composer height up to viewport limits.
-  useLayoutEffect(() => {
-    const input = composer.current;
-    if (!input) return;
-    const resize = () => {
-      input.style.height = '0px';
-      input.style.height = `${input.scrollHeight}px`;
-    };
-    resize();
-    addEventListener('resize', resize);
-    return () => removeEventListener('resize', resize);
-  }, [text]);
   // Stick to the bottom when new messages arrive and the list was already at the bottom.
   const atBottom = useRef(true);
   useLayoutEffect(() => { const el = list.current; if (el && atBottom.current) el.scrollTop = el.scrollHeight; }, [messages.length]);
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const on = () => {
-      setRateLimited(true);
-      clearTimeout(timer);
-      timer = setTimeout(() => setRateLimited(false), 1500);
-    };
-    addEventListener('tri-chat-rate-limited', on);
-    return () => { removeEventListener('tri-chat-rate-limited', on); clearTimeout(timer); };
-  }, []);
-  const send = (event: Event) => {
-    event.preventDefault();
-    const value = text.trim();
-    if (!value || pending.current) return;
-    const revision = draftRevision.current;
-    pending.current = true;
-    setSending(true);
-    setSendError(false);
-    bridge.request({ name: 'sendChatMessage', text: value }).then(() => {
-      if (!mounted.current) return;
-      // Typing while the request is in flight must not lose the next message.
-      if (draftRevision.current === revision) setText('');
-      atBottom.current = true;
-    }).catch(() => {
-      if (mounted.current) setSendError(true);
-    }).finally(() => {
-      pending.current = false;
-      if (mounted.current) setSending(false);
-    });
-  };
   const items: preact.JSX.Element[] = [];
   messages.forEach((m, i) => {
     const prev = messages[i - 1];
@@ -163,7 +111,8 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose, ful
     items.push(<Message key={m.id} message={m} groupStart={groupStart} bridge={bridge} avatars={avatars} />);
   });
   return (
-    <div class={`tri-chat-panel ${full ? 'tri-chat-panel--full' : ''}`} aria-label={`Chat de ${channelName}`}>
+    <div class={`tri-chat-panel ${full ? 'tri-chat-panel--full' : ''} ${conversation ? 'tri-chat-panel--conversation' : ''}`} aria-label={`Chat de ${channelName}`}>
+      {conversation && <header class="tri-conversation-heading"><Icon name="Chat" size={16}/><h2>Conversa</h2></header>}
       {!full && onClose && (
         <header class="tri-chat-panel__header">
           <Icon name="Chat" size={20} className="tri-chat-panel__icon" />
@@ -173,66 +122,16 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose, ful
       )}
       <div class="tri-chat-panel__scroller" ref={list}
         onScroll={e => { const el = e.currentTarget as HTMLDivElement; atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8; }}>
-        {/* Start of the channel, above its history (Discord, audit 18/10): 68px circle with the 36px chat icon,
-            "Bem-vindo(a) a <canal>!" heading-xxl/extrabold, "Este é o começo do canal <canal>." text-md; Discord's
-            "Editar canal" button has no triscord function. The column sits at the bottom while the history is short. */}
         <div class="tri-chat-panel__content">
-          <div class="tri-channel-welcome">
+          {(!conversation || messages.length === 0) && <div class="tri-channel-welcome">
             <span class="tri-channel-welcome__icon"><Icon name="Chat" size={36} /></span>
             <h3 class="tri-channel-welcome__title">Bem-vindo(a) a {channelName}!</h3>
             <p class="tri-channel-welcome__text">Este é o começo do canal {channelName}.</p>
-          </div>
+          </div>}
           <ol class="tri-messages">{items}</ol>
         </div>
       </div>
-      <form class="tri-composer" onSubmit={send} aria-busy={sending}>
-        <div id={feedbackId} class="tri-composer__feedback">
-          {sendError ? <p role="alert">Não foi possível enviar. Seu rascunho foi mantido. Tente novamente.</p>
-            : rateLimited ? <p role="status">Muitas mensagens em sequência. Aguarde um instante antes de reenviar.</p>
-            : sending ? <p role="status">Enviando mensagem…</p> : null}
-        </div>
-        <div class={`tri-composer__box tri-composer-floating ${rateLimited ? 'is-rate-limited' : ''}`}>
-          <Tooltip text="Enviar um arquivo">
-            <button type="button" class="tri-composer__attach" aria-label="Enviar um arquivo" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Envio de arquivos em desenvolvimento.' }))}>
-              <Icon name="CirclePlus" size={24} />
-            </button>
-          </Tooltip>
-          <textarea ref={composer} class="tri-composer__input" name="message" rows={1}
-            placeholder={`Conversar em ${channelName}`} aria-label={`Conversar em ${channelName}`} aria-multiline="true" aria-describedby={feedbackId}
-            maxLength={2000} autoComplete="off" value={text} onInput={e => edit((e.target as HTMLTextAreaElement).value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-                e.preventDefault();
-                e.currentTarget.form?.requestSubmit();
-              }
-            }} />
-          <div class="tri-composer__buttons">
-            <Tooltip text="Enviar um presente">
-              <button type="button" class="tri-composer__action" aria-label="Enviar um presente" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Presentes Nitro em desenvolvimento.' }))}>
-                <Icon name="Gift" size={24} />
-              </button>
-            </Tooltip>
-            <Tooltip text="Abrir seletor de GIF">
-              <button type="button" class="tri-composer__action" aria-label="Abrir seletor de GIF" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Seletor de GIF em desenvolvimento.' }))}>
-                <Icon name="Gif" size={24} />
-              </button>
-            </Tooltip>
-            <Tooltip text="Abrir seletor de figurinhas">
-              <button type="button" class="tri-composer__action" aria-label="Abrir seletor de figurinhas" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Figurinhas em desenvolvimento.' }))}>
-                <Icon name="Sticker" size={24} />
-              </button>
-            </Tooltip>
-            <Tooltip text="Selecione um emoji">
-              <button type="button" class="tri-composer__action" aria-label="Selecione um emoji" onClick={() => edit(text + ' 😄 ')}>
-                <Icon name="Reaction" size={24} />
-              </button>
-            </Tooltip>
-            <button type="submit" class="tri-composer__send" disabled={sending || !text.trim()} aria-label={sendError ? 'Tentar enviar novamente' : 'Enviar mensagem'}>
-              {sendError ? 'Tentar novamente' : sending ? 'Enviando…' : 'Enviar'}
-            </button>
-          </div>
-        </div>
-      </form>
+      <ChatComposer channelName={channelName} bridge={bridge} onSent={() => { atBottom.current = true; }}/>
     </div>
   );
 }

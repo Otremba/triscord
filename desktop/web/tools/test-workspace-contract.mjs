@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
-const bundle=await build({stdin:{contents:`export {WorkspaceNav,workspaceMenuEntries} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';export {modalTabTarget} from './focus-policy';export {MemberList} from './components/MemberList';export {FixtureBridge} from './bridge';export {fixtureSession} from './fixtures';export {participantMenuEntries} from './components/ParticipantMenu';export {callTiles} from './components/CallView';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,define:{'location.search':'""'},loader:{'.png':'dataurl','.css':'empty'},platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
-const {WorkspaceNav,workspaceMenuEntries,ShimmerButton,DeviceSelect,deviceChoices,modalTabTarget,MemberList,FixtureBridge,fixtureSession,participantMenuEntries,callTiles}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
+const bundle=await build({stdin:{contents:`export {WorkspaceNav,workspaceMenuEntries} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';export {modalTabTarget} from './focus-policy';export {MemberList} from './components/MemberList';export {FixtureBridge} from './bridge';export {fixtureSession} from './fixtures';export {participantMenuEntries} from './components/ParticipantMenu';export {callTiles,callGridLayout} from './components/CallView';export {ChannelHeader} from './components/ChannelHeader';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,define:{'location.search':'""'},loader:{'.png':'dataurl','.css':'empty'},platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
+const {WorkspaceNav,workspaceMenuEntries,ShimmerButton,DeviceSelect,deviceChoices,modalTabTarget,MemberList,FixtureBridge,fixtureSession,participantMenuEntries,callTiles,callGridLayout,ChannelHeader}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
 const sourceBundle=await build({entryPoints:[fileURLToPath(new URL('../src/share-sources.ts',import.meta.url))],bundle:true,write:false,platform:'node',format:'esm'});
 const {loadShareSources}=await import(`data:text/javascript;base64,${Buffer.from(sourceBundle.outputFiles[0].contents).toString('base64')}`);
 const events=new Set();
@@ -166,3 +166,27 @@ assert.ok(webLabels.includes('Volume do usuário'),'Standard runtime includes us
 assert.ok(webLabels.includes('Volume da transmissão'),'Standard runtime includes stream volume slider for live users');
 console.log('Call focus, stream hidden and participant actions: stage focus, fixture bridge and Tauri volume omission verified');
 
+
+assert.deepEqual(callGridLayout(2,600,220,16),{columns:2,cardWidth:292},'cards reserve the actual gap between columns');
+for(const count of [1,2,3,8]){
+  for(const [width,height,columnGap,rowGap] of [[600,220,16,16],[320,160,16,8],[1024,400,8,16]]){
+    const {columns,cardWidth}=callGridLayout(count,width,height,columnGap,rowGap);
+    const rows=Math.ceil(count/columns);
+    assert.ok(columns*cardWidth+(columns-1)*columnGap<=width,'card columns must fit their measured content box');
+    assert.ok(rows*cardWidth*9/16+(rows-1)*rowGap<=height,'card rows must fit above the call controls');
+  }
+}
+const headerActions=[];
+const channelHeader=ChannelHeader({channel:{id:'general',name:'Geral',kind:'voice',users:[{id:'a'},{id:'b'}]},quality:'',showChat:true,chatOpen:true,showMembers:true,membersOpen:false,onToggleChat:()=>headerActions.push('chat'),onToggleMembers:()=>headerActions.push('members')});
+const headerNodes=nodes(channelHeader);
+const headerButtons=headerNodes.filter(node=>node.type==='button');
+assert.deepEqual(headerButtons.map(node=>node.props['aria-label']),['Ocultar chat','Lista de membros'],'channel header exposes implemented controls');
+assert.equal(headerButtons[0].props['aria-expanded'],true);
+assert.equal(headerButtons[1].props['aria-expanded'],false);
+headerButtons.forEach(node=>node.props.onClick());
+assert.deepEqual(headerActions,['chat','members']);
+assert.ok(headerNodes.some(node=>node.type==='h1'&&node.props.children==='Geral'));
+const workspaceSwitch=tree.find(node=>node.type==='button'&&node.props.class==='tri-workspace-switch');
+assert.ok(workspaceSwitch,'space switching uses a native button');
+assert.equal(nodes(workspaceSwitch).filter(node=>node.type==='button').length,1,'space actions cannot nest interactive buttons');
+console.log('Conversation layout: grid fitting, real header actions and independent workspace buttons passed');

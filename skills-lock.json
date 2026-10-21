@@ -79,6 +79,12 @@
       "skillPath": "skills/reading-livekit-docs/SKILL.md",
       "computedHash": "bffaa851dd7e16731c9993bee2563b7d7988e8994423090a1d93f3ea3a70049c"
     },
+    "refactoring-ui": {
+      "source": "wondelai/skills",
+      "sourceType": "github",
+      "skillPath": "refactoring-ui/SKILL.md",
+      "computedHash": "acd801e4a042f742dfc1e5054c14ea8e1baffee79d5ae8e830d6fb3c340e3834"
+    },
     "rust-async-patterns": {
       "source": "wshobson/agents",
       "sourceType": "github",

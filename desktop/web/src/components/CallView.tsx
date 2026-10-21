@@ -168,11 +168,11 @@ export function useCallIdle(ms = 2000) {
 }
 
 // Largest 16:9 card size that fits `count` cards in the stage, and the column count that achieves it.
-function layoutFor(count: number, width: number, height: number): { columns: number; cardWidth: number } {
+export function callGridLayout(count: number, width: number, height: number, columnGap = 8, rowGap = columnGap): { columns: number; cardWidth: number } {
   let best = { columns: 1, cardWidth: 0 };
   for (let columns = 1; columns <= count; columns++) {
     const rows = Math.ceil(count / columns);
-    const cardWidth = Math.floor(Math.min((width - (columns - 1) * 8) / columns, ((height - (rows - 1) * 8) / rows) * 16 / 9));
+    const cardWidth = Math.floor(Math.min((width - (columns - 1) * columnGap) / columns, ((height - (rows - 1) * rowGap) / rows) * 16 / 9));
     if (cardWidth > best.cardWidth) best = { columns, cardWidth };
   }
   return best;
@@ -210,14 +210,20 @@ export function CallView({ session, bridge, store, idle = false, inPopout = fals
   const [showNonVideo, setShowNonVideoState] = useState(() => { try { return localStorage.getItem('tri-call-show-nonvideo') !== '0'; } catch { return true; } });
   const setShowNonVideo = (on: boolean) => { setShowNonVideoState(on); try { localStorage.setItem('tri-call-show-nonvideo', on ? '1' : '0'); } catch { /* storage unavailable */ } };
   const stage = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 880, height: 600 });
+  const [size, setSize] = useState({ width: 880, height: 600, columnGap: 8, rowGap: 8 });
   const [area, setArea] = useState({ w: 912, h: 754, top: 48 });
   useEffect(() => {
     const element = stage.current;
     if (!element) return;
-    // Grid area inside the stage: 16px on the sides, 64px on top (the header floats over it), 90px for the controls.
+    // Use the rendered grid's padding so cards fit both the workspace and popout layouts.
     const observer = new ResizeObserver(() => {
-      setSize({ width: element.clientWidth - 32, height: element.clientHeight - 64 - 90 });
+      const grid = element.querySelector<HTMLElement>('.tri-call-grid');
+      if (grid) {
+        const padding = getComputedStyle(grid);
+        setSize({ width: grid.clientWidth - parseFloat(padding.paddingLeft) - parseFloat(padding.paddingRight),
+          height: grid.clientHeight - parseFloat(padding.paddingTop) - parseFloat(padding.paddingBottom),
+          columnGap: parseFloat(padding.columnGap) || 0, rowGap: parseFloat(padding.rowGap) || 0 });
+      }
       const header = element.parentElement?.querySelector<HTMLElement>('.tri-channel-header');
       setArea({ w: element.clientWidth, h: element.clientHeight, top: header ? Math.max(0, header.getBoundingClientRect().bottom - element.getBoundingClientRect().top) : 48 });
     });
@@ -244,7 +250,7 @@ export function CallView({ session, bridge, store, idle = false, inPopout = fals
     if (!user || !tile) return;
     openParticipantMenu(new MouseEvent('contextmenu', { clientX: event.x, clientY: event.y }), user, session, bridge, tile);
   }), [store, streams, allUsers, session, bridge]);
-  const { columns, cardWidth } = layoutFor(Math.max(1, count), Math.max(160, size.width), Math.max(90, size.height));
+  const { columns, cardWidth } = callGridLayout(Math.max(1, count), Math.max(160, size.width), Math.max(90, size.height), size.columnGap, size.rowGap);
   const tiles = callTiles(session).filter(t => showNonVideo || t.kind !== 'user');
   const focused = tiles.find(t => t.key === focus.key);
   const setFocus = (key: string | null) => onFocus?.({ ...focus, key });

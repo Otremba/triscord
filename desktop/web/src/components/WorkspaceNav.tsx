@@ -88,27 +88,22 @@ export function WorkspaceNav({ session, bridge }: { session: Session; bridge: Br
 
   return (
     <nav class="tri-workspace-nav" aria-label="Espaços">
-      <div
-        class="tri-workspace-current"
-        role="button"
-        tabIndex={0}
-        aria-haspopup="menu"
-        aria-label={`Espaço atual: ${current?.name ?? 'Início'}. Clique para trocar de servidor.`}
-        onClick={openDropdown}
-        onKeyDown={e => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            (e.currentTarget as HTMLElement).click();
-          }
-        }}
-      >
-        <span class="tri-workspace-current__icon" aria-hidden="true">
-          {current ? <ServerIcon server={current} size={36} /> : <Icon name="Friends" size={24} />}
-        </span>
-        <div class="tri-workspace-current__info">
-          <span class="tri-workspace-current__name">{current?.name ?? 'Início'}</span>
-          <Icon name="ChevronSmallDown" size={18} className="tri-workspace-current__chevron" />
-        </div>
+      <div class="tri-workspace-current">
+        <button
+          type="button"
+          class="tri-workspace-switch"
+          aria-haspopup="menu"
+          aria-label={`Espaço atual: ${current?.name ?? 'Início'}. Clique para trocar de servidor.`}
+          onClick={openDropdown}
+        >
+          <span class="tri-workspace-current__icon" aria-hidden="true">
+            {current ? <ServerIcon server={current} size={36} /> : <Icon name="Friends" size={24} />}
+          </span>
+          <span class="tri-workspace-current__info">
+            <span class="tri-workspace-current__name">{current?.name ?? 'Início'}</span>
+            <Icon name="ChevronSmallDown" size={18} className="tri-workspace-current__chevron" />
+          </span>
+        </button>
         <select
           id="tri-workspace-select"
           class="tri-sr-only"

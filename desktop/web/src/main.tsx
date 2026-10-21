@@ -31,6 +31,7 @@ import './styles/friends-view.css';
 import './styles/tailwind.generated.css';
 import './styles/workspace.css';
 import './styles/workspace-themes.css';
+import './styles/conversation.css';
 
 // Keep the first paint aligned with the midnight default; saved account preferences arrive from the core.
 const params = new URLSearchParams(location.search);

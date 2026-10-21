@@ -1,0 +1,73 @@
+/* Conversation layout owns its spacing; palettes remain in workspace-themes.css. */
+:root[data-design="workspace"] { --conversation-width:1040px;--conversation-gutter:24px; }
+:root[data-design="workspace"] .tri-page__main { background:var(--ui-canvas); }
+:root[data-design="workspace"] .tri-channel-header { position:relative;height:64px;flex:none;gap:16px;padding:0 var(--conversation-gutter);border-bottom:1px solid var(--ui-border);background:var(--ui-canvas); }
+:root[data-design="workspace"] .tri-channel-header__symbol { display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:8px;background:var(--ui-panel);color:var(--ui-accent); }
+:root[data-design="workspace"] .tri-channel-header__identity { display:flex;flex-direction:column;gap:4px;min-width:0; }
+:root[data-design="workspace"] .tri-channel-header__title { flex:none;font-size:16px;line-height:20px;font-weight:600; }
+:root[data-design="workspace"] .tri-channel-header__description { color:var(--ui-muted);font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+:root[data-design="workspace"] .tri-channel-header__toolbar { margin-left:auto;gap:8px; }
+:root[data-design="workspace"] .tri-channel-header__toolbar .tri-icon-button { width:36px;height:36px;border-radius:8px; }
+:root[data-design="workspace"] .tri-channel-header__toolbar .is-active { background:var(--ui-panel);color:var(--ui-accent); }
+:root[data-design="workspace"] .tri-channel-header__focus { min-width:0;overflow:hidden;text-overflow:ellipsis; }
+:root[data-design="workspace"] .tri-members-sidebar { width:208px;flex-basis:208px;background:var(--ui-sidebar);border-left:1px solid var(--ui-border); }
+:root[data-design="workspace"] .tri-members-group__title { color:var(--ui-muted);font-size:12px;letter-spacing:0;text-transform:none; }
+:root[data-design="workspace"] .tri-member-item__layout { border-radius:8px; }
+:root[data-design="workspace"] .tri-app--workspace:not(.tri-app--call-fullscreen) .tri-page__main--call>.tri-call { margin:16px var(--conversation-gutter);border:0;border-radius:12px;background:var(--ui-sidebar);overflow:hidden; }
+:root[data-design="workspace"] .tri-app--workspace:not(.tri-app--call-fullscreen) .tri-page__main--conversation>.tri-call { flex:0 1 38%;min-height:240px;max-height:384px;margin-bottom:0; }
+:root[data-design="workspace"] .tri-app--workspace:not(.tri-app--call-fullscreen) .tri-page__main--conversation.tri-page__main--focused>.tri-call { flex-basis:60%;min-height:240px;max-height:none; }
+:root[data-design="workspace"] .tri-page__main--conversation>.tri-chat-panel { height:auto;flex:1 1 0; }
+:root[data-design="workspace"] .tri-app--workspace:not(.tri-app--call-fullscreen) .tri-call-grid { padding:24px 16px 80px;gap:16px; }
+:root[data-design="workspace"] :is(.tri-call-capsule,.tri-call-attached,.tri-call-button,.tri-call-disconnect) { box-shadow:none;backdrop-filter:none; }
+:root[data-design="workspace"] .tri-call-capsule { border:1px solid var(--ui-border);background:var(--ui-panel); }
+:root[data-design="workspace"] .tri-call-button { background:var(--ui-field); }
+:root[data-design="workspace"] .tri-call-button.is-red { background:var(--ui-critical-bg);color:var(--ui-critical); }
+:root[data-design="workspace"] .tri-call-disconnect { background:var(--ui-critical-button);color:var(--ui-critical-text); }
+:root[data-design="workspace"] :is(.tri-call-card,.tri-video-tile) { border-radius:12px;box-shadow:none; }
+:root[data-design="workspace"] .tri-call-card { background:var(--ui-panel);border:1px solid var(--ui-border); }
+:root[data-design="workspace"] .tri-call-card--grid { padding-bottom:24px; }
+:root[data-design="workspace"] .tri-call-card.is-speaking { outline:2px solid var(--ui-positive);box-shadow:none;animation:none; }
+:root[data-design="workspace"] .tri-app--workspace .tri-call.is-idle .tri-call-bottom,
+:root[data-design="workspace"] .tri-app--workspace .tri-page__main.is-idle .tri-channel-header { opacity:1;visibility:visible;pointer-events:auto; }
+:root[data-design="workspace"] .tri-app--workspace .tri-call.is-idle .tri-call-bottom>* { pointer-events:auto; }
+:root[data-design="workspace"] .tri-chat-panel { background:var(--ui-canvas);min-height:0; }
+:root[data-design="workspace"] .tri-chat-panel__scroller { padding:16px 8px 24px; }
+:root[data-design="workspace"] .tri-chat-panel__content { width:100%;max-width:var(--conversation-width);margin-inline:auto; }
+:root[data-design="workspace"] .tri-conversation-heading { display:flex;align-items:center;gap:8px;flex:none;padding:16px var(--conversation-gutter) 8px;color:var(--ui-muted); }
+:root[data-design="workspace"] .tri-conversation-heading h2 { margin:0;font-size:14px;line-height:20px;font-weight:600; }
+:root[data-design="workspace"] .tri-message { padding-right:24px; }
+:root[data-design="workspace"] .tri-message.is-group-start { margin-top:24px; }
+:root[data-design="workspace"] .tri-message__content { max-width:72ch;font-size:15px;line-height:1.6;color:var(--ui-message-text); }
+:root[data-design="workspace"] .tri-message__username { font-size:14px;font-weight:600; }
+:root[data-design="workspace"] .tri-message__timestamp { margin-left:8px;font-size:12px;color:var(--ui-subtle); }
+:root[data-design="workspace"] .tri-message:focus-within .tri-message__bar { opacity:1;pointer-events:auto; }
+:root[data-design="workspace"] .tri-channel-welcome { margin:24px 16px;gap:8px; }
+:root[data-design="workspace"] .tri-channel-welcome__title { margin:0;font-size:24px;line-height:1.25;font-weight:600; }
+:root[data-design="workspace"] .tri-channel-welcome__text { max-width:65ch;font-size:14px;line-height:1.5;color:var(--ui-muted); }
+:root[data-design="workspace"] .tri-channel-welcome__icon { width:44px;height:44px;border-radius:12px;background:var(--ui-panel);color:var(--ui-accent); }
+:root[data-design="workspace"] .tri-composer { width:100%;max-width:var(--conversation-width);margin-inline:auto;padding:0 var(--conversation-gutter) 16px; }
+:root[data-design="workspace"] .tri-composer-floating { margin:0;padding-inline:16px 8px;gap:8px;border-radius:12px;border:1px solid var(--ui-border);background:var(--ui-panel); }
+:root[data-design="workspace"] .tri-composer__input { min-width:0;font-size:14px; }
+:root[data-design="workspace"] .tri-composer__buttons { gap:8px;margin-left:0; }
+:root[data-design="workspace"] .tri-composer__hint { display:block;margin-top:8px;color:var(--ui-subtle);font-size:12px;line-height:16px; }
+:root[data-design="workspace"] .tri-composer-floating:focus-within { border-color:var(--ui-accent);box-shadow:none; }
+:root[data-design="workspace"] .tri-message-action-dock { background:var(--ui-panel);border:1px solid var(--ui-border);border-radius:8px; }
+:root[data-design="workspace"] .tri-reaction.is-me { border-color:var(--ui-accent);background:var(--ui-selected); }
+
+@media (max-width:1100px) {
+  :root[data-design="workspace"] { --conversation-gutter:16px; }
+  :root[data-design="workspace"] .tri-members-sidebar { width:184px;flex-basis:184px; }
+  :root[data-design="workspace"] .tri-call-controls { width:max-content;max-width:calc(100% - 32px);flex-wrap:nowrap;gap:8px; }
+  :root[data-design="workspace"] .tri-call-capsule { height:44px;padding:4px;gap:2px; }
+  :root[data-design="workspace"] .tri-call-button { width:32px;height:36px; }
+  :root[data-design="workspace"] .tri-call-button--caret { width:14px; }
+  :root[data-design="workspace"] .tri-call-disconnect { width:52px;height:44px; }
+  :root[data-design="workspace"] .tri-call-card--grid .tri-avatar--80 { width:56px;height:56px; }
+  :root[data-design="workspace"] .tri-call-card--grid .tri-avatar__letter { font-size:24px; }
+  :root[data-design="workspace"] .tri-call-card--grid .tri-call-card__pill { height:24px;bottom:8px;font-size:12px; }
+}
+@media (max-height:700px) {
+  :root[data-design="workspace"] .tri-app--workspace:not(.tri-app--call-fullscreen) .tri-page__main--conversation>.tri-call { min-height:208px;flex-basis:38%; }
+  :root[data-design="workspace"] .tri-conversation-heading { padding-top:8px; }
+  :root[data-design="workspace"] .tri-composer__hint { display:none; }
+}
