@@ -54,5 +54,8 @@ export function fixtureSession(name: string): Session {
     return { ...call, categories: [{ ...call.categories[0], channels: [{ ...channel, users: channel.users.map(u => u.id === 'bob' ? { ...u, live: true } : u) }] }],
       streams: [{ id: 'scr:bob', kind: 'screen', ownerId: 'bob', title: 'Bob', width: 1920, height: 1080, path: 'native-overlay' }] };
   }
+  if (name === 'stream-focus') {
+    return { ...fixtureSession('stream'), callFocus: { key: 'scr:bob', filmOpen: true } };
+  }
   return base;
 }

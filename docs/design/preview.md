@@ -82,3 +82,13 @@ Em 850×600 foram reproduzidas duas falhas do perfil: a primeira linha da grade 
 Fixtures explícitos de início, vazio, erro/reconexão de voz e falha de perfil permitem revisar estados sem rede. A bridge de demonstração responde a carregar/salvar perfil localmente; a bridge nativa continua sem fallback para fixtures. Foram conferidos o erro de perfil com nova tentativa, o estado sem servidores e a transição ao modal de criar/entrar. Textos do modal não prometem upload de ícone inexistente nem oferecem um código de convite fictício clicável; convite vazio não pode ser enviado.
 
 TypeScript, unidades Node (incluindo identidade/fixtures), 104 unidades Rust e compilação MSVC passaram em `complete-form-review-build.log`. Não houve E2E de backend, áudio real, instalador, push, release ou deploy. Ainda faltam a revisão de vídeo/popout/menus sobre superfícies nativas e a cobertura completa dos demais estados; não declarar o objetivo integral concluído.
+
+## Revisão de chamada, foco de vídeo e ações de participantes
+
+A revisão da interface de chamada e das superfícies de vídeo revelou e corrigiu o estado da visão ampliada (*stage focus*):
+- No `ChannelView`, a seleção de foco dependia exclusivamente de `session.callFocus` do snapshot. O núcleo Tauri/Rust não mantinha essa propriedade, impedindo a expansão dos cards de transmissão/câmera para o palco de destaque. Foi introduzida a sincronização de `localFocus` com despacho imediato de `setCallFocus` via bridge.
+- O modelo Rust (`Model`) agora possui o campo opcional `call_focus: Option<Value>`, serializado no snapshot como `callFocus`. O comando `setCallFocus` atualiza o modelo e dispara publicação de snapshot para a interface. O foco é limpo em `reset_connection`, ao sair da sala e ao ser expulso (`kicked`).
+- No seletor de compartilhamento (`SharePicker`), a aba "Dispositivos" é omitida quando a runtime não suporta câmera ou quando nenhum dispositivo de captura está presente, evitando tentativas inválidas de `startDeviceShare`.
+- No menu de contexto do participante (`ParticipantMenu`), foi adicionado o item funcional "Silenciar para mim" (`setPeerAudio` com `muted`), suportado pela tabela `peer_muted` do núcleo Rust. Os controles deslizantes de volume individual ("Volume do usuário" e "Volume da transmissão") e "Silenciar transmissão" continuam omitidos sob a runtime Tauri, evitando erros de operação indisponível antes da implementação de mixagem DSP dedicada.
+- O `FixtureBridge` passou a refletir `setCallFocus`, `setCallFullscreen` e `setStreamHidden`. O fixture `stream-focus` permite testar a visão ampliada estaticamente. Testes de contrato cobrem a emissão desses comandos e as ações filtradas por runtime.
+

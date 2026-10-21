@@ -67,6 +67,7 @@ export function SharePicker({ bridge, store, onClose }: { bridge: Bridge; store:
     return off;
   }, [bridge, store]);
   const devices = settings?.cameraDevices ?? [];
+  const hasDeviceTab = store.current?.runtime?.camera !== false && (devices.length > 0);
   const shown = (list?.sources ?? []).filter(source => source.kind === tab);
   const start = (source: ShareSource) => {
     if (!list) return;
@@ -84,9 +85,11 @@ export function SharePicker({ bridge, store, onClose }: { bridge: Bridge; store:
           <button role="tab" aria-selected={tab === 'screen'} class={tab === 'screen' ? 'is-selected' : ''} onClick={() => setTab('screen')}>
             <Icon name="ScreenShare" size={16} /> Tela Inteira
           </button>
-          <button role="tab" aria-selected={tab === 'device'} class={tab === 'device' ? 'is-selected' : ''} onClick={() => setTab('device')}>
-            <Icon name="Video" size={16} /> Dispositivos
-          </button>
+          {hasDeviceTab && (
+            <button role="tab" aria-selected={tab === 'device'} class={tab === 'device' ? 'is-selected' : ''} onClick={() => setTab('device')}>
+              <Icon name="Video" size={16} /> Dispositivos
+            </button>
+          )}
         </div>
         <div class="tri-share-grid">
           {tab === 'device' && devices.length === 0 && (

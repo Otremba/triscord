@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
-const bundle=await build({stdin:{contents:`export {WorkspaceNav} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';export {modalTabTarget} from './focus-policy';export {MemberList} from './components/MemberList';export {FixtureBridge} from './bridge';export {fixtureSession} from './fixtures';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,define:{'location.search':'""'},loader:{'.png':'dataurl','.css':'empty'},platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
-const {WorkspaceNav,ShimmerButton,DeviceSelect,deviceChoices,modalTabTarget,MemberList,FixtureBridge,fixtureSession}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
+const bundle=await build({stdin:{contents:`export {WorkspaceNav} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';export {modalTabTarget} from './focus-policy';export {MemberList} from './components/MemberList';export {FixtureBridge} from './bridge';export {fixtureSession} from './fixtures';export {participantMenuEntries} from './components/ParticipantMenu';export {callTiles} from './components/CallView';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,define:{'location.search':'""'},loader:{'.png':'dataurl','.css':'empty'},platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
+const {WorkspaceNav,ShimmerButton,DeviceSelect,deviceChoices,modalTabTarget,MemberList,FixtureBridge,fixtureSession,participantMenuEntries,callTiles}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
 function nodes(root){if(!root||typeof root!=='object')return [];const children=[root.props?.children].flat(Infinity);return [root,...children.flatMap(nodes)];}
 const sent=[];
 const servers=Array.from({length:8},(_,i)=>({id:`server-${i}`,name:`Espaço ${i}`,owned:i===0}));
@@ -72,3 +72,42 @@ assert.equal(afterProfile.display_name,'Visual review');
 assert.equal(afterProfile.bio,beforeProfile.bio,'review saves must retain fields not edited');
 await assert.rejects(new FixtureBridge(fixtureSession('profile-error')).request({name:'getOwnProfile'}),/simulada/);
 console.log('Review fixtures: local profile save and explicit load failure passed without network');
+
+const focusSession=fixtureSession('stream-focus');
+assert.deepEqual(focusSession.callFocus,{key:'scr:bob',filmOpen:true},'stream-focus fixture specifies stage focus on bob stream');
+const tiles=callTiles(focusSession);
+assert.ok(tiles.some(t=>t.key==='scr:bob'&&t.kind==='stream'),'stream-focus includes bob stream card');
+
+let patched=null;
+const callBridge=new FixtureBridge(fixtureSession('stream'));
+callBridge.onMessage(msg=>{if(msg.type==='delta')patched=msg.patch;});
+callBridge.send({name:'setCallFocus',key:'scr:bob',filmOpen:false});
+assert.deepEqual(patched,{callFocus:{key:'scr:bob',filmOpen:false}},'FixtureBridge updates callFocus');
+callBridge.send({name:'setCallFullscreen',on:true});
+assert.deepEqual(patched,{callFullscreen:true},'FixtureBridge updates callFullscreen');
+callBridge.send({name:'setStreamHidden',streamId:'scr:bob',hidden:true});
+assert.equal(patched?.streams?.[0]?.hidden,true,'FixtureBridge updates stream hidden state');
+
+const tauriSession={...fixtureSession('call'),runtime:{name:'tauri',preview:true,voice:true,screen:true,camera:false,googleLogin:true}};
+const peerUser=tauriSession.categories[0].channels[0].users.find(u=>u.id==='bob');
+const tauriSent=[];
+const tauriBridgeMock={send:cmd=>tauriSent.push(cmd)};
+const tauriEntries=participantMenuEntries(peerUser,tauriSession,tauriBridgeMock);
+const tauriLabels=tauriEntries.map(e=>e.label).filter(Boolean);
+assert.ok(tauriLabels.includes('Silenciar para mim'),'Tauri runtime provides working local mute');
+assert.ok(!tauriLabels.includes('Volume do usuário'),'Tauri runtime omits unsupported individual volume slider');
+assert.ok(!tauriLabels.includes('Volume da transmissão'),'Tauri runtime omits unsupported stream volume slider');
+assert.ok(!tauriLabels.includes('Silenciar transmissão'),'Tauri runtime omits stream mute');
+
+const muteEntry=tauriEntries.find(e=>e.label==='Silenciar para mim');
+muteEntry.action();
+assert.deepEqual(tauriSent.pop(),{name:'setPeerAudio',socketId:'bob',muted:true});
+
+const webSession={...fixtureSession('stream')};
+const webPeerUser=webSession.categories[0].channels[0].users.find(u=>u.id==='bob');
+const webEntries=participantMenuEntries(webPeerUser,webSession,tauriBridgeMock);
+const webLabels=webEntries.map(e=>e.label).filter(Boolean);
+assert.ok(webLabels.includes('Volume do usuário'),'Standard runtime includes user volume slider');
+assert.ok(webLabels.includes('Volume da transmissão'),'Standard runtime includes stream volume slider for live users');
+console.log('Call focus, stream hidden and participant actions: stage focus, fixture bridge and Tauri volume omission verified');
+

@@ -32,8 +32,26 @@ function ChannelContent({ session, bridge, store, popout = false, workspace=fals
   const isText = channel ? (channel.kind === 'text') : false;
 
   // The core keeps the focus so the popout opens on the same card (observed); it clears it when the call changes.
-  const focus: CallFocus = { key: session.callFocus?.key ?? null, filmOpen: session.callFocus?.filmOpen ?? true };
-  const setFocus = (next: CallFocus) => bridge.send({ name: 'setCallFocus', key: next.key, filmOpen: next.filmOpen });
+  const [localFocus, setLocalFocus] = useState<CallFocus>(() => ({
+    key: session.callFocus?.key ?? null,
+    filmOpen: session.callFocus?.filmOpen ?? true,
+  }));
+  useEffect(() => {
+    if (session.callFocus !== undefined) {
+      setLocalFocus({
+        key: session.callFocus?.key ?? null,
+        filmOpen: session.callFocus?.filmOpen ?? true,
+      });
+    }
+  }, [session.callFocus]);
+  const focus: CallFocus = {
+    key: session.callFocus !== undefined ? (session.callFocus?.key ?? null) : localFocus.key,
+    filmOpen: session.callFocus !== undefined ? (session.callFocus?.filmOpen ?? true) : localFocus.filmOpen,
+  };
+  const setFocus = (next: CallFocus) => {
+    setLocalFocus(next);
+    bridge.send({ name: 'setCallFocus', key: next.key, filmOpen: next.filmOpen });
+  };
   const focused = inRoom && !(session.callPopout && !popout) ? callTiles(session).find(t => t.key === focus.key) : undefined;
   const settings = session.settings;
   const voiceStatus=callStatus(session);

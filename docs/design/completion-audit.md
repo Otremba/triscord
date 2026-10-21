@@ -11,12 +11,12 @@ Esta auditoria mantém o escopo original. Estado em 21/10/2026: implementação 
 | Preservar preferências existentes | Cinco variantes em `workspace-themes.css`, mesmas chaves no core | Tokens e contratos verificados; troca real de tema não exercitada |
 | Sem glow e animações permanentes decorativas | Aurora retirada do bundle, botões/marca sólidos, cards sem rastreamento; regra de movimento reduzido | Implementado por código; comportamento em execução não observado |
 | Orientação por servidor/canal/voz/fala | Seletor completo, `kind` real, `callStatus`, outline de fala baseado no snapshot | Estados unitários/contratos verificados; sessão real não exercitada |
-| Controles de mídia acessíveis | Barra com mute, deafen, saída, compartilhamento e desconexão; capacidades existentes | Handlers inspecionados; geometria em tela cheia/popout e menus sobre vídeo nativo não comprovadas |
-| Mensagens e transmissões em destaque | Chamada e conversa na mesma coluna, controle explícito do chat, componentes de vídeo preservados | Código/build verificados; proporção, clipping e sobreposição precisam de avaliação visual |
+| Controles de mídia acessíveis | Barra com mute, deafen, saída, compartilhamento e desconexão; menu de participante com silenciar local e sem sliders indisponíveis no Tauri; seletor omite dispositivos sem câmera | Handlers inspecionados e contratos unitários verificados; geometria em tela cheia/popout e menus sobre vídeo nativo não comprovados em execução |
+| Mensagens e transmissões em destaque | Chamada e conversa na mesma coluna, controle do chat, palco de visão ampliada com sincronização local e suporte no modelo Rust (`callFocus`), componentes de vídeo preservados | Código/build e contratos verificados; proporção, clipping e sobreposição em execução precisam de avaliação visual |
 | Carregamento/vazio/erro/reconexão | `StatePanel`, nota de conexão persistente, rascunho em falha IPC, retry de envio | Implementado; envio real e entrega individual não comprovados pelo protocolo |
 | Formulários e teclado | Botões nativos, tooltips por foco, seletor nativo, foco visível, regras responsivas | Contratos sem DOM e tipos verificados; política de contenção de foco implementada/testada sem DOM; integração real e navegação completa ainda não verificadas |
 | Preservar funcionalidades | Contratos IPC, capacidades, mídia de perfil, APIs e núcleo mantidos; não adicionar sucesso simulado | Preservação em código não prova paridade completa. A reescrita Rust tem limitações anteriores ao redesign |
-| Acabamento das telas completas | Fontes de login, chat, chamada, perfil, configurações, menus e modais adaptadas | Revisão parcial com evidências em `preview.md`; faltam vídeo/popout/menus sobre superfícies nativas e demais estados para declarar o objetivo concluído |
+| Acabamento das telas completas | Fontes de login, chat, chamada, palco/filmstrip de vídeo, perfil, configurações, menus e modais adaptadas | Revisão com evidências em `preview.md`; integração completa de janelas nativas D3D11 e demais fluxos em runtime real continuam pendentes |
 
 ## Próximas verificações
 

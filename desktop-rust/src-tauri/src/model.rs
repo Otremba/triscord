@@ -46,6 +46,7 @@ pub struct Model {
     /// Milliseconds since the epoch when the current room was joined (the call timer); 0 outside a room.
     pub connected_at: u64,
     pub call_fullscreen: bool,
+    pub call_focus: Option<Value>,
     /// Hub socket ids this user silenced for themselves (`localMuted`); their audio track is disabled, not unsubscribed.
     pub peer_muted: HashSet<String>,
 }
@@ -188,6 +189,7 @@ impl Model {
             "voiceState": if self.voice_state.is_empty() {"idle"} else {&self.voice_state}, "voiceRequested": self.voice_requested,
             "sharing": self.sharing, "sharingName": self.sharing_name,
             "streams": self.streams,
+            "callFocus": self.call_focus,
             "settings": self.preferences.snapshot(&self.input_devices, &self.output_devices),
             "profile": self.profile,
             "account": { "id": account_id, "displayName": display_name, "username": nick,
@@ -239,6 +241,7 @@ impl Model {
         self.peer_muted.clear();
         self.connected_at = 0;
         self.call_fullscreen = false;
+        self.call_focus = None;
         self.generation
     }
     /// The people LiveKit hears speaking, as hub socket ids. Returns whether anything changed.
@@ -364,6 +367,7 @@ impl Model {
                 self.speaking.clear();
                 self.connected_at = 0;
                 self.call_fullscreen = false;
+                self.call_focus = None;
             }
             _ => return false,
         }
@@ -640,4 +644,19 @@ mod tests {
         let s2 = &snap["session"]["categories"][0]["channels"][0]["users"][1];
         assert_eq!(s2["customStatus"], "ouvindo musica");
     }
+    #[test]
+    fn call_focus_is_preserved_in_snapshot_and_cleared_on_leave() {
+        let mut model = signed_in();
+        assert!(model.snapshot()["session"]["callFocus"].is_null());
+        model.call_focus = Some(json!({"key": "scr:s2", "filmOpen": true}));
+        let snap = model.snapshot();
+        assert_eq!(snap["session"]["callFocus"]["key"], "scr:s2");
+        assert_eq!(snap["session"]["callFocus"]["filmOpen"], true);
+        assert!(model.update(0, "kicked", json!({})));
+        assert!(model.snapshot()["session"]["callFocus"].is_null());
+        model.call_focus = Some(json!({"key": "scr:s2", "filmOpen": true}));
+        model.reset_connection();
+        assert!(model.snapshot()["session"]["callFocus"].is_null());
+    }
 }
+

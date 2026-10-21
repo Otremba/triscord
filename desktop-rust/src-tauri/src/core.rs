@@ -892,6 +892,7 @@ impl Core {
                 model.speaking.clear();
                 model.peer_muted.clear();
                 model.connected_at = 0;
+                model.call_focus = None;
                 if std::mem::take(&mut model.call_fullscreen) {
                     drop(model);
                     if let Some(window) = app.get_webview_window("main") {

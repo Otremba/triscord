@@ -76,8 +76,23 @@ async fn dispatch(
             presenter.role(id, command["role"].as_str().unwrap_or_default())?;
             return Ok(serde_json::Value::Null);
         }
-        // Frame-pacing telemetry of the C++ overlays and the focused-card hint: the GPU presenter needs neither.
-        Some("videoIdle" | "videoStats" | "videoAck" | "setCallFocus") => {
+        Some("setCallFocus") => {
+            let key = command["key"]
+                .as_str()
+                .filter(|k| !k.is_empty() && k.len() <= 64)
+                .map(str::to_owned);
+            let film_open = command["filmOpen"].as_bool().unwrap_or(true);
+            let focus = key.map(|k| serde_json::json!({ "key": k, "filmOpen": film_open }));
+            let core = state.try_lock().map_err(|_| error::Error {
+                code: "busy",
+                message: "Aguarde a operação atual terminar.",
+            })?;
+            core.model.lock().unwrap_or_else(|e| e.into_inner()).call_focus = focus;
+            model::publish(&app, &core.model);
+            return Ok(serde_json::Value::Null);
+        }
+        // Frame-pacing telemetry of the C++ overlays: the GPU presenter needs neither.
+        Some("videoIdle" | "videoStats" | "videoAck") => {
             return Ok(serde_json::Value::Null)
         }
         Some("window") => return window::action(&app, command["action"].as_str().unwrap_or_default()),

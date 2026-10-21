@@ -70,6 +70,11 @@ export class FixtureBridge implements Bridge {
     if (command.name === 'selectChannel') this.patch({ selectedChannelId: command.channelId });
     if (command.name === 'setMuted') this.patch({ muted: command.muted });
     if (command.name === 'setDeafened') this.patch({ deafened: command.deafened });
+    if (command.name === 'setCallFocus') this.patch({ callFocus: command.key ? { key: command.key, filmOpen: command.filmOpen ?? true } : null });
+    if (command.name === 'setCallFullscreen') this.patch({ callFullscreen: command.on });
+    if (command.name === 'setStreamHidden' && this.session.streams) {
+      this.patch({ streams: this.session.streams.map(s => s.id === command.streamId ? { ...s, hidden: command.hidden } : s) });
+    }
     return requestId;
   }
   onMessage(handler: (message: CoreMessage) => void): void { this.handler = handler; this.push(); }
