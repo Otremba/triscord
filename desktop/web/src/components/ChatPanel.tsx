@@ -110,7 +110,7 @@ function Message({ message, groupStart, bridge, avatars }: { message: ChatMessag
   );
 }
 
-export function ChatPanel({ channelName, messages, avatars, bridge, onClose }: { channelName: string; messages: ChatMessage[]; avatars?: Avatars; bridge: Bridge; onClose: () => void }) {
+export function ChatPanel({ channelName, messages, avatars, bridge, onClose, full = false }: { channelName: string; messages: ChatMessage[]; avatars?: Avatars; bridge: Bridge; onClose?: () => void; full?: boolean }) {
   const list = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState('');
@@ -151,12 +151,14 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose }: {
     items.push(<Message key={m.id} message={m} groupStart={groupStart} bridge={bridge} avatars={avatars} />);
   });
   return (
-    <aside class="tri-chat-panel" aria-label={`Chat de ${channelName}`}>
-      <header class="tri-chat-panel__header">
-        <Icon name="Chat" size={20} className="tri-chat-panel__icon" />
-        <h2 class="tri-chat-panel__title">{channelName}</h2>
-        <button class="tri-icon-button tri-chat-panel__close" aria-label="Fechar" onClick={onClose}><Icon name="Close" size={24} /></button>
-      </header>
+    <div class={`tri-chat-panel ${full ? 'tri-chat-panel--full' : ''}`} aria-label={`Chat de ${channelName}`}>
+      {!full && onClose && (
+        <header class="tri-chat-panel__header">
+          <Icon name="Chat" size={20} className="tri-chat-panel__icon" />
+          <h2 class="tri-chat-panel__title">{channelName}</h2>
+          <button class="tri-icon-button tri-chat-panel__close" aria-label="Fechar" onClick={onClose}><Icon name="Close" size={24} /></button>
+        </header>
+      )}
       <div class="tri-chat-panel__scroller" ref={list}
         onScroll={e => { const el = e.currentTarget as HTMLDivElement; atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8; }}>
         {/* Start of the channel, above its history (Discord, audit 18/10): 68px circle with the 36px chat icon,
@@ -211,6 +213,6 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose }: {
           </div>
         </div>
       </form>
-    </aside>
+    </div>
   );
 }

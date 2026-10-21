@@ -26,6 +26,8 @@ import './styles/call-view-controls.css';
 import './styles/motion.generated.css';
 import './styles/custom-theme.css';
 import './styles/camera-preview.css';
+import './styles/member-list.css';
+import './styles/friends-view.css';
 
 // Theme comes from the core's settings. Until they arrive, Discord's default for an account with no preference:
 // "Escuro" (ThemeStore maps UNSET to NJ8.DARK, whose class is theme-darker; web bundle, REA). Fixtures/tests may pick

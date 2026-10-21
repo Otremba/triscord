@@ -80,7 +80,11 @@ export function ChannelView({ session, bridge, store, popout = false }: { sessio
           </div>
         </div>
       </header>
-      {inRoom ? <CallView session={session} bridge={bridge} store={store} idle={idle} inPopout={popout} focus={focus} onFocus={setFocus} /> : channel ? (
+      {inRoom ? (
+        <CallView session={session} bridge={bridge} store={store} idle={idle} inPopout={popout} focus={focus} onFocus={setFocus} />
+      ) : isText && channel ? (
+        <ChatPanel channelName={channel.name} messages={session.chat ?? []} avatars={session.avatars} bridge={bridge} full />
+      ) : channel ? (
         <div class="tri-prejoin">
           <h2 class="tri-prejoin__title">{channel.name}</h2>
           <p class="tri-prejoin__subtitle">{channel.users.length ? channel.users.map(u => u.name).join(', ') : 'Ninguém está em voz'}</p>
