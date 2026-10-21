@@ -4,6 +4,7 @@ import type { OwnProfile, ProfileFields, Session } from '../protocol';
 import { Icon } from './Icon';
 import { ModalLayer, useModalClose } from './ModalLayer';
 import { Modal } from './Modal';
+import { ShimmerButton } from './ui/ShimmerButton';
 
 const EMPTY: ProfileFields = {display_name:null,pronouns:null,bio:null,note:null,banner_color:null,profile_theme_start:null,profile_theme_end:null};
 function fields(profile: OwnProfile): ProfileFields {
@@ -91,7 +92,7 @@ export function ProfileEditor({session,bridge,onClose}:{session:Session;bridge:B
       </form>
       <footer><span role={error?'alert':'status'}>{loading?'Carregando perfil…':error||message|| (dirty?'Você tem alterações não salvas.':'')}</span>
         <button class="tri-button tri-button--secondary" disabled={busy||loading||!dirty} onClick={()=>{setDraft(saved);setMessage('');}}>Redefinir</button>
-        <button type="submit" form="tri-profile-form" class="tri-button tri-button--primary" disabled={busy||!ready||!dirty}>Salvar alterações</button>
+        <ShimmerButton type="submit" form="tri-profile-form" variant="aurora" disabled={busy||!ready||!dirty}>Salvar alterações</ShimmerButton>
       </footer>
     </section>
     {discard&&<Modal title="Descartar alterações?" subtitle="Suas alterações de texto não salvas serão perdidas." onClose={()=>setDiscard(false)}

@@ -13,6 +13,7 @@ import { setOccluders, setStageOccluders } from '../video';
 import { Tooltip } from './Tooltip';
 import { openSoundboard } from './Soundboard';
 import { openAudioMenu } from './AudioMenu';
+import { AudioRipple } from './ui/AudioRipple';
 
 // Call view of the connected voice channel (CALLS.md, discord-call-view-client.png):
 //   black stage; 16:9 cards (radius 8) with an 80px avatar in the middle; a 32px pill with the name in the
@@ -33,7 +34,9 @@ function ParticipantCard({ user, session, bridge, role = 'grid', style, onFocus 
     <div class={`tri-call-card tri-call-card--${role} ${user.speaking ? 'is-speaking' : ''}`} style={style} aria-label={user.name} role="button" tabIndex={0} onContextMenu={e=>openParticipantMenu(e,user,session,bridge)}
       onClick={e=>onFocus ? onFocus() : user.self ? dispatchEvent(new Event('tri-open-profile')) : openParticipantProfile(user.id,e.currentTarget)}
       onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.currentTarget.click();}}}>
-      <span class="tri-avatar tri-avatar--80">{avatar ? <img src={avatar} alt=""/> : <span class="tri-avatar__letter">{user.name.slice(0, 1).toUpperCase()}</span>}</span>
+      <AudioRipple speaking={!!user.speaking}>
+        <span class="tri-avatar tri-avatar--80">{avatar ? <img src={avatar} alt=""/> : <span class="tri-avatar__letter">{user.name.slice(0, 1).toUpperCase()}</span>}</span>
+      </AudioRipple>
       <span class="tri-call-card__pill">
         {user.deafened ? <Icon name="HeadphonesDeafened" size={20} /> : user.serverMuted || user.muted || user.localMuted ? <Icon name="MicrophoneMuted" size={20} className={user.serverMuted ? 'is-server' : undefined} /> : null}
         <span>{user.name}</span>

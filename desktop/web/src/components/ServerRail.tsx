@@ -5,6 +5,7 @@ import type { MenuEntry } from './ContextMenu';
 import { Icon } from './Icon';
 import { Tooltip } from './Tooltip';
 import { openContextMenu } from './ContextMenu';
+import { TriscordLogo } from './ui/TriscordLogo';
 
 // Discord's guild acronym (bundle f_0000d3 offset 11891250), same as HubApi::serverAcronym in C++.
 export function acronym(name: string): string {
@@ -66,7 +67,7 @@ function RailItem({ server, selected, onSelect, voice }: { server: Server; selec
     <div class="tri-rail__item">
       <div class="tri-rail__pill-wrapper"><span class={`tri-rail__pill ${pill ? `tri-rail__pill--${pill}` : ''}`} /></div>
       <Tooltip text={server.name} position="right" spacing={12} guild>
-        <button class={`tri-rail__button ${selected ? 'is-selected' : ''}`} aria-label={server.name} aria-current={selected}
+        <button class={`tri-rail__button tri-magnetic-item ${selected ? 'is-selected' : ''}`} aria-label={server.name} aria-current={selected}
           onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={onSelect}
           onContextMenu={e => openContextMenu(e, serverMenu(server, selected), { width: 'fixed', label: server.name })}>
           <ServerIcon server={server} />
@@ -82,16 +83,16 @@ export function ServerRail({ servers, selectedId, callServerId, bridge, voice }:
   const homeSelected = !selectedId || selectedId === '@me' || selectedId === '';
   const serverList = servers.filter(s => s.id && s.id !== '@me');
   return (
-    <nav class="tri-rail" aria-label="Servidores">
+    <nav class="tri-rail tri-floating-dock" aria-label="Servidores">
       <div class="tri-rail__item">
         <div class="tri-rail__pill-wrapper">
           <span class={`tri-rail__pill ${homeSelected ? 'tri-rail__pill--selected' : homeHovered ? 'tri-rail__pill--hovered' : ''}`} />
         </div>
         <Tooltip text="Mensagens diretas" position="right" spacing={12} guild>
-          <button class={`tri-rail__button tri-rail__home-button ${homeSelected ? 'is-selected' : ''}`} aria-label="Mensagens diretas"
+          <button class={`tri-rail__button tri-rail__home-button tri-magnetic-item ${homeSelected ? 'is-selected' : ''}`} aria-label="Mensagens diretas"
             onMouseEnter={() => setHomeHovered(true)} onMouseLeave={() => setHomeHovered(false)}
             onClick={() => bridge.send({ name: 'selectServer', serverId: '' })}>
-            <Icon name="DiscordLogo" size={26} />
+            <TriscordLogo size={28} />
           </button>
         </Tooltip>
       </div>

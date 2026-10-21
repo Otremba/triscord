@@ -7,6 +7,8 @@ import { callChannelOf } from '../protocol';
 import type { IconName } from '../icons.generated';
 import { Icon } from './Icon';
 import { Tooltip } from './Tooltip';
+import { AudioEqualizer } from './ui/AudioEqualizer';
+import { AudioRipple } from './ui/AudioRipple';
 
 // Split audio button: module __5e764 — 32x32 button with square right corners, 1px gap, 16x32 chevron
 // (16px ChevronSmallDown) with square left corners; hovering the group lights both halves.
@@ -62,15 +64,18 @@ export function AccountPanel({ session, bridge }: { session: Session; bridge: Br
         </div>
       )}
       {channel && (
-        <div class="tri-voice-panel">
+        <div class="tri-voice-panel tri-glass-panel border-b border-white/10">
           <div class="tri-voice-panel__top">
-            <Icon name="ConnectionFine" size={20} className="tri-voice-panel__signal" />
+            <div class="flex items-center gap-2">
+              <Icon name="ConnectionFine" size={20} className="tri-voice-panel__signal text-neon-emerald" />
+              <AudioEqualizer active={true} />
+            </div>
             <div class="tri-voice-panel__texts">
-              <span class="tri-voice-panel__title">{session.camera ? 'Vídeo conectado' : 'Voz conectada'}</span>
-              <span class="tri-voice-panel__room">{channel.name} / {server?.name ?? 'Triscord'}</span>
+              <span class="tri-voice-panel__title font-semibold text-white">{session.camera ? 'Vídeo conectado' : 'Voz conectada'}</span>
+              <span class="tri-voice-panel__room text-xs text-slate-400">{channel.name} / {server?.name ?? 'Triscord'}</span>
             </div>
             <Tooltip text="Desconectar">
-              <button class="tri-account__button" aria-label="Desconectar" onClick={() => bridge.send({ name: 'leaveVoice' })}>
+              <button class="tri-account__button hover:text-red-400" aria-label="Desconectar" onClick={() => bridge.send({ name: 'leaveVoice' })}>
                 <Icon name="Disconnect" size={20} />
               </button>
             </Tooltip>

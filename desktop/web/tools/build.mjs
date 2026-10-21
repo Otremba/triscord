@@ -2,7 +2,10 @@
 // maps to https://app.triscord/ in WebView2. Icons are regenerated from the C++ list first.
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import postcss from 'postcss';
+import tailwindcss from 'tailwindcss';
+import autoprefixer from 'autoprefixer';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +15,18 @@ if (!tauri) {
   execFileSync(process.execPath, [resolve(web, 'tools/icons-from-cpp.mjs')], { stdio: 'inherit' });
   execFileSync(process.execPath, [resolve(web, 'tools/spring-easing.mjs')], { stdio: 'inherit' });
 }
+
+// Compile Tailwind CSS with Triscord Aurora design system config
+const tailwindCssInput = readFileSync(resolve(web, 'src/styles/tailwind.css'), 'utf-8');
+const tailwindResult = await postcss([
+  tailwindcss(resolve(web, 'tailwind.config.cjs')),
+  autoprefixer,
+]).process(tailwindCssInput, {
+  from: resolve(web, 'src/styles/tailwind.css'),
+  to: resolve(web, 'src/styles/tailwind.generated.css'),
+});
+writeFileSync(resolve(web, 'src/styles/tailwind.generated.css'), tailwindResult.css);
+
 const dist = resolve(web, tauri ? 'dist-rust' : 'dist');
 mkdirSync(dist, { recursive: true });
 await build({

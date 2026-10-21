@@ -2,6 +2,8 @@ import { useEffect, useState } from 'preact/hooks';
 import type { Bridge } from '../bridge';
 import type { AuthState } from '../protocol';
 import glyph from '../assets/triscord-glyph.png';
+import { TriscordLogo } from './ui/TriscordLogo';
+import { ShimmerButton } from './ui/ShimmerButton';
 
 // Login, observed in Discord (LOGIN.md, discord-login.png, 1280x900) and its auth box module __921c5
 // recovered with REA: 480px box (784px only with the QR column, which triscord has no use for), 32px
@@ -46,10 +48,10 @@ export function LoginScreen({ auth, bridge, googleLogin = true }: { auth: AuthSt
   const busy = saving || auth.state === 'signingIn';
   const shownError = error ?? auth.error ?? null;
   return (
-    <div class="tri-login">
+    <div class="tri-login bg-space-950">
       <div class="tri-login__art" aria-hidden="true"><span /><span /><span /></div>
-      <div class="tri-login__brand"><img src={glyph} alt="" width={32} height={32} /><span>Triscord</span></div>
-      <div class="tri-login__box" role="dialog" aria-label="Entrar">
+      <div class="tri-login__brand flex items-center gap-3"><TriscordLogo size={36} /><span class="font-extrabold tracking-tight bg-gradient-to-r from-neon-violet via-neon-cyan to-neon-emerald bg-clip-text text-transparent text-xl">Triscord</span></div>
+      <div class="tri-login__box tri-glass-panel" role="dialog" aria-label="Entrar">
         {auth.state === 'needsNick' ? (
           <form class="tri-login__form" onSubmit={submitNick} noValidate>
             <h1 class="tri-login__title">Como você quer ser chamado?</h1>
@@ -58,7 +60,7 @@ export function LoginScreen({ auth, bridge, googleLogin = true }: { auth: AuthSt
             <input id="tri-nick" name="nick" class={`tri-login__input ${error ? 'has-error' : ''}`} value={nick} maxLength={32}
               onInput={e => setNick((e.target as HTMLInputElement).value)} autoFocus aria-invalid={!!error} />
             {shownError && <p class="tri-login__error" role="alert">{shownError}</p>}
-            <button class="tri-login__button" type="submit" disabled={saving}>Continuar</button>
+            <ShimmerButton class="w-full" type="submit" variant="cyan" disabled={saving}>Continuar</ShimmerButton>
           </form>
         ) : (
           <form class="tri-login__form" onSubmit={submitLogin} noValidate>
@@ -76,7 +78,7 @@ export function LoginScreen({ auth, bridge, googleLogin = true }: { auth: AuthSt
             </div>
             <p class="tri-login__hint">Primeira vez? Escolha um nome e entre. A senha é opcional e pode ser criada depois em Configurações.</p>
             {shownError && <p class="tri-login__error" role="alert">{shownError}</p>}
-            <button class="tri-login__button" type="submit" disabled={busy}>{saving ? <span class="tri-login__dots" aria-label="Entrando" /> : 'Entrar'}</button>
+            <ShimmerButton class="w-full" type="submit" variant="aurora" disabled={busy}>{saving ? <span class="tri-login__dots" aria-label="Entrando" /> : 'Entrar'}</ShimmerButton>
             {googleLogin && <><div class="tri-login__divider"><span>ou</span></div>
             <button type="button" class="tri-login__google" disabled={busy} onClick={() => { setError(null); bridge.send({ name: 'signIn' }); }}>
               <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">

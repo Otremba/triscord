@@ -60,8 +60,15 @@ function Message({ message, groupStart, bridge, avatars }: { message: ChatMessag
   const avatar = avatars?.[message.authorId];
   const [picker, setPicker] = useState(false);
   const react = (emoji: string) => { setPicker(false); bridge.send({ name: 'toggleReaction', messageId: message.id, emoji }); };
+  const handleMouseMove = (e: MouseEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    el.style.setProperty('--mouse-x', `${e.clientX - rect.left}`);
+    el.style.setProperty('--mouse-y', `${e.clientY - rect.top}`);
+  };
+
   return (
-    <li class={`tri-message ${groupStart ? 'is-group-start' : ''}`} onMouseLeave={() => setPicker(false)}
+    <li class={`tri-message tri-spotlight ${groupStart ? 'is-group-start' : ''}`} onMouseMove={handleMouseMove} onMouseLeave={() => setPicker(false)}
       onContextMenu={e => openContextMenu(e, messageMenu(message, bridge), { width: 'fixed', label: 'Ações da mensagem' })}>
       {groupStart ? (
         <>
@@ -84,7 +91,7 @@ function Message({ message, groupStart, bridge, avatars }: { message: ChatMessag
           ))}
         </div>
       )}
-      <div class={`tri-message__bar ${picker ? 'is-open' : ''}`}>
+      <div class={`tri-message__bar tri-message-action-dock ${picker ? 'is-open' : ''}`}>
         {REACTIONS.slice(0, 3).map(emoji => (
           <Tooltip key={emoji} text={<><strong>{emoji}</strong><br />Clique para reagir</>}>
             <button class="tri-message__bar-button" aria-label={`Reagir com ${emoji}`} onClick={() => react(emoji)}><span class="tri-message__bar-emoji">{emoji}</span></button>
@@ -174,7 +181,7 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose, ful
         </div>
       </div>
       <form class="tri-composer" onSubmit={send}>
-        <div class={`tri-composer__box ${rateLimited ? 'is-rate-limited' : ''}`}>
+        <div class={`tri-composer__box tri-composer-floating ${rateLimited ? 'is-rate-limited' : ''}`}>
           <Tooltip text="Enviar um arquivo">
             <button type="button" class="tri-composer__attach" aria-label="Enviar um arquivo" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Envio de arquivos em desenvolvimento.' }))}>
               <Icon name="CirclePlus" size={24} />

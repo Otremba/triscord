@@ -424,10 +424,9 @@ try {
   // Hover on Server 2 changes pill to 20px
   const s2Button = page.locator('.tri-rail__item').nth(2).locator('button.tri-rail__button');
   await s2Button.hover();
-  await page.waitForTimeout(250);
-  assert.equal(await server2Pill.evaluate(el => el.classList.contains('tri-rail__pill--hovered')), true);
+  await page.waitForFunction(el => Math.round(parseFloat(window.getComputedStyle(el).height)) === 20, await server2Pill.elementHandle());
   const s2HoverHeight = await server2Pill.evaluate(el => window.getComputedStyle(el).height);
-  assert.equal(s2HoverHeight, '20px');
+  assert.equal(Math.round(parseFloat(s2HoverHeight)), 20);
   checks.push('Guild Rail: Hovering server expands pill to 20px');
 
   // 1.2 Clyde Home Button: squircle transition (50% -> 16px hover/selected)

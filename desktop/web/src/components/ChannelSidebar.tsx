@@ -6,6 +6,7 @@ import { openParticipantProfile } from './ParticipantProfile';
 import { Icon } from './Icon';
 import { Tooltip } from './Tooltip';
 import { openContextMenu, type MenuEntry } from './ContextMenu';
+import { AudioRipple } from './ui/AudioRipple';
 
 // Server header: module _f37cb1 — --custom-channel-header-height (49px incl. the 1px --border-subtle bottom
 // border), 8px padding, medium weight, --text-strong. The invite button (UserPlus) only for owners.
@@ -62,7 +63,9 @@ function VoiceUserRow({ user, session, bridge }: { user: VoiceUser; session: Ses
     <li class={`tri-voice-user ${user.speaking ? 'is-speaking' : ''}`} title={user.customStatus || undefined} role="button" tabIndex={0} aria-label={`Ver perfil de ${user.name}`}
       onClick={e=>open(e.currentTarget)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open(e.currentTarget);}}}
       onContextMenu={e=>openParticipantMenu(e,user,session,bridge)}>
-      <span class="tri-avatar tri-avatar--24">{user.avatarUrl ? <img src={user.avatarUrl} alt=""/> : <span class="tri-avatar__letter">{user.name.slice(0, 1).toUpperCase()}</span>}</span>
+      <AudioRipple speaking={!!user.speaking}>
+        <span class="tri-avatar tri-avatar--24">{user.avatarUrl ? <img src={user.avatarUrl} alt=""/> : <span class="tri-avatar__letter">{user.name.slice(0, 1).toUpperCase()}</span>}</span>
+      </AudioRipple>
       <span class="tri-voice-user__name">{user.name}</span>
       {user.live && <span class="tri-live-badge">AO VIVO</span>}
       <span class="tri-voice-user__icons">
