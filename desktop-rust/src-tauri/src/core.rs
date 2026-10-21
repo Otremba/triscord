@@ -90,6 +90,7 @@ pub enum Command {
         #[serde(rename = "serverId")]
         server_id: String,
     },
+    #[serde(alias = "selectChannel")]
     OpenTextRoom {
         #[serde(rename = "channelId")]
         channel_id: String,
@@ -121,10 +122,6 @@ pub enum Command {
     DeleteChatMessage {
         #[serde(rename = "messageId")]
         message_id: String,
-    },
-    SelectChannel {
-        #[serde(rename = "channelId")]
-        channel_id: String,
     },
     CreateChannel {
         #[serde(rename = "channelName")]
@@ -903,7 +900,7 @@ impl Core {
                 }
                 Ok(Value::Null)
             }
-            Command::JoinVoice { channel_id } | Command::SelectChannel { channel_id } => {
+            Command::JoinVoice { channel_id } => {
                 // A second click on the room we are in (or joining) must not tear the call down and start it again.
                 if {
                     let m = self.model.lock().unwrap_or_else(|e| e.into_inner());

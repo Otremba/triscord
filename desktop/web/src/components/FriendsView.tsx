@@ -74,8 +74,12 @@ export function FriendsView({ session, bridge }: { session: Session; bridge: Bri
                 <Icon name="MagnifyingGlass" size={16} className="tri-friends-search__icon" />
               </div>
               <div class="tri-friends-empty">
-                <div class="tri-friends-empty__wumpus">
-                  <Icon name="Friends" size={80} />
+                <div class="tri-friends-empty__illustration">
+                  <svg width="180" height="110" viewBox="0 0 180 110" fill="none" aria-hidden="true">
+                    <circle cx="90" cy="50" r="36" fill="var(--background-base-lowest, #1e1f22)" />
+                    <path d="M90 35a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM74 68c0-8.8 7.2-16 16-16s16 7.2 16 16v4H74v-4Z" fill="var(--channels-default, #80848e)" opacity="0.35" />
+                    <circle cx="125" cy="35" r="3" fill="var(--brand-500, #5865f2)" opacity="0.5" />
+                  </svg>
                 </div>
                 <p class="tri-friends-empty__text">Nenhum amigo está disponível no momento. Wumpus está esperando amigos!</p>
               </div>

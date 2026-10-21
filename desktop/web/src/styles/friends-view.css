@@ -56,8 +56,10 @@
 .tri-friends-tab {
   padding: 2px 8px;
   border-radius: var(--radius-xs, 4px);
+  border: 0;
+  background: transparent;
   font-size: 14px;
-  font-weight: var(--font-weight-medium, 500);
+  font-weight: 500;
   line-height: 20px;
   color: var(--channels-default, #b5bac1);
   cursor: pointer;
@@ -70,21 +72,21 @@
 }
 
 .tri-friends-tab.is-active {
-  background: var(--background-mod-normal, rgba(255, 255, 255, 0.12));
-  color: var(--interactive-text-active, #fff);
+  background: var(--interactive-background-selected, rgba(255, 255, 255, 0.12));
+  color: #ffffff;
 }
 
 .tri-friends-tab--add {
-  background: transparent;
-  color: var(--green-360, #23a55a);
+  background: var(--green-360, #248046) !important;
+  color: #ffffff !important;
 }
 .tri-friends-tab--add:hover {
-  background: rgba(35, 165, 90, 0.1);
-  color: var(--green-360, #23a55a);
+  background: #1a6334 !important;
+  color: #ffffff !important;
 }
 .tri-friends-tab--add.is-active {
-  background: transparent;
-  color: var(--green-360, #23a55a);
+  background: transparent !important;
+  color: var(--green-360, #23a55a) !important;
 }
 
 .tri-friends-header__toolbar {

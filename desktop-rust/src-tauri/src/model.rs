@@ -199,7 +199,7 @@ impl Model {
             "categories": [{"id": "voice", "name": "Canais de Voz", "channels": channels}],
             "rooms": self.rooms.iter().map(|r| json!({"id": r["id"], "name": r["name"], "userCount": r["userCount"]})).collect::<Vec<_>>(),
             "textRoomId": self.text_room,
-            "selectedChannelId": self.text_room.clone().or_else(|| self.desired_room.clone()),
+            "selectedChannelId": self.text_room.clone().or_else(|| self.desired_room.clone()).or_else(|| self.rooms.first().and_then(|r| r["id"].as_str()).map(str::to_owned)),
             "chat": self.chat.iter().map(|m| self.chat_message(m, &account_id)).collect::<Vec<_>>(),
             "connection": if self.connection.is_empty() { "offline" } else { self.connection },
             "muted": self.muted || self.server_muted || self.deafened, "deafened": self.deafened,

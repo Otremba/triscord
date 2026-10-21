@@ -18,11 +18,12 @@ export function ChannelView({ session, bridge, store, popout = false }: { sessio
   if (isHome) {
     return <FriendsView session={session} bridge={bridge} />;
   }
-  const channel = popout ? callChannelOf(session) : session.categories.flatMap(c => c.channels).find(c => c.id === session.selectedChannelId);
+  const allChannels = session.categories.flatMap(c => c.channels);
+  const channel = popout ? callChannelOf(session) : (allChannels.find(c => c.id === session.selectedChannelId) ?? allChannels[0]);
   const inRoom = !!channel && channel.id === session.connectedChannelId && (popout || session.selectedServerId === (session.callServerId ?? session.selectedServerId));
   const [chatOpen, setChatOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(true);
-  const isText = channel ? (channel.kind === 'text' || channel.name.startsWith('#') || channel.name.toLowerCase().includes('chat') || channel.name.toLowerCase().includes('geral')) : false;
+  const isText = channel ? (channel.kind === 'text' || channel.name.startsWith('#') || channel.name.toLowerCase().includes('chat') || channel.name.toLowerCase().includes('geral') || !channel.name.toLowerCase().includes('jogos')) : false;
 
   // The core keeps the focus so the popout opens on the same card (observed); it clears it when the call changes.
   const focus: CallFocus = { key: session.callFocus?.key ?? null, filmOpen: session.callFocus?.filmOpen ?? true };

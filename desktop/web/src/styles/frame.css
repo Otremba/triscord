@@ -19,9 +19,9 @@
 }
 .tri-dm-search-button {
   display: flex; align-items: center; width: 100%; height: 28px; padding: 0 8px;
-  border-radius: var(--radius-xs, 4px); background: var(--background-base-lower, #1e1f22);
+  box-sizing: border-box; border: 0; border-radius: var(--radius-xs, 4px); background: var(--background-base-lowest, #1e1f22);
   color: var(--text-muted, #949ba4); font-size: 14px; font-weight: var(--font-weight-medium, 500);
-  cursor: pointer; transition: background-color .15s ease, color .15s ease;
+  cursor: pointer; transition: background-color .15s ease, color .15s ease; text-align: start;
 }
 .tri-dm-search-button:hover {
   background: var(--interactive-background-hover, rgba(255, 255, 255, 0.06));
@@ -29,6 +29,30 @@
 }
 .tri-dm-nav {
   display: flex; flex-direction: column; gap: 2px; padding: 8px 8px 16px 8px;
+}
+.tri-dm-nav__item {
+  display: flex; align-items: center; gap: 16px; width: 100%; height: 42px; padding: 0 12px;
+  box-sizing: border-box; border-radius: var(--radius-xs, 4px); border: 0; background: transparent;
+  color: var(--channels-default, #949ba4); font-size: 16px; font-weight: 500; cursor: pointer;
+  transition: background-color .15s ease, color .15s ease; text-align: start;
+}
+.tri-dm-nav__item:hover {
+  background: var(--interactive-background-hover, rgba(255, 255, 255, 0.06));
+  color: var(--interactive-text-hover, #dbdee1);
+}
+.tri-dm-nav__item.is-selected {
+  background: var(--interactive-background-selected, rgba(255, 255, 255, 0.12));
+  color: var(--interactive-text-active, #ffffff);
+}
+.tri-dm-nav__item.is-selected .tri-dm-nav__icon,
+.tri-dm-nav__item:hover .tri-dm-nav__icon {
+  color: currentColor;
+}
+.tri-dm-nav__icon {
+  flex: none; color: var(--channel-icon, #80848e);
+}
+.tri-dm-nav__name {
+  flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .tri-dm-list-header {
   display: flex; align-items: center; justify-content: space-between; height: 32px;
@@ -200,6 +224,18 @@
 }
 .tri-channel-header__icon { color: var(--channel-icon); }
 .tri-channel-header__title { color: var(--text-strong); font-weight: var(--font-weight-semibold); }
+.tri-channel-header__search {
+  position: relative; display: flex; align-items: center; height: 24px; width: 144px;
+  margin-inline-start: 8px; transition: width .15s ease-in-out;
+}
+.tri-channel-header__search:focus-within { width: 240px; }
+.tri-channel-header__search input {
+  width: 100%; height: 24px; padding: 0 24px 0 8px; box-sizing: border-box; border: 0;
+  border-radius: var(--radius-xs, 4px); background: var(--background-base-lowest, #1e1f22);
+  color: var(--text-default, #dbdee1); font-size: 14px; font-weight: 500; outline: none;
+}
+.tri-channel-header__search input::placeholder { color: var(--text-muted, #949ba4); }
+.tri-channel-header__search-icon { position: absolute; right: 6px; color: var(--text-muted, #949ba4); pointer-events: none; }
 .tri-chat { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 16px; }
 /* Call card: 16:9, radius 8 (CALLS.md); the video fills it. */
 .tri-video-tile { position: relative; width: min(100%, 960px); aspect-ratio: 16 / 9; border-radius: var(--radius-sm); overflow: hidden; background: var(--background-base-lowest); }

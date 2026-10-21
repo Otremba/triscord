@@ -155,11 +155,12 @@ function CategoryList({ category, session, bridge }: { category: Category; sessi
             const connected = channel.id === session.connectedChannelId && session.selectedServerId === (session.callServerId ?? session.selectedServerId);
             return (
               <li key={channel.id} class={`tri-channel ${selected ? 'is-selected' : ''} ${connected ? 'is-connected' : ''}`}>
-                <div class="tri-channel__link" role="button" tabIndex={0} onClick={() => bridge.send({ name: 'selectChannel', channelId: channel.id })}
+                <div class="tri-channel__link" role="button" tabIndex={0}
+                  onClick={() => { bridge.send({ name: 'openTextRoom', channelId: channel.id }); bridge.send({ name: 'selectChannel', channelId: channel.id }); }}
                   onContextMenu={e => openContextMenu(e, channelMenu(bridge, server, channel.id, channel.name, connected, category.name), { label: channel.name })}
-                  onKeyDown={e => { if (e.key === 'Enter') bridge.send({ name: 'selectChannel', channelId: channel.id }); }}>
+                  onKeyDown={e => { if (e.key === 'Enter') { bridge.send({ name: 'openTextRoom', channelId: channel.id }); bridge.send({ name: 'selectChannel', channelId: channel.id }); } }}>
                   {(() => {
-                    const isText = channel.kind === 'text' || channel.name.startsWith('#') || channel.name.toLowerCase().includes('chat') || channel.name.toLowerCase().includes('geral');
+                    const isText = channel.kind === 'text' || channel.name.startsWith('#') || channel.name.toLowerCase().includes('chat') || channel.name.toLowerCase().includes('geral') || !channel.name.toLowerCase().includes('jogos');
                     return <Icon name={isText ? 'TextChannel' : 'VoiceSpeaker'} size={20} className="tri-channel__icon" />;
                   })()}
                   <span class="tri-channel__name">{channel.name}</span>
@@ -189,17 +190,17 @@ export function ChannelSidebar({ session, bridge }: { session: Session; bridge: 
           </button>
         </header>
         <div class="tri-dm-nav">
-          <button class="tri-channel__link is-selected">
-            <Icon name="Friends" size={20} className="tri-channel__icon" />
-            <span class="tri-channel__name">Amigos</span>
+          <button class="tri-dm-nav__item is-selected">
+            <Icon name="Friends" size={20} className="tri-dm-nav__icon" />
+            <span class="tri-dm-nav__name">Amigos</span>
           </button>
-          <button class="tri-channel__link" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Página do Nitro em desenvolvimento.' }))}>
-            <Icon name="Nitro" size={20} className="tri-channel__icon" />
-            <span class="tri-channel__name">Nitro</span>
+          <button class="tri-dm-nav__item" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Página do Nitro em desenvolvimento.' }))}>
+            <Icon name="Nitro" size={20} className="tri-dm-nav__icon" />
+            <span class="tri-dm-nav__name">Nitro</span>
           </button>
-          <button class="tri-channel__link" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Loja de itens em desenvolvimento.' }))}>
-            <Icon name="Shop" size={20} className="tri-channel__icon" />
-            <span class="tri-channel__name">Loja</span>
+          <button class="tri-dm-nav__item" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Loja de itens em desenvolvimento.' }))}>
+            <Icon name="Shop" size={20} className="tri-dm-nav__icon" />
+            <span class="tri-dm-nav__name">Loja</span>
           </button>
         </div>
         <div class="tri-dm-list-header">
