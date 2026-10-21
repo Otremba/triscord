@@ -14,7 +14,7 @@ export function useModalClose(onClose: () => void) {
   const close = useCallback(() => setClosing(true), []);
   useEffect(() => {
     if (!closing) return;
-    const ms = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tri-spring-modal-out-duration')) || 0;
+    const ms = matchMedia('(prefers-reduced-motion: reduce)').matches?0:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tri-spring-modal-out-duration')) || 0;
     const timer = setTimeout(onClose, ms);
     return () => clearTimeout(timer);
   }, [closing, onClose]);

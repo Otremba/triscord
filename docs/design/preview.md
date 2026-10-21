@@ -38,6 +38,14 @@ O aviso já existente `corrupt .drectve` permanece no build script do host; a co
 
 ## O que falta antes de concluir o objetivo
 
+### Continuação de usabilidade
+
+Controles de perfil na lista de membros agora são botões HTML nativos, com nome acessível. A seleção de canal também usa um botão nativo, separado das ações de chat/convite: Enter nessas ações não executa mais um handler de seleção no contêiner. Isso também permite ativação nativa por Espaço sem handlers de teclado concorrentes.
+
+Tooltips passam a abrir por foco, preservar handlers dos filhos e referenciar seu conteúdo por `aria-describedby`; Escape dispensa o tooltip visível. O fechamento de tooltip/modal não espera a duração da animação quando o sistema pede movimento reduzido.
+
+TypeScript, unidades Node existentes, build da interface, 104 unidades Rust e compilação MSVC passaram após essas alterações. Nenhuma navegação real por teclado foi automatizada ou observada: isso ainda depende de validação em execução permitida. A lista abaixo continua pendente.
+
 1. Avaliação/refinamento do usuário sobre a direção integrada em grafite/cobre, apresentada em `main-screen-v2.svg`.
 2. Ajustes decorrentes dessa avaliação antes da ativação geral.
 3. Conferência visual permitida das telas reais, incluindo larguras menores, popouts, vídeo nativo, foco, menus sobre vídeo, estados de erro e formulários. Compilação/unidades não comprovam esses itens.

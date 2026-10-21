@@ -168,6 +168,7 @@
   padding: var(--space-xxs) var(--space-xs); border-radius: var(--radius-sm); text-align: start;
 }
 .tri-channel__icon { color: var(--channel-icon); }
+.tri-channel__select { display:flex;align-items:center;gap:var(--space-xs);flex:1;min-width:0;min-height:28px;text-align:start; }
 .tri-channel__name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: var(--font-weight-medium); line-height: var(--channels-name-line-height); color: var(--channels-default); }
 .tri-channel:hover .tri-channel__link { background: var(--interactive-background-hover); }
 .tri-channel:hover .tri-channel__name { color: var(--interactive-text-hover); }

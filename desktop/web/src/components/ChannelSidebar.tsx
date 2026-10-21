@@ -158,16 +158,17 @@ function CategoryList({ category, session, bridge }: { category: Category; sessi
             const connected = channel.id === session.connectedChannelId && session.selectedServerId === (session.callServerId ?? session.selectedServerId);
             return (
               <li key={channel.id} class={`tri-channel ${selected ? 'is-selected' : ''} ${connected ? 'is-connected' : ''}`}>
-                <div class="tri-channel__link" role="button" tabIndex={0}
-                  onClick={() => { bridge.send({ name: 'openTextRoom', channelId: channel.id }); bridge.send({ name: 'selectChannel', channelId: channel.id }); }}
-                  onContextMenu={e => openContextMenu(e, channelMenu(bridge, server, channel.id, channel.name, connected, category.name), { label: channel.name })}
-                  onKeyDown={e => { if (e.key === 'Enter') { bridge.send({ name: 'openTextRoom', channelId: channel.id }); bridge.send({ name: 'selectChannel', channelId: channel.id }); } }}>
+                <div class="tri-channel__link"
+                  onContextMenu={e => openContextMenu(e, channelMenu(bridge, server, channel.id, channel.name, connected, category.name), { label: channel.name })}>
+                  <button type="button" class="tri-channel__select" aria-current={selected?'page':undefined} aria-label={channel.name}
+                    onClick={() => { bridge.send({ name: 'openTextRoom', channelId: channel.id }); bridge.send({ name: 'selectChannel', channelId: channel.id }); }}>
                   {(() => {
                     const isText = channel.kind === 'text' || channel.name.startsWith('#') || channel.name.toLowerCase().includes('chat') || channel.name.toLowerCase().includes('geral') || !channel.name.toLowerCase().includes('jogos');
                     return <Icon name={isText ? 'TextChannel' : 'VoiceSpeaker'} size={20} className="tri-channel__icon" />;
                   })()}
                   <span class="tri-channel__name">{channel.name}</span>
                   {connected && session.connectedAt && <CallTimer since={session.connectedAt} />}
+                  </button>
                   <ChannelActions server={server} channelId={channel.id} connected={connected} />
                 </div>
                 {channel.users.length > 0 && (

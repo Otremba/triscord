@@ -64,21 +64,21 @@ export function MemberList({ session, bridge }: { session: Session; bridge: Brid
             <ul class="tri-members-list">
               {onlineMembers.map(m => (
                 <li key={m.id} class="tri-member-item">
-                  <div class="tri-member-item__layout" role="button" tabIndex={0}
+                  <button type="button" class="tri-member-item__layout" aria-label={`Abrir perfil de ${m.name}`}
                     onClick={e => onMemberClick(m, e.currentTarget as HTMLElement)}>
-                    <div class="tri-avatar tri-avatar--32">
+                    <span class="tri-avatar tri-avatar--32">
                       {m.avatarUrl ? (
                         <img src={m.avatarUrl} alt="" />
                       ) : (
                         <span class="tri-avatar__letter">{m.name.slice(0, 1).toUpperCase()}</span>
                       )}
                       <span class={`tri-avatar__status tri-avatar__status--${m.status}`} />
-                    </div>
-                    <div class="tri-member-item__content">
+                    </span>
+                    <span class="tri-member-item__content">
                       <span class="tri-member-item__name">{m.name}</span>
                       {m.role && <span class="tri-member-item__activity">{m.role}</span>}
-                    </div>
-                  </div>
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -93,20 +93,20 @@ export function MemberList({ session, bridge }: { session: Session; bridge: Brid
             <ul class="tri-members-list">
               {offlineMembers.map(m => (
                 <li key={m.id} class="tri-member-item is-offline">
-                  <div class="tri-member-item__layout" role="button" tabIndex={0}
+                  <button type="button" class="tri-member-item__layout" aria-label={`Abrir perfil de ${m.name}`}
                     onClick={e => onMemberClick(m, e.currentTarget as HTMLElement)}>
-                    <div class="tri-avatar tri-avatar--32">
+                    <span class="tri-avatar tri-avatar--32">
                       {m.avatarUrl ? (
                         <img src={m.avatarUrl} alt="" />
                       ) : (
                         <span class="tri-avatar__letter">{m.name.slice(0, 1).toUpperCase()}</span>
                       )}
                       <span class="tri-avatar__status tri-avatar__status--offline" />
-                    </div>
-                    <div class="tri-member-item__content">
+                    </span>
+                    <span class="tri-member-item__content">
                       <span class="tri-member-item__name">{m.name}</span>
-                    </div>
-                  </div>
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
