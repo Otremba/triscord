@@ -7,8 +7,7 @@ import { callChannelOf } from '../protocol';
 import type { IconName } from '../icons.generated';
 import { Icon } from './Icon';
 import { Tooltip } from './Tooltip';
-import { AudioEqualizer } from './ui/AudioEqualizer';
-import { AudioRipple } from './ui/AudioRipple';
+import { callStatus } from '../call-status';
 
 // Split audio button: module __5e764 — 32x32 button with square right corners, 1px gap, 16x32 chevron
 // (16px ChevronSmallDown) with square left corners; hovering the group lights both halves.
@@ -47,6 +46,7 @@ const STATUS_LABEL: Record<Session['account']['status'], string> = {
 // Left out (no triscord function): the noise suppression button and activities of the button row.
 export function AccountPanel({ session, bridge }: { session: Session; bridge: Bridge }) {
   const { account, muted, deafened } = session;
+  const status=callStatus(session);
   const channel = callChannelOf(session);
   const server = session.servers.find(s => s.id === (session.callServerId ?? session.selectedServerId));
   const share = () => (session.sharing ? bridge.send({ name: 'stopScreenShare' }) : dispatchEvent(new Event('tri-open-share-picker')));
@@ -64,14 +64,13 @@ export function AccountPanel({ session, bridge }: { session: Session; bridge: Br
         </div>
       )}
       {channel && (
-        <div class="tri-voice-panel tri-glass-panel border-b border-white/10">
+        <div class="tri-voice-panel tri-glass-panel border-b border-white/10" data-connection-tone={status.tone}>
           <div class="tri-voice-panel__top">
             <div class="flex items-center gap-2">
-              <Icon name="ConnectionFine" size={20} className="tri-voice-panel__signal text-neon-emerald" />
-              <AudioEqualizer active={true} />
+              <Icon name="ConnectionFine" size={20} className="tri-voice-panel__signal" />
             </div>
-            <div class="tri-voice-panel__texts">
-              <span class="tri-voice-panel__title font-semibold text-white">{session.camera ? 'Vídeo conectado' : 'Voz conectada'}</span>
+            <div class="tri-voice-panel__texts" role="status" aria-live="polite" aria-atomic="true">
+              <span class="tri-voice-panel__title font-semibold text-white">{status.label}</span>
               <span class="tri-voice-panel__room text-xs text-slate-400">{channel.name} / {server?.name ?? 'Triscord'}</span>
             </div>
             <Tooltip text="Desconectar">

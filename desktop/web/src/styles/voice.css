@@ -33,6 +33,9 @@
 .tri-voice-panel__top { justify-content: flex-start; }
 .tri-voice-panel__texts { flex: 1 1 auto; }
 .tri-voice-panel__signal { flex: none; box-sizing: content-box; padding: 6px; border-radius: var(--radius-sm); background: var(--background-feedback-positive); color: var(--icon-feedback-positive); }
+.tri-voice-panel[data-connection-tone="pending"] .tri-voice-panel__signal { background: transparent; color: var(--text-feedback-warning, #d5b775); }
+.tri-voice-panel[data-connection-tone="critical"] .tri-voice-panel__signal { background: transparent; color: var(--text-feedback-critical, #e7a0a8); }
+.tri-voice-panel[data-connection-tone="neutral"] .tri-voice-panel__signal { background: transparent; color: var(--text-muted, #a3aab6); }
 .tri-voice-panel__button.is-green { background: var(--green-360); color: var(--white); }
 /* Stream row while sharing (observed): icon, window title, stop button, divider below. */
 .tri-stream-panel { display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 8px 0 12px; border-bottom: 1px solid var(--border-subtle); }
