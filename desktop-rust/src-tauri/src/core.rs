@@ -173,6 +173,15 @@ pub enum Command {
         #[serde(rename = "streamMuted")]
         stream_muted: Option<bool>,
     },
+    PlaySound {
+        #[serde(rename = "soundId")]
+        sound_id: String,
+    },
+    PreviewSound {
+        #[serde(rename = "soundId")]
+        sound_id: String,
+    },
+    StopSoundPreview,
     #[serde(other)]
     Unsupported,
 }
@@ -1157,6 +1166,25 @@ impl Core {
                 }
                 Ok(Value::Null)
             }
+            Command::PlaySound { sound_id } => {
+                if !crate::sound::catalog().iter().any(|s| s["id"] == sound_id) {
+                    return Err(Error::invalid());
+                }
+                if let Some(socket) = &self.socket {
+                    let _ = socket.sender().try_send((
+                        "play-sound".into(),
+                        serde_json::json!({"soundId": sound_id}),
+                    ));
+                }
+                Ok(Value::Null)
+            }
+            Command::PreviewSound { sound_id } => {
+                if !crate::sound::catalog().iter().any(|s| s["id"] == sound_id) {
+                    return Err(Error::invalid());
+                }
+                Ok(Value::Null)
+            }
+            Command::StopSoundPreview => Ok(Value::Null),
             Command::Unsupported => Err(Error::unsupported()),
         }
     }
@@ -1206,6 +1234,21 @@ mod tests {
             serde_json::from_value::<Command>(json!({"name":"executeShell","command":"arbitrary"}))
                 .unwrap(),
             Command::Unsupported
+        ));
+    }
+    #[test]
+    fn sound_commands_deserialization_works() {
+        assert!(matches!(
+            serde_json::from_value::<Command>(json!({"name":"playSound","soundId":"quack"})).unwrap(),
+            Command::PlaySound { sound_id } if sound_id == "quack"
+        ));
+        assert!(matches!(
+            serde_json::from_value::<Command>(json!({"name":"previewSound","soundId":"airhorn"})).unwrap(),
+            Command::PreviewSound { sound_id } if sound_id == "airhorn"
+        ));
+        assert!(matches!(
+            serde_json::from_value::<Command>(json!({"name":"stopSoundPreview"})).unwrap(),
+            Command::StopSoundPreview
         ));
     }
 }

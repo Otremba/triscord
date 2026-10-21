@@ -27,7 +27,8 @@ impl Credentials {
         if parsed.scheme() != "wss"
             || parsed.port().is_some_and(|port| port != 443)
             || parsed.path() != "/"
-            || parsed.host_str() != Some("triscord.217-9-14-79.sslip.io")
+            || !["triscord.217-9-14-79.sslip.io", "217-9-14-79.nip.io", "triscord.duckdns.org"]
+                .contains(&parsed.host_str().unwrap_or_default())
             || !parsed.username().is_empty()
             || parsed.password().is_some()
             || parsed.query().is_some()
@@ -91,6 +92,26 @@ impl Media {
                                         close(&mut active).await;
                                         status(&app,&model,generation,"error");
                                         notice(&app,"A conexão de voz terminou. Use Reconectar voz para solicitar uma nova admissão.");
+                                    }
+                                    RoomEvent::DataReceived { payload, participant, .. } => {
+                                        if let Ok(value) = serde_json::from_slice::<Value>(&payload) {
+                                            if value["type"] == "user-state" {
+                                                let socket = participant.as_ref().and_then(|p| socket_of(&p.identity().to_string())).unwrap_or_default();
+                                                if !socket.is_empty() {
+                                                    let changed = model.lock().unwrap_or_else(|e| e.into_inner()).update(
+                                                        voice.generation,
+                                                        "user-state-updated",
+                                                        serde_json::json!({
+                                                            "socketId": socket,
+                                                            "state": value["state"]
+                                                        }),
+                                                    );
+                                                    if changed {
+                                                        publish(&app, &model);
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                     _=>{}
                                 }
@@ -395,10 +416,13 @@ mod tests {
     use serde_json::json;
     #[test]
     fn media_endpoint_is_pinned_and_token_never_debugged() {
-        assert!(Credentials::parse(
-            &json!({"url":"wss://triscord.217-9-14-79.sslip.io","token":"synthetic"})
-        )
-        .is_ok());
+        for url in [
+            "wss://triscord.217-9-14-79.sslip.io",
+            "wss://217-9-14-79.nip.io",
+            "wss://triscord.duckdns.org",
+        ] {
+            assert!(Credentials::parse(&json!({"url":url,"token":"synthetic"})).is_ok());
+        }
         for url in [
             "ws://triscord.217-9-14-79.sslip.io",
             "wss://evil.test",
@@ -439,5 +463,28 @@ mod tests {
         assert!(wanted(&model, 2, "room"));
         model.lock().unwrap().voice_requested = false;
         assert!(!wanted(&model, 2, "room"));
+    }
+    #[test]
+    fn data_channel_user_state_updates_room_participants() {
+        let mut model = crate::model::Model {
+            generation: 1,
+            ..Default::default()
+        };
+        model.rooms.push(json!({
+            "id": "room-1",
+            "name": "General",
+            "users": [{"socketId": "sock-2", "username": "Peer", "isMuted": false, "isDeafened": false}]
+        }));
+        let changed = model.update(
+            1,
+            "user-state-updated",
+            json!({
+                "socketId": "sock-2",
+                "state": {"isMuted": true, "isDeafened": true}
+            }),
+        );
+        assert!(changed);
+        assert_eq!(model.rooms[0]["users"][0]["isMuted"], true);
+        assert_eq!(model.rooms[0]["users"][0]["isDeafened"], true);
     }
 }

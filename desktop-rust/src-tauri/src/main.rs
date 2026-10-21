@@ -17,6 +17,9 @@ mod socket;
 mod vault;
 mod video_codec;
 mod video_gpu;
+mod audio_loopback;
+mod sound;
+mod updater;
 mod window;
 
 use tauri::Manager;
