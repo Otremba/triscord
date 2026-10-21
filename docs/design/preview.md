@@ -32,3 +32,13 @@ O tipo do canal agora vem exclusivamente do campo `kind` do snapshot; nomes como
 O compositor ganhou ação de envio visível, aviso de envio em andamento e erro acessível com nova tentativa. Um pedido pendente bloqueia submits duplicados. Em falha do comando IPC, o rascunho permanece; uma resposta de sucesso não limpa texto editado durante o pedido. Trocas de servidor/canal remontam o painel por identidade, descartando feedback de outra sala. O temporizador de limite de mensagens é cancelado no unmount. A aceitação do comando pelo núcleo não é comprovante de entrega ao servidor; o protocolo atual não oferece confirmação individual de entrega.
 
 TypeScript, unidades Node existentes, 104 unidades Rust, build frontend e compilação MSVC passaram após essa continuação. Não foram exercitados envio real, teclado, layout ou dispositivos. runtimeVerified=false. Conferência visual permanece pendente.
+
+## Continuação — dispositivos e controles acessíveis
+
+A barra de chamada agora inclui desativar/reativar áudio e opções de saída, também quando a lateral está oculta pela tela cheia ou no popout. O início usa o tom real do estado de voz, sem ícone sempre positivo em erro/reconexão.
+
+`DeviceSelect` substitui o listbox manual nas configurações: seleção nativa por teclado e busca por nome, escolha explícita de padrão do Windows, IDs únicos e identificação de dispositivo desconectado sem fallback silencioso. Unidades Node sem DOM cobrem os IDs duplicados, dispositivo ausente, seleção padrão e ausência de callbacks ao reescolher o mesmo dispositivo. Nenhum dispositivo é enumerado ou aberto pelo teste.
+
+Configurações receberam margens de leitura, uma coluna para campos em larguras menores e navegação superior em janelas estreitas. A busca sem resultados mostra orientação. A seleção da página usa `aria-current=page`; uploads de imagem do perfil mostram foco no rótulo visível. Essas regras foram analisadas e compiladas, não renderizadas para comprovar seu layout.
+
+TypeScript, unidades Node, 104 unidades Rust e compilação MSVC passaram. runtimeVerified=false; sem E2E, app, instalador, captura ou dispositivos. Objetivo ainda em andamento, inclusive auditoria de preservação dos temas configuráveis e conferência visual completa quando permitida.

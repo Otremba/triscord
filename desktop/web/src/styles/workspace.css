@@ -307,3 +307,33 @@
   :root[data-design="workspace"] .tri-composer__buttons { flex:1;justify-content:flex-end;flex-wrap:wrap;margin-bottom:8px; }
   :root[data-design="workspace"] .tri-composer__input { min-width:140px; }
 }
+
+/* Device menus use the platform keyboard model; no competing listbox/focus layer. */
+:root[data-design="workspace"] .tri-device-select { position:relative;display:flex;align-items:center;min-width:0; }
+:root[data-design="workspace"] .tri-device-select__icon { position:absolute;left:12px;pointer-events:none;color:var(--ui-muted); }
+:root[data-design="workspace"] .tri-device-select select { min-width:0;width:100%;min-height:42px;padding:8px 32px 8px 40px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-field);color:var(--ui-text);font:inherit;cursor:pointer;text-overflow:ellipsis; }
+:root[data-design="workspace"] .tri-settings__column { padding:36px 24px 56px; }
+:root[data-design="workspace"] .tri-settings__header { min-height:56px; }
+:root[data-design="workspace"] .tri-settings__search-empty { margin:12px 8px;color:var(--ui-muted);font-size:13px;line-height:1.5; }
+:root[data-design="workspace"] .tri-profile-editor__media label:has(input:focus-visible) { outline:2px solid var(--ui-accent);outline-offset:3px;border-radius:8px; }
+:root[data-design="workspace"] .tri-workspace-home__call[data-connection-tone="pending"]>svg { color:#d5b775; }
+:root[data-design="workspace"] .tri-workspace-home__call[data-connection-tone="critical"]>svg { color:var(--ui-critical); }
+:root[data-design="workspace"] .tri-workspace-home__call[data-connection-tone="neutral"]>svg { color:var(--ui-muted); }
+@media (max-width:1000px) {
+  :root[data-design="workspace"] .tri-modal-backdrop:has(>.tri-settings) { padding:16px; }
+  :root[data-design="workspace"] .tri-settings__nav { flex-basis:208px;padding-left:12px; }
+  :root[data-design="workspace"] :is(.tri-settings__item,.tri-settings__search) { width:180px; }
+  :root[data-design="workspace"] .tri-settings__grid { grid-template-columns:minmax(0,1fr); }
+  :root[data-design="workspace"] .tri-settings__field--half { max-width:none; }
+  :root[data-design="workspace"] .tri-settings__row { flex-wrap:wrap; }
+}
+@media (max-width:700px) {
+  :root[data-design="workspace"] .tri-settings { flex-direction:column; }
+  :root[data-design="workspace"] .tri-settings__nav { flex:0 0 auto;max-height:35%;overflow:auto;padding:12px; }
+  :root[data-design="workspace"] .tri-settings__profile { margin:0 0 12px; }
+  :root[data-design="workspace"] .tri-settings__search { width:100%; }
+  :root[data-design="workspace"] .tri-settings__nav-list { flex:none;overflow:visible; }
+  :root[data-design="workspace"] .tri-settings__item { width:100%; }
+  :root[data-design="workspace"] .tri-settings__content { min-height:0; }
+  :root[data-design="workspace"] .tri-settings__column { padding:24px 16px; }
+}

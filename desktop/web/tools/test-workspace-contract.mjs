@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
-const bundle=await build({stdin:{contents:`export {WorkspaceNav} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
-const {WorkspaceNav,ShimmerButton}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
+const bundle=await build({stdin:{contents:`export {WorkspaceNav} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
+const {WorkspaceNav,ShimmerButton,DeviceSelect,deviceChoices}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
 function nodes(root){if(!root||typeof root!=='object')return [];const children=[root.props?.children].flat(Infinity);return [root,...children.flatMap(nodes)];}
 const sent=[];
 const servers=Array.from({length:8},(_,i)=>({id:`server-${i}`,name:`Espaço ${i}`,owned:i===0}));
@@ -24,3 +24,22 @@ assert.match(submit.props.class,/w-full/);assert.match(submit.props.class,/profi
 assert.equal(submit.props.type,'submit');assert.equal(submit.props.form,'profile');assert.equal(submit.props.disabled,true);
 assert.equal(ShimmerButton({children:'Abrir'}).props.type,'button','an action button must not submit an enclosing form implicitly');
 console.log('Workspace contracts: complete server picker, native commands, empty navigation and button form semantics passed');
+
+const devices=[{id:'mic-1',name:'Microfone USB',isDefault:true},{id:'mic-2',name:'Microfone da câmera'},{id:'mic-1',name:'Repeated provider entry'},{id:'',name:'Provider default alias'}];
+const choices=deviceChoices('mic-1',devices);
+assert.deepEqual(choices.map(option=>option.id),['','mic-1','mic-2'],'each physical id and system-default choice must appear once');
+assert.match(choices[0].name,/Padrão do Windows.*Microfone USB/);
+const removed=deviceChoices('disconnected-mic',devices);
+assert.equal(removed.at(-1).id,'disconnected-mic');
+assert.equal(removed.at(-1).unavailable,true,'disconnection must remain explicit rather than silently selecting default');
+assert.deepEqual(deviceChoices('',[]),[{id:'',name:'Padrão do Windows',unavailable:false}]);
+const changes=[];
+const deviceView=DeviceSelect({value:'mic-1',options:devices,label:'Microfone',onChange:id=>changes.push(id)});
+const devicePicker=nodes(deviceView).find(node=>node.type==='select');
+assert.equal(devicePicker.props.value,'mic-1');
+assert.equal(devicePicker.props['aria-label'],'Microfone');
+devicePicker.props.onChange({currentTarget:{value:'mic-1'}});
+assert.deepEqual(changes,[],'reselecting the same device must not reinitialize media');
+devicePicker.props.onChange({currentTarget:{value:''}});
+assert.deepEqual(changes,[''],'selecting the system default must preserve the empty-id contract');
+console.log('Device selector: defaults, removed devices, duplicate ids and explicit changes passed without devices or DOM');

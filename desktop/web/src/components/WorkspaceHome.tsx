@@ -12,7 +12,7 @@ export function WorkspaceHome({session,bridge}:{session:Session;bridge:Bridge}) 
   const add=()=>dispatchEvent(new Event('tri-open-server-modal'));
   return <main class="tri-workspace-home">
     <header class="tri-workspace-home__header"><span class="tri-workspace-label">Seu início</span><h1>Bom te ver, {session.account.displayName}.</h1><p>Escolha um espaço e fique perto de quem importa.</p></header>
-    {channel&&<section class="tri-workspace-home__call" aria-label="Sua chamada atual">
+    {channel&&<section class="tri-workspace-home__call" aria-label="Sua chamada atual" data-connection-tone={voice.tone}>
       <Icon name="VoiceSpeaker" size={24}/><div><strong>{channel.name}</strong><p role="status">{voice.label}</p></div>
       <button type="button" onClick={()=>bridge.send({name:'leaveVoice'})}>Desconectar</button>
     </section>}

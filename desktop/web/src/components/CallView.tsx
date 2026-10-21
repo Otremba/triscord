@@ -111,6 +111,17 @@ function ControlsBar({ session, bridge, onShare, invite, inPopout, showNonVideo,
             <Icon name="ChevronSmallDown" size={16} />
           </button>
         </div>
+        <div class="tri-call-attached">
+          <Tooltip text={session.deafened ? 'Reativar áudio' : 'Desativar áudio'}>
+            <button type="button" class={`tri-call-button ${session.deafened ? 'is-red' : ''}`} aria-label={session.deafened ? 'Reativar áudio' : 'Desativar áudio'} aria-pressed={session.deafened}
+              onClick={() => bridge.send({ name: 'setDeafened', deafened: !session.deafened })}>
+              <Icon name={session.deafened ? 'HeadphonesDeafened' : 'Headphones'} size={20}/>
+            </button>
+          </Tooltip>
+          <button type="button" class="tri-call-button tri-call-button--caret" aria-label="Opções de saída" aria-haspopup="dialog" onClick={event => openAudioMenu(event.currentTarget, 'output')}>
+            <Icon name="ChevronSmallDown" size={16}/>
+          </button>
+        </div>
         {hasCamera && <><Tooltip text={session.cameraPending ? 'Cancelar ativação da câmera' : session.camera ? 'Desativar câmera' : 'Ativar câmera'}>
           <button class={`tri-call-button ${session.camera ? 'is-green' : ''}`} aria-label={session.cameraPending ? 'Cancelar ativação da câmera' : session.camera ? 'Desativar câmera' : 'Ativar câmera'}
             aria-pressed={!!session.camera} onClick={() => bridge.send({ name: 'setCamera', on: !(session.camera || session.cameraPending) })}>

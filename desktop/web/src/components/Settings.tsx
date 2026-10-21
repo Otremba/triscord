@@ -7,6 +7,7 @@ import type { IconName } from '../icons.generated';
 import { Icon } from './Icon';
 import { ModalLayer, useModalClose } from './ModalLayer';
 import { Modal } from './Modal';
+import { DeviceSelect } from './ui/DeviceSelect';
 
 // User settings, observed in Discord (out/claude-observations/motion/settings-*.png, SETTINGS.md; 1280x900 window):
 // - a layer inside the window, 40px from every edge, 1px border, opening/closing with the modal springs
@@ -82,40 +83,6 @@ function Slider({ value, max, label, onChange }: { value: number; max: number; l
     <input type="range" class="tri-slider" min={0} max={max} value={value} aria-label={label}
       style={{ '--tri-fill': `${(100 * value) / max}%` } as Record<string, string>}
       onInput={e => onChange(+(e.target as HTMLInputElement).value)} />
-  );
-}
-
-function Select({ value, options, icon, label, onChange }: {
-  value: string; options: { id: string; name: string; isDefault?: boolean }[]; icon?: IconName; label: string; onChange: (id: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    addEventListener('mousedown', close, true);
-    return () => removeEventListener('mousedown', close, true);
-  }, [open]);
-  // Discord labels the default "Padrão do Windows (<the default device>)", the name muted (audit 18/10).
-  const fallback = options.find(o => o.isDefault)?.name;
-  const all: { id: string; name: string; isDefault?: boolean; detail?: string }[] = [{ id: '', name: 'Padrão do Windows', detail: fallback }, ...options];
-  const current = all.find(o => o.id === value) ?? { id: value, name: 'Dispositivo Indisponível' };
-  return (
-    <div class="tri-select" ref={ref}>
-      <button type="button" class={`tri-select__value ${open ? 'is-open' : ''}`} aria-haspopup="listbox" aria-expanded={open} aria-label={label} onClick={() => setOpen(!open)}>
-        {icon && <Icon name={icon} size={20} className="tri-select__icon" />}
-        <span class="tri-select__text">{current.name}{current.detail && <span class="tri-select__detail"> ({current.detail})</span>}</span>
-        <Icon name={open ? 'ChevronSmallUp' : 'ChevronSmallDown'} size={24} className="tri-select__chevron" />
-      </button>
-      {open && (
-        <div class="tri-select__popout" role="listbox" aria-label={label}>
-          {all.map(o => (
-            <button type="button" key={o.id || 'default'} role="option" aria-selected={o.id === value} class={`tri-select__option ${o.id === value ? 'is-selected' : ''}`}
-              onClick={() => { setOpen(false); if (o.id !== value) onChange(o.id); }}>{o.name}{o.detail && <span class="tri-select__detail"> ({o.detail})</span>}</button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -236,7 +203,7 @@ export function Settings({ session, bridge, store, onClose }: { session: Session
             {nav.map(n => (
               <div key={n.page}>
                 {n.group && <div class="tri-settings__group">{n.group}</div>}
-                <button class={`tri-settings__item ${page === n.page ? 'is-selected' : ''}`} aria-current={page === n.page} onClick={() => setPage(n.page)}>
+                <button class={`tri-settings__item ${page === n.page ? 'is-selected' : ''}`} aria-current={page === n.page ? 'page' : undefined} onClick={() => setPage(n.page)}>
                   <Icon name={n.icon} size={20} /><span>{n.label}</span>
                 </button>
                 {page === n.page && n.subs.length > 1 && (
@@ -248,6 +215,7 @@ export function Settings({ session, bridge, store, onClose }: { session: Session
                 )}
               </div>
             ))}
+            {!nav.length && <p class="tri-settings__search-empty" role="status">Nenhuma configuração encontrada. Tente outro termo.</p>}
             <div class="tri-settings__separator" />
             <button class="tri-settings__item is-danger" onClick={() => setDialog('signOut')}>
               <Icon name="DoorExit" size={20} /><span>Sair</span>
@@ -286,9 +254,9 @@ export function Settings({ session, bridge, store, onClose }: { session: Session
                   <h2 class="tri-settings__heading" data-sub>Voz</h2>
                   <div class="tri-settings__grid">
                     <div class="tri-settings__field"><span class="tri-settings__label">Microfone</span>
-                      <Select value={s.inputDevice} options={s.inputDevices} icon="Microphone" label="Microfone" onChange={id => set('inputDevice', id)} /></div>
+                      <DeviceSelect value={s.inputDevice} options={s.inputDevices} icon="Microphone" label="Microfone" onChange={id => set('inputDevice', id)} /></div>
                     <div class="tri-settings__field"><span class="tri-settings__label">Alto-falante</span>
-                      <Select value={s.outputDevice} options={s.outputDevices} icon="Headphones" label="Alto-falante" onChange={id => set('outputDevice', id)} /></div>
+                      <DeviceSelect value={s.outputDevice} options={s.outputDevices} icon="Headphones" label="Alto-falante" onChange={id => set('outputDevice', id)} /></div>
                     <div class="tri-settings__field"><span class="tri-settings__label">Volume do Microfone</span>
                       <Slider value={s.inputVolume} max={100} label="Volume do Microfone" onChange={v => set('inputVolume', v)} /></div>
                     <div class="tri-settings__field"><span class="tri-settings__label">Volume do Alto-falante</span>
@@ -332,7 +300,7 @@ export function Settings({ session, bridge, store, onClose }: { session: Session
                   <div class="tri-settings__divider" />
                   <h2 class="tri-settings__heading" data-sub>Câmera</h2>
                   <div class="tri-settings__field tri-settings__field--half"><span class="tri-settings__label">Câmera</span>
-                    <Select value={s.cameraDevice} options={s.cameraDevices} icon="Video" label="Câmera" onChange={id => set('cameraDevice', id)} /></div>
+                    <DeviceSelect value={s.cameraDevice} options={s.cameraDevices} icon="Video" label="Câmera" onChange={id => set('cameraDevice', id)} /></div>
                   {cameraPreview && !closing && <CameraPreview bridge={bridge} store={store}/>}
                   <div class="tri-camera-preview-actions"><button class="tri-button tri-button--primary" onClick={() => setCameraPreview(!cameraPreview)}>
                     {cameraPreview ? 'Parar teste' : 'Testar vídeo'}</button></div>
