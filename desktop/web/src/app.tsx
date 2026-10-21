@@ -35,7 +35,7 @@ type OpenModal = { kind: 'createChannel'; categoryName: string } | { kind: 'invi
 
 // Grid from Discord's app layout (module __5e434): title bar across the top; guild list and channel list
 // inside the sidebar (the account panel floats over both); the page fills the rest.
-export function App({ store, bridge, workspace = false }: { store: SessionStore; bridge: Bridge; workspace?:boolean }) {
+export function App({ store, bridge, workspace = true }: { store: SessionStore; bridge: Bridge; workspace?:boolean }) {
   const session = useSession(store);
   const [serverModal, setServerModal] = useState(false);
   useEffect(() => { const open = () => setServerModal(true); addEventListener('tri-open-server-modal', open); return () => removeEventListener('tri-open-server-modal', open); }, []);

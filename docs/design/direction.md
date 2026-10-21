@@ -1,4 +1,8 @@
-# Proposta de direção visual — revisões 01 e 02
+# Direção aprovada — grafite e azul discreto
+
+Em 21/10, o usuário escolheu azul discreto, preservando a navegação integrada e a personalidade da revisão 02. Essa direção passa a ser o padrão do frontend. As imagens anteriores registram propostas, incluindo a alternativa cobre; não representam a aparência verificada em execução. Implementação e limites de validação: [interface integrada](preview.md).
+
+## Histórico das propostas — revisões 01 e 02
 
 Estado: **proposta para avaliação**, ainda não aplicada ao aplicativo. O objetivo completo continua ativo. A imagem contém dados ilustrativos; não comprova funcionamento de chamada, captura ou transmissão.
 

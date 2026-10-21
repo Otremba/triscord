@@ -113,12 +113,6 @@ fn main() {
             let core = core::Core::new(directory, app.handle().clone(), presenter)
                 .map_err(|e| std::io::Error::other(e.message))?;
             app.manage(Mutex::new(core));
-            // An explicit, process-local review switch; ordinary launches keep the current UI.
-            if std::env::var("TRISCORD_DESIGN_PREVIEW").as_deref() == Ok("1") {
-                let mut url = window.url()?;
-                url.query_pairs_mut().append_pair("design", "next");
-                window.navigate(url)?;
-            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![dispatch])

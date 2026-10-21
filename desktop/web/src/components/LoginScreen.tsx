@@ -49,8 +49,7 @@ export function LoginScreen({ auth, bridge, googleLogin = true }: { auth: AuthSt
   const shownError = error ?? auth.error ?? null;
   return (
     <div class="tri-login bg-space-950">
-      <div class="tri-login__art" aria-hidden="true"><span /><span /><span /></div>
-      <div class="tri-login__brand flex items-center gap-3"><TriscordLogo size={36} /><span class="font-extrabold tracking-tight bg-gradient-to-r from-neon-violet via-neon-cyan to-neon-emerald bg-clip-text text-transparent text-xl">Triscord</span></div>
+      <div class="tri-login__brand flex items-center gap-3"><TriscordLogo size={36} /><span class="font-semibold tracking-tight text-xl">Triscord</span></div>
       <div class="tri-login__box tri-glass-panel" role="dialog" aria-label="Entrar">
         {auth.state === 'needsNick' ? (
           <form class="tri-login__form" onSubmit={submitNick} noValidate>

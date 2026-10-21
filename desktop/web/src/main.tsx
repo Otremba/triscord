@@ -29,15 +29,13 @@ import './styles/camera-preview.css';
 import './styles/member-list.css';
 import './styles/friends-view.css';
 import './styles/tailwind.generated.css';
-import './styles/aurora.css';
-import './styles/workspace-preview.css';
+import './styles/workspace.css';
 
 // Theme comes from the core's settings. Until they arrive, Discord's default for an account with no preference:
 // "Escuro" (ThemeStore maps UNSET to NJ8.DARK, whose class is theme-darker; web bundle, REA). Fixtures/tests may pick
 // another one with ?theme= to compare with captures.
 const params = new URLSearchParams(location.search);
-const workspace=params.get('design')==='next';
-if(workspace)document.documentElement.dataset.design='next';
+document.documentElement.dataset.design='workspace';
 document.documentElement.dataset.theme = params.get('theme') ?? 'darker';
 
 const bridge = createBridge(() => fixtureSession(params.get('fixture') ?? 'default'));
@@ -47,5 +45,5 @@ startVideo(bridge);
 bridge.send({ name: 'requestSnapshot' }); // the core answers with the current session
 // The Rust core runs the real interface; ?preview opens the bare development page it started with.
 const tauri = bridge instanceof TauriBridge;
-render(tauri && params.has('preview') ? <RustPreview store={store} bridge={bridge} /> : <><App store={store} bridge={bridge} workspace={workspace} />{tauri && <NoticeToast />}</>, document.getElementById('app')!);
+render(tauri && params.has('preview') ? <RustPreview store={store} bridge={bridge} /> : <><App store={store} bridge={bridge} workspace />{tauri && <NoticeToast />}</>, document.getElementById('app')!);
 (window as unknown as { __triscord?: unknown }).__triscord = { bridge, store };

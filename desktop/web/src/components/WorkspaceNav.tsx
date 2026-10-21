@@ -4,7 +4,7 @@ import { Icon } from './Icon';
 import { openContextMenu } from './ContextMenu';
 import { ServerIcon, serverMenuEntries } from './ServerRail';
 
-/** Candidate navigation for ?design=next. All actions use existing account/server contracts. */
+/** Integrated workspace navigation. All actions use existing account/server contracts. */
 export function WorkspaceNav({session,bridge}:{session:Session;bridge:Bridge}) {
   const current=session.servers.find(server=>server.id===session.selectedServerId);
   const recent=session.servers.filter(server=>server.id!==current?.id).slice(0,2);

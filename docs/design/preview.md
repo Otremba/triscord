@@ -1,55 +1,26 @@
-# Prévia isolada da revisão 02
+# Interface integrada — grafite e azul discreto
 
-Estado: **candidata para avaliação**, não ativada por padrão, não publicada e não copiada para a instalação. O objetivo completo continua em andamento: a direção visual e a aparência real ainda precisam ser avaliadas.
+Em 21/10, o usuário aprovou **azul discreto** para a direção com navegação integrada. O frontend agora a usa por padrão, sem parâmetro de URL ou variável de ambiente. A interface está no build de desenvolvimento; não foi publicada nem copiada para a instalação.
 
-## O que foi implementado
+## Implementação
 
-- `WorkspaceNav`: marca plana, seletor completo de servidores, atalhos limitados sem perder acesso aos demais, início e entrada para criar/aceitar convite. Opções de convite, exclusão e saída reutilizam os menus existentes.
-- `WorkspaceHome`: início baseado nos servidores reais da sessão, contexto da chamada atual, perfil/configurações e orientação quando não há servidores. Não inventa amigos, atividade ou métricas de uso.
-- Chamada e conversa na mesma coluna na prévia, com alternância do chat e controles de chamada visíveis. Foco de vídeo, capacidades do núcleo e fluxo de menus continuam nos componentes existentes.
-- `StatePanel`: carregamento inicial, ausência de canal e ações pertinentes. Falha de voz permanece visível na chamada, com ação explícita de reconexão existente.
-- Tokens semânticos candidatos, superfícies sólidas, cobre discreto, navegação por foco, entradas e controles de configurações na mesma paleta. Movimento reduzido retira transições/animações na prévia.
-- Adaptação dos componentes de login, perfil, menus e demais superfícies por tokens; não se trata de validação visual final dessas telas.
-- A renderização da tela inicial foi separada do componente que possui os hooks da sala. Ir para o início desmonta os hooks/listeners da sala corretamente, em vez de retornar antes deles na mesma função.
-- O botão compartilhado preserva simultaneamente `class`, `className`, `type`, `form` e `disabled`; ações sem `type` usam `button`, evitando submit implícito.
+- Navegação integrada com marca plana, seletor completo de servidores, atalhos recentes e acesso a criação/convites. A tela inicial usa os servidores reais, contexto da chamada e perfil/configurações, sem métricas inventadas.
+- Chamada e conversa na mesma coluna, com alternância do chat e controles visíveis. Capacidades do núcleo e contratos de ações continuam existentes.
+- `StatePanel` para carregamento, ausência de canal e ações pertinentes; falhas de voz persistem com reconexão explícita.
+- `desktop/web/src/styles/workspace.css` consolida superfícies, tipografia, foco, controles e estados compartilhados de login, configurações, perfis, menus e modais. Aurora foi retirada do bundle.
+- Botões sólidos preservam `class`, `className`, `type`, `form` e `disabled`. Ações usam `type=button` por padrão. Marca sem gradiente e cards sem iluminação/rastreamento do mouse. Personalização de arte/cores do perfil permanece.
+- Botões nativos para membros e seleção de canal, ações de canal separadas, tooltips por foco/hover com `aria-describedby` e Escape. Movimento reduzido também remove espera no fechamento dos overlays. O aviso de tela cheia expira por temporizador mesmo com animações desativadas.
 
-## Isolamento
+Paleta: canvas `#1E2021`, painel `#292C2D`, azul `#A4B8E6`, seleção `#303B51`, botão `#405780` e texto do botão `#F3F6FF`. Contrastes calculados para pares específicos: texto/botão 6,72:1, texto/hover 5,51:1, texto/seleção 8,93:1. Não representam auditoria de todas as telas.
 
-O frontend só define `data-design=next` quando a URL contém `?design=next`. Todas as regras da folha candidata são prefixadas por esse atributo, inclusive dentro de media queries. O modo padrão continua usando a interface existente.
+A chave `TRISCORD_DESIGN_PREVIEW` foi retirada do núcleo, pois a direção aprovada é o padrão. O identificador e os dados separados `app.triscord.rust-preview` permanecem. Sem bridge nativa, a página continua usando os fixtures existentes; isso não representa conta/chamada real.
 
-Para uma execução **manual e deliberada** do binário de desenvolvimento, o núcleo reconhece `TRISCORD_DESIGN_PREVIEW=1` e acrescenta o parâmetro à URL interna. Isso não altera o identificador `app.triscord.rust-preview`, não importa configurações da instalação e não executa atualização. Não há ativação persistente no sistema.
+## Verificação
 
-Nenhum lançamento manual foi feito por esta tarefa. Abrir a interface em execução não faz parte da validação permitida atualmente.
+TypeScript, unidades Node de estado de voz/IPC/VNodes, build Tailwind/esbuild, 104 testes Rust sem interface e compilação Windows MSVC passaram. O build continua sequencial com `-j 2`. A análise estática da folha confirma a contenção dos seletores em `data-design=workspace`; não comprova geometria ou aparência em execução.
 
-Em uma renderização web sem bridge nativa, os dados continuam sendo os fixtures já existentes; isso não deve ser apresentado como uma chamada ou conta real.
+O aviso não fatal `corrupt .drectve` continua no build script do host. `runtimeVerified=false`: nenhum aplicativo, navegador, instalador, captura, dispositivo ou E2E foi executado. O aplicativo instalado e chamadas não foram interrompidos. Não houve push, release ou deploy.
 
-## Verificação realizada
+## Limites restantes
 
-- TypeScript sem erros.
-- Unidades Node do estado de voz, contrato IPC e contratos da navegação/botões. O teste novo inspeciona VNodes e executa handlers com uma bridge falsa, sem DOM ou navegador. Confere acesso a todos os servidores, navegação para início, estado vazio e semântica de formulário.
-- Build da interface com Tailwind/esbuild. Corrigida a resolução do conteúdo do Tailwind para ser relativa à configuração, evitando classes ausentes quando o build parte da raiz do repositório.
-- 104 testes unitários Rust e compilação Windows MSVC, sequenciais com `-j 2`.
-- Inspeção por PostCSS da contenção dos seletores da prévia. Essa análise comprova o prefixo das regras, não a aparência, a disposição ou o contraste final em execução.
-- `git diff --check` sem erros de whitespace.
-
-O build script não executa mais o runner visual headless automaticamente. Edge/Playwright/UI automation são excluídos da validação nativa em cumprimento às instruções atuais.
-
-O aviso já existente `corrupt .drectve` permanece no build script do host; a compilação MSVC concluiu. `runtimeVerified=false`: nenhum app, navegador, instalador, captura, microfone, alto-falante ou E2E foi executado.
-
-## O que falta antes de concluir o objetivo
-
-### Continuação de usabilidade
-
-Controles de perfil na lista de membros agora são botões HTML nativos, com nome acessível. A seleção de canal também usa um botão nativo, separado das ações de chat/convite: Enter nessas ações não executa mais um handler de seleção no contêiner. Isso também permite ativação nativa por Espaço sem handlers de teclado concorrentes.
-
-Tooltips passam a abrir por foco, preservar handlers dos filhos e referenciar seu conteúdo por `aria-describedby`; Escape dispensa o tooltip visível. O fechamento de tooltip/modal não espera a duração da animação quando o sistema pede movimento reduzido.
-
-TypeScript, unidades Node existentes, build da interface, 104 unidades Rust e compilação MSVC passaram após essas alterações. Nenhuma navegação real por teclado foi automatizada ou observada: isso ainda depende de validação em execução permitida. A lista abaixo continua pendente.
-
-1. Avaliação/refinamento do usuário sobre a direção integrada em grafite/cobre, apresentada em `main-screen-v2.svg`.
-2. Ajustes decorrentes dessa avaliação antes da ativação geral.
-3. Conferência visual permitida das telas reais, incluindo larguras menores, popouts, vídeo nativo, foco, menus sobre vídeo, estados de erro e formulários. Compilação/unidades não comprovam esses itens.
-4. Retirar ou substituir a camada Aurora global somente quando a nova direção estiver estabelecida, evitando duas identidades concorrentes. A prévia ainda usa compatibilidade com os tokens dos componentes existentes; isso não representa o design system final consolidado.
-5. Revisão de acessibilidade e regressões dos fluxos completos dentro das formas de validação autorizadas. Não afirmar que todas as funcionalidades ou o desempenho real foram comprovados.
-
-Não houve push, release, deploy ou substituição do aplicativo instalado.
+A direção visual foi aprovada e aplicada ao código. Ainda falta conferir a aparência e interação das telas reais quando a validação visual for permitida, incluindo larguras menores, popouts, vídeo nativo, menus sobre vídeo, foco e estados de formulário. As imagens SVG/PNG anteriores são propostas estáticas; a revisão 02 registra a alternativa cobre, substituída pela escolha de azul. Não afirmar paridade funcional completa ou resolução dos problemas de mídia da reescrita por esta mudança visual.
