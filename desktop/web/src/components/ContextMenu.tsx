@@ -133,15 +133,21 @@ export function ContextMenuHost() {
       removeEventListener('blur', close); removeEventListener('resize', close); removeEventListener('wheel', onDown, true);
     };
   }, [menu]);
+  const [flipped, setFlipped] = useState(false);
   // Place at the pointer, then keep 16px inside the window (flip up/left when it would overflow).
   useLayoutEffect(() => {
     const el = layer.current?.firstElementChild as HTMLElement | null;
     if (!menu || !el) return;
     const pad = 16, w = el.offsetWidth, h = el.offsetHeight;
     let left = menu.x, top = menu.y;
-    if (left + w > innerWidth - pad) left = Math.max(pad, menu.x - w);
+    let isFlippedX = false;
+    if (left + w > innerWidth - pad) {
+      left = Math.max(pad, menu.x - w);
+      isFlippedX = true;
+    }
     if (top + h > innerHeight - pad) top = Math.max(pad, innerHeight - pad - h);
     setPos({ left, top });
+    setFlipped(isFlippedX);
   }, [menu]);
   // Native video windows sit above the page: cut the menu (and an open submenu) out of them while it shows.
   useEffect(() => {
@@ -156,7 +162,7 @@ export function ContextMenuHost() {
   if (!menu) return null;
   const style: Record<string, string> = pos ? { left: `${pos.left}px`, top: `${pos.top}px` } : { left: `${menu.x}px`, top: `${menu.y}px`, visibility: 'hidden' };
   return (
-    <div class="tri-menu-layer" ref={layer} style={style}>
+    <div class={`tri-menu-layer ${flipped ? 'tri-menu-layer--flip-x' : ''}`} ref={layer} style={style}>
       <MenuList entries={menu.entries} onClose={() => setMenu(null)} width={menu.width} label={menu.label} focus />
     </div>
   );

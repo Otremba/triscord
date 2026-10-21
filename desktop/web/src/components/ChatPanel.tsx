@@ -27,12 +27,10 @@ const dayLabel = (ts: number) => { const d = new Date(ts); return `${d.getDate()
 // "Fixar mensagem", ..., and the danger "Excluir mensagem" for own messages, each with a leading 20px icon.
 // triscord keeps: quick reactions (its six reactions: the first four), "Adicionar reação" with the six, "Copiar
 // texto" (CopyIcon) and "Excluir mensagem" (TrashIcon; Shift skips the confirmation, as Discord's hint says).
-function messageMenu(message: ChatMessage, bridge: Bridge): MenuEntry[] {
+export function messageMenu(message: ChatMessage, bridge: Bridge): MenuEntry[] {
   const react = (emoji: string) => bridge.send({ name: 'toggleReaction', messageId: message.id, emoji });
   return [
-    { kind: 'reactions', emojis: REACTIONS.slice(0, 4), onPick: react },
-    { kind: 'item', label: 'Adicionar reação', icon: 'Reaction', action: () => {},
-      submenu: REACTIONS.map(emoji => ({ kind: 'item' as const, label: emoji, action: () => react(emoji) })) },
+    { kind: 'reactions', emojis: REACTIONS, onPick: react },
     { kind: 'separator' },
     { kind: 'item', label: 'Copiar texto', icon: 'Copy', action: () => bridge.send({ name: 'copyMessageText', messageId: message.id }) },
     ...(message.own ? [{ kind: 'separator' as const }, { kind: 'item' as const, label: 'Excluir mensagem', icon: 'Trash' as const, danger: true,
@@ -81,6 +79,17 @@ function Message({ message, groupStart, bridge, avatars }: { message: ChatMessag
         <Tooltip text="Adicionar reação">
           <button class="tri-message__bar-button" aria-label="Adicionar reação" onClick={() => setPicker(!picker)}><Icon name="Reaction" size={20} /></button>
         </Tooltip>
+        {message.own && (
+          <Tooltip text="Excluir mensagem">
+            <button class="tri-message__bar-button tri-message__bar-button--danger" aria-label="Excluir mensagem" onClick={e => {
+              if (e.shiftKey) {
+                bridge.send({ name: 'deleteChatMessage', messageId: message.id });
+              } else {
+                dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'deleteMessage', message } }));
+              }
+            }}><Icon name="Trash" size={18} /></button>
+          </Tooltip>
+        )}
         <Tooltip text="Mais">
           <button class="tri-message__bar-button" aria-label="Mais" onClick={e => {
             const r = (e.currentTarget as HTMLElement).getBoundingClientRect();

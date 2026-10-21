@@ -4779,7 +4779,7 @@ dependencies = [
 
 [[package]]
 name = "triscord-desktop"
-version = "0.9.51"
+version = "0.9.52"
 dependencies = [
  "base64 0.22.1",
  "futures-util",

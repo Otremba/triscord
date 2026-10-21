@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
-const bundle=await build({stdin:{contents:`export {WorkspaceNav,workspaceMenuEntries} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';export {modalTabTarget} from './focus-policy';export {MemberList} from './components/MemberList';export {FixtureBridge} from './bridge';export {fixtureSession} from './fixtures';export {participantMenuEntries} from './components/ParticipantMenu';export {callTiles,callGridLayout} from './components/CallView';export {ChannelHeader} from './components/ChannelHeader';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,define:{'location.search':'""'},loader:{'.png':'dataurl','.css':'empty'},platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
-const {WorkspaceNav,workspaceMenuEntries,ShimmerButton,DeviceSelect,deviceChoices,modalTabTarget,MemberList,FixtureBridge,fixtureSession,participantMenuEntries,callTiles,callGridLayout,ChannelHeader}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
+const bundle=await build({stdin:{contents:`export {WorkspaceNav,workspaceMenuEntries} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';export {modalTabTarget} from './focus-policy';export {MemberList} from './components/MemberList';export {FixtureBridge} from './bridge';export {fixtureSession} from './fixtures';export {participantMenuEntries} from './components/ParticipantMenu';export {callTiles,callGridLayout} from './components/CallView';export {ChannelHeader} from './components/ChannelHeader';export {messageMenu} from './components/ChatPanel';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,define:{'location.search':'""'},loader:{'.png':'dataurl','.css':'empty'},platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
+const {WorkspaceNav,workspaceMenuEntries,ShimmerButton,DeviceSelect,deviceChoices,modalTabTarget,MemberList,FixtureBridge,fixtureSession,participantMenuEntries,callTiles,callGridLayout,ChannelHeader,messageMenu}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
 const sourceBundle=await build({entryPoints:[fileURLToPath(new URL('../src/share-sources.ts',import.meta.url))],bundle:true,write:false,platform:'node',format:'esm'});
 const {loadShareSources}=await import(`data:text/javascript;base64,${Buffer.from(sourceBundle.outputFiles[0].contents).toString('base64')}`);
 const events=new Set();
@@ -194,4 +194,22 @@ assert.ok(headerNodes.some(node=>node.type==='h1'&&node.props.children==='Geral'
 const workspaceSwitch=tree.find(node=>node.type==='button'&&/\btri-workspace-switch\b/.test(node.props.class));
 assert.ok(workspaceSwitch,'space switching uses a native button');
 assert.equal(nodes(workspaceSwitch).filter(node=>node.type==='button').length,1,'space actions cannot nest interactive buttons');
-console.log('Conversation layout: grid fitting, real header actions and independent workspace buttons passed');
+
+const testCommands=[];
+const mockBridge={send:cmd=>testCommands.push(cmd)};
+const ownMessage={id:'msg-1',authorId:'u1',authorName:'Alice',timestamp:Date.now(),text:'Hello',own:true,reactions:[]};
+const otherMessage={id:'msg-2',authorId:'u2',authorName:'Bob',timestamp:Date.now(),text:'Hi',own:false,reactions:[]};
+const ownEntries=messageMenu(ownMessage,mockBridge);
+const otherEntries=messageMenu(otherMessage,mockBridge);
+const ownLabels=ownEntries.map(e=>e.label).filter(Boolean);
+const otherLabels=otherEntries.map(e=>e.label).filter(Boolean);
+assert.ok(ownLabels.includes('Copiar texto')&&ownLabels.includes('Excluir mensagem'),'own message menu includes copy and delete');
+assert.ok(otherLabels.includes('Copiar texto')&&!otherLabels.includes('Excluir mensagem'),'other message menu omits delete');
+const reactionRow=ownEntries.find(e=>e.kind==='reactions');
+assert.equal(reactionRow?.emojis?.length,6,'quick reactions bar contains all 6 emojis');
+assert.ok(!ownEntries.some(e=>e.submenu),'message menu has no nested submenus that can clip or glitch');
+const deleteEntry=ownEntries.find(e=>e.label==='Excluir mensagem');
+assert.equal(deleteEntry?.danger,true);
+deleteEntry.action({shiftKey:true});
+assert.deepEqual(testCommands.pop(),{name:'deleteChatMessage',messageId:'msg-1'},'Shift+click on delete sends native deletion command');
+console.log('Conversation layout: grid fitting, real header actions, message actions and independent workspace buttons passed');

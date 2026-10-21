@@ -34,12 +34,13 @@
 .tri-menu__item.is-danger .tri-menu__checkbox.is-checked { background: var(--icon-feedback-critical); }
 .tri-menu__item.is-disabled { opacity: .5; pointer-events: none; }
 .tri-menu__separator { box-sizing: border-box; margin: 8px; border-bottom: 1px solid var(--border-subtle); }
-.tri-menu__submenu-anchor { position: absolute; top: -9px; left: calc(100% + 8px); z-index: 1; }
+.tri-menu__submenu-anchor { position: absolute; top: -9px; left: calc(100% + 8px); z-index: 10; }
+.tri-menu-layer--flip-x .tri-menu__submenu-anchor { left: auto; right: calc(100% + 8px); }
 
 /* Quick reactions row */
-.tri-menu__reactions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 0 0 4px; }
+.tri-menu__reactions { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; padding: 2px 0 6px; }
 .tri-menu__reaction {
-  height: 40px; border: 1px solid var(--border-subtle); border-radius: 8px; background: transparent; font-size: 20px; line-height: 24px;
+  height: 32px; border: 1px solid var(--border-subtle); border-radius: 6px; background: transparent; font-size: 18px; line-height: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
 .tri-menu__reaction:hover { background: var(--interactive-background-hover); }
 
