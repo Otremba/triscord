@@ -1,7 +1,4 @@
-/* User settings (Settings.tsx). Measured on out/claude-observations/motion/settings-*.png (1280x900 window, client
-   1264x892) and SETTINGS.md; colours mapped to tokens (nav #323339 = --background-base-lower, content #36373e =
-   --background-base-low, selected #42434a = --background-mod-normal over the nav). The navigation/shell CSS module
-   was not in the cache (Discord builds this screen with its newer settings layout), so geometry is measured. */
+/* User settings (Settings.tsx) */
 .tri-modal-backdrop:has(> .tri-settings) { padding: 40px; }
 .tri-settings {
   display: flex; box-sizing: border-box; width: 100%; height: 100%; overflow: hidden;
@@ -107,9 +104,7 @@
 /* Conta → Senha e autenticação: the description under the row label. */
 .tri-settings__row .tri-settings__label .tri-settings__description { display: block; margin-top: 4px; font-weight: var(--font-weight-normal); }
 
-/* Consecutive switch rows (Voz e vídeo: Supressão de ruído, Controle de ganho automático): Discord separates each
-   option with 20px and a 1px line (18/10: "tá tudo junto"). The description keeps clear of the switch. */
-/* "Alta qualidade" / "Padrão" under the noise suppression switch (Discord lists its suppressors the same way). */
+/* Voice & video options separator */
 .tri-settings__noise-mode { margin-top: 8px; }
 .tri-settings__noise-strength { margin-top: 20px; }
 .tri-settings__noise-strength + .tri-settings__toggle-row { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-subtle); }

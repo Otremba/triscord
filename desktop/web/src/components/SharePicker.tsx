@@ -5,22 +5,7 @@ import type { SessionStore } from '../store';
 import { Icon } from './Icon';
 import { ModalLayer, useModalClose } from './ModalLayer';
 
-// Share picker, observed in Discord (SHARE.md, 1280x900 window, 96 DPI): 960x746 modal centred (16px margin
-// in smaller windows) over a darkened window; segmented tabs on a 910x40 rail (4px inset, 32px segments)
-// "Aplicativos" and "Tela Inteira"; two-column grid of 439x247 thumbnails (radius 8, black), step 455x297,
-// caption with 16px icon and 16px name; hover darkens the thumbnail, draws a 2px outline 2px away and shows
-// a white 155x42 "Compartilhar tela" button. There is no confirm button: choosing a source starts sharing.
-// Stream mode block (SHARE.md, same as the Qt picker): "Jogos" (16px bold) over "Vídeo mais suave · 720p · 30fps"
-// (12px), a 110x40 SD/HD toggle and a 40x40 gear opening "Modo de transmissão" (245px, right-aligned with the gear,
-// bottom 10px above it): radios "Jogos" / "Compartilhamento de tela" with their quality, then "Silenciar áudio da
-// transmissão". INFERRED mapping (as in Qt): SD 720p / HD 1080p, Jogos 30 fps (60 in HD), Compartilhamento de tela
-// 15 fps (triscord has no 5 fps "Fonte"). HD needs Nitro in Discord: no paid lock here. Saved as settings.
-// Monitors are captioned "Tela 1", "Tela 2" (named by the core, as Discord's y/R7n4). "Dispositivos" lists the capture
-// devices (the cameras of the settings page) and streams the chosen one as the screen share; its CTA is "Selecionar"
-// (e72JFB) and with no device Discord's empty state shows "Você não tem nenhum dispositivo de captura disponível."
-// (/z3YaZ) and "No futuro, você poderá usar esta aba…" (agwSGA). Cards: module __2f580 (styles/call.css).
-// INFERRED: the black preview with the device icon (Discord shows the camera's own preview; no camera here).
-// Left out: "Personalizada", "Avançado" and the Nitro banner.
+// Screen and window share source picker modal.
 type Mode = 'game' | 'screen';
 function quality(mode: Mode, hd: boolean, parenthesised: boolean) {
   const res = `${hd ? 1080 : 720}p`, fps = `${mode === 'game' ? (hd ? 60 : 30) : 15}fps`;

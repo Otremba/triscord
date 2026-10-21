@@ -3,16 +3,7 @@ import type { Bridge } from '../bridge';
 import { Modal } from './Modal';
 import { useModalClose } from './ModalLayer';
 
-// Invite, from Discord's InstantInviteModal (chunk 940ef764bff92620.js, CSS module __67dba), its copy field
-// (modules 747007/416052/109802, CSS module _fffc15) and the capture discord-invite-modal.png / -copied.png.
-// Title "Convidar amigos para {servidor}". triscord has no friends list, so this is Discord's own variant
-// without friends (getBodyContent with showFriends false): subText__67dba text-sm "Compartilhe este link com
-// outros para conceder acesso ao seu servidor!" (the owner's string; only owners can invite), then the copy
-// field and, 16px below, footerText__67dba text-xs: hub invites have no expiry or use limit, which Discord
-// words as "Seu link de convite nunca irá expirar." (QrHBnC). The "never expire" checkbox and link settings
-// are left out (no triscord function). The field holds the bare code: triscord has no invite domain and
-// "Entrar em um servidor" accepts the code.
-// Copy button: brand by default, green "Copiado" for 1s after copying, red on failure (delay 1e3 in 416052).
+// Server invite generation and copy modal.
 export function InviteModal({ bridge, serverId, serverName, onClose }: { bridge: Bridge; serverId: string; serverName: string; onClose: () => void }) {
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

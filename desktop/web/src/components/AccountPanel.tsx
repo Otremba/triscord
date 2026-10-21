@@ -9,8 +9,7 @@ import { Icon } from './Icon';
 import { Tooltip } from './Tooltip';
 import { callStatus } from '../call-status';
 
-// Split audio button: module __5e764 — 32x32 button with square right corners, 1px gap, 16x32 chevron
-// (16px ChevronSmallDown) with square left corners; hovering the group lights both halves.
+// Split button with main toggle action and chevron menu.
 function SplitAudioButton({ red, icon, label, menuLabel, onToggle, onMenu }:
   { red: boolean; icon: IconName; label: string; menuLabel: string; onToggle: () => void; onMenu: (event: MouseEvent) => void }) {
   return (
@@ -31,18 +30,7 @@ const STATUS_LABEL: Record<Session['account']['status'], string> = {
   online: 'Disponível', idle: 'Ausente', dnd: 'Não perturbar', invisible: 'Invisível', offline: 'Offline',
 };
 
-// Panels: layout module __5e434 — absolute, 8px (--custom-panels-spacing) from the sidebar's bottom/left,
-// width 100% - 16, --background-base-low, 1px --border-muted, radius 8.
-// Account row: module __37e49 — 56px, 14px medium, gap 8; popout button padding 5px, radius 4, hover
-// --background-mod-normal; buttons gap 8; red icon --icon-feedback-critical when muted/deafened.
-// Observed in Discord (out/claude-observations/motion/panel-deafen-toggle, voice-join, share-start):
-// - hovering the account swaps the status line for the username;
-// - tooltips above the buttons, texts from the pt-BR locale: "Silenciar"/"Dessilenciar" (HITUcR/l3z++I),
-//   "Desativar áudio"/"Reativar áudio" (wjcRFX/XiejaJ), "Configurações de usuário";
-// - voice section: green signal icon (ConnectionFineIcon) left of "Voz conectada" / "Vídeo conectado" (daXg45 /
-//   HtVOdd), the room / server line, "Desconectar"; a row of buttons: camera (VideoSlash while off, green while
-//   on, "Ativar câmera"/"Desativar câmera"), share ("Compartilhar tela"/"Parar de transmitir", green while
-//   sharing); while sharing, a row above with the shared window's name and a stop button.
+// Bottom sidebar account row and user voice/audio controls.
 // Left out (no triscord function): the noise suppression button and activities of the button row.
 export function AccountPanel({ session, bridge }: { session: Session; bridge: Bridge }) {
   const { account, muted, deafened } = session;

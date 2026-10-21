@@ -1,8 +1,4 @@
-/* Design-system modal (CSS module __8a031), "Criar canal" (__62141), invite (__67dba) and the copy field
-   (_fffc15), all recovered with REA; form controls measured on discord-create-channel-*.png and
-   discord-invite-*.png (dark theme, 1280x900, 100% scale). See Modal.tsx for the structure. */
-
-/* Shell: container__8a031 + size-md__8a031 + padding-size-sm__8a031 */
+/* Modal dialog styles (Modal.tsx) */
 .tri-dmodal {
   --tri-modal-padding: 24px; --tri-modal-padding-sm: 8px; --tri-modal-padding-md: 16px;
   position: relative; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; max-width: 480px;

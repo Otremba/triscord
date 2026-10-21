@@ -38,9 +38,7 @@ export function participantMenuEntries(user: VoiceUser, session: Session, bridge
     entries.push({kind:'item',label:stream.hidden ? `Mostrar ${noun}` : `Ocultar ${noun} para mim`,
       action:()=>bridge.send({name:'setStreamHidden',streamId:stream.id,hidden:!stream.hidden})});
   }
-  // Moderation group (Discord's useAdminActionItems, module 291247, the last group of "user-context"): "Silenciar voz
-  // no servidor" (checkbox, danger, also for yourself) and "Desconectar" (danger, not for yourself). triscord's hub
-  // gives them to the room owner, per room, under Discord's label. Its "Desativar áudio no servidor" has no hub equivalent.
+  // Room owner moderation actions.
   const call = callChannelOf(session);
   const self = call?.users.find(u => u.self);
   if (call && self && call.ownerId === self.id && call.users.some(u => u.id === user.id)) {

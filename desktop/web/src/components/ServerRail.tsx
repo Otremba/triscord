@@ -7,15 +7,12 @@ import { Tooltip } from './Tooltip';
 import { openContextMenu } from './ContextMenu';
 import { TriscordLogo } from './ui/TriscordLogo';
 
-// Discord's guild acronym (bundle f_0000d3 offset 11891250), same as HubApi::serverAcronym in C++.
+// Generate acronym from server name.
 export function acronym(name: string): string {
   return name.replace(/'s /g, ' ').replace(/\w+/g, w => w[0]).replace(/\s/g, '');
 }
 
-// Guild tile: module __6e9f8 (40x40 --guildbar-avatar-size, acronym in --text-default on
-// --background-mod-subtle, brand background + white on hover/selected) and __0d706/__2dbe1 acronym weight.
-// Font size for a long acronym. Discord's own rule was not recovered (REA_CLAUDE_20261016.md, open gap):
-// INFERRED — 16px (observed for the 3-letter "Sdc") shrunk until it fits the tile with 4px each side.
+// Calculate font size for server acronym tile.
 const measure = (() => { let ctx: CanvasRenderingContext2D | null = null; return (text: string, px: number) => {
   ctx ??= document.createElement('canvas').getContext('2d');
   if (!ctx) return 0;
@@ -34,14 +31,7 @@ export function ServerIcon({ server, size = 40 }: { server: Server; size?: numbe
   return <span class="tri-server-acronym" style={{ width: `${size}px`, height: `${size}px`, fontSize: `${acronymSize(text, size)}px` }}>{text}</span>;
 }
 
-// Indicator: module __58105 — 8px wide white pill, height 8 (unread) / 20 (hover) / 40 (selected),
-// 0.2s ease-out transitions on height, opacity and transform.
-// Server context menu (observed, motion/ctx-server: 220px "fixed" menu): Discord lists "Marcar como lida",
-// "Convidar para o servidor", mute/notification settings, server settings, privacy, per-server profile, "Criar
-// canal", "Criar categoria", "Criar evento", "Mover para...". triscord keeps the items it can do: the invite for
-// owners and "Criar canal" (in the server you are viewing: rooms are created there). "Sair do servidor" closes
-// Discord's menu for members (red, J2TBi3); the owner, who cannot leave, gets "Excluir servidor" there instead
-// (Discord keeps deletion in the server settings, which triscord does not have).
+// Server context menu actions.
 const openRemoval = (kind: 'deleteServer' | 'leaveServer', server: Server) =>
   dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind, serverId: server.id, serverName: server.name } }));
 export function serverMenuEntries(server: Server, selected: boolean): MenuEntry[] {

@@ -3,24 +3,12 @@ import { setOccluders } from '../video';
 import type { IconName } from '../icons.generated';
 import { Icon } from './Icon';
 
-// Discord's context menu, recovered with REA (CSS module _c1e9c4, out/rea-claude-20261016/css-rules/menu_c1e9c4.css;
-// renderer module 980707) and observed (out/claude-observations/motion/ctx-*):
-// - menu: --background-surface-higher, 1px --border-subtle, radius 8, --shadow-high; scroller padding 8px;
-//   "fixed" menus are 220px wide, "flexible" ones 188-320px, the rest fit their content (observed 157px);
-// - item: text-sm/medium, label container min-height 32px with 8px padding, 20px icon 8px from the label
-//   (iconContainer; iconContainerLeft for leading icons), --interactive-text-default; focused/hovered:
-//   --interactive-background-hover, radius 4, --text-strong; danger: --text-feedback-critical, focused
-//   --background-feedback-critical; disabled at half opacity; caret 20px --text-muted for submenus;
-// - separator: 1px --border-subtle with 8px margins;
-// - opens at the pointer, moved to stay 16px inside the window (--custom-menu-viewport-padding); appears and
-//   disappears within one frame (observed, no animation); Escape, a click outside, scrolling or blur close it.
+// Context menu entry definitions.
 export type MenuEntry =
   | { kind: 'item'; label: string; subtext?: string; icon?: IconName; danger?: boolean; disabled?: boolean; action: (event: MouseEvent | KeyboardEvent) => void; submenu?: MenuEntry[];
-      checked?: boolean }  // MenuCheckboxItem: a trailing checkbox (danger rows colour it critical, menu module _c1e9c4)
+      checked?: boolean }
   | { kind: 'separator' }
   | { kind: 'reactions'; emojis: string[]; onPick: (emoji: string) => void }
-  // MenuControlItem with a slider (Discord's "Volume do usuário" / "Volume da transmissão" in the user menu): a label
-  // above a 0..max range; the menu stays open while it is dragged.
   | { kind: 'slider'; label: string; value: number; max: number; onChange: (value: number) => void };
 
 export interface MenuRequest { x: number; y: number; entries: MenuEntry[]; width?: 'fixed' | 'flexible'; label?: string }

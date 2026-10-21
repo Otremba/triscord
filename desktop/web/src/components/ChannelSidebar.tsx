@@ -8,12 +8,7 @@ import { Tooltip } from './Tooltip';
 import { openContextMenu, type MenuEntry } from './ContextMenu';
 import { AudioRipple } from './ui/AudioRipple';
 
-// Server header: module _f37cb1 — --custom-channel-header-height (49px incl. the 1px --border-subtle bottom
-// border), 8px padding, medium weight, --text-strong. The invite button (UserPlus) only for owners.
-// Server header dropdown (Discord, audit 18/10: the header is a button with a chevron that turns up while open; a 220px
-// menu centred under the header, 4px below, items with 20px icons on the left): Discord lists Impulso de servidor,
-// Convidar para o servidor, Config. do servidor, Criar canal/categoria/evento, Diretório de Apps, notification and privacy
-// settings, Editar perfil por servidor and "Sair do servidor" for members. triscord keeps what it can do.
+// Server header dropdown menu options.
 function serverDropdown(server: Server): MenuEntry[] {
   const invite = () => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'invite', serverId: server.id, serverName: server.name } }));
   return [
@@ -49,14 +44,7 @@ function ServerHeader({ server, bridge }: { server: Server; bridge: Bridge }) {
   );
 }
 
-// Category: module __29444 — 24px row, padding-inline 16 / 8, 12px chevron rotating -90deg when collapsed
-// (0.1s linear), "+" only on hover; 16px before the category (--custom-category-channel-space-before-category).
-// Channel row: module __2ea32 — 8px left margin, 1px vertical padding, link radius 8 with 4/8 padding,
-// 20px icon --channel-icon, name --channels-default, hover --interactive-background-hover, selected
-// --interactive-background-selected with --interactive-text-active.
-// Participant under a voice channel (CALLS.md / SIDEBAR.md, observed): 24px avatar at +36 of the row box,
-// 14px name 8px after it, 16px muted/deafened icons with 4px gaps ending 8px from the right edge.
-// Speaking: green ring on the avatar (--status-positive). "AO VIVO" badge when sharing (SHARE.md).
+// Voice channel participant row.
 function VoiceUserRow({ user, session, bridge }: { user: VoiceUser; session: Session; bridge: Bridge }) {
   const open=(anchor:HTMLElement)=>user.self ? dispatchEvent(new Event('tri-open-profile')) : openParticipantProfile(user.id,anchor);
   return (
@@ -81,10 +69,7 @@ function VoiceUserRow({ user, session, bridge }: { user: VoiceUser; session: Ses
   );
 }
 
-// Hover actions of a voice channel row: module _c69b6d (iconItem: hidden until the row is hovered, 4px apart;
-// actionIcon 16px --icon-muted, --interactive-text-hover on hover), tooltips above. Discord shows "Abrir chat",
-// "Criar convite" and "Editar canal" (observed, motion/channel-hover); triscord keeps the ones it can do:
-// the chat of the room you are in and the invite for owners. "Editar canal" has no triscord function.
+// Hover actions for voice channel row.
 function ChannelActions({ server, channelId, connected }: { server?: Server; channelId: string; connected: boolean }) {
   return (
     <span class="tri-channel__actions">
@@ -107,9 +92,7 @@ function ChannelActions({ server, channelId, connected }: { server?: Server; cha
   );
 }
 
-// Call timer of the connected channel row (observed, motion/camera-toggle, share-start): m:ss (h:mm:ss after an
-// hour) in --text-feedback-positive at the row's right; hovering the row shows the action icons instead
-// (module _c69b6d: iconVisibility:hover hides channelInfo). INFERRED: 12px --font-code (glyphs 8px tall).
+// Elapsed call timer.
 function CallTimer({ since }: { since: number }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
@@ -117,10 +100,7 @@ function CallTimer({ since }: { since: number }) {
   return <span class="tri-channel__timer">{h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`}</span>;
 }
 
-// Voice channel context menu (observed, motion/ctx-channel: menu fitted to its content): Discord lists "Marcar
-// como lida", "Convidar para voz", "Fixe o Canal no Topo", "Copiar link", "Abrir chat", "Ocultar nomes", "Silenciar
-// canal", "Mover para...", "Editar canal", "Duplicar canal", "Criar canal de voz", "Excluir canal". triscord keeps
-// "Convidar para voz" (owners), "Abrir chat" (the room you are in) and "Criar canal de voz".
+// Voice channel context menu.
 function channelMenu(bridge: Bridge, server: Server | undefined, channelId: string, channelName: string, connected: boolean, categoryName: string): MenuEntry[] {
   return [
     ...(server?.owned && server.id ? [{ kind: 'item' as const, label: 'Convidar para voz',
@@ -128,8 +108,6 @@ function channelMenu(bridge: Bridge, server: Server | undefined, channelId: stri
     { kind: 'separator' as const },
     ...(connected ? [{ kind: 'item' as const, label: 'Abrir chat', action: () => dispatchEvent(new CustomEvent('tri-open-chat', { detail: channelId })) }] : []),
     { kind: 'separator' as const },
-    // Discord's last group: Editar canal, Duplicar canal, Criar canal de voz, Excluir canal (audit 18/10); the hub has no
-    // rename/delete for rooms, so triscord offers the other two.
     { kind: 'item' as const, label: 'Duplicar canal', action: () => bridge.send({ name: 'createChannel', channelName }) },
     { kind: 'item' as const, label: 'Criar canal de voz', action: () => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'createChannel', categoryName } })) },
   ];

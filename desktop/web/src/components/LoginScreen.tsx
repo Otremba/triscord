@@ -5,17 +5,7 @@ import glyph from '../assets/triscord-glyph.png';
 import { TriscordLogo } from './ui/TriscordLogo';
 import { ShimmerButton } from './ui/ShimmerButton';
 
-// Login, observed in Discord (LOGIN.md, discord-login.png, 1280x900) and its auth box module __921c5
-// recovered with REA: 480px box (784px only with the QR column, which triscord has no use for), 32px
-// padding (--custom-auth-box-auth-box-padding), radius 8, high elevation shadow; semibold 24px title
-// "Boas-vindas de volta!" and subtitle "Estamos muito animados em te ver novamente!"; 12px bold uppercase labels,
-// 40px fields, a 38px brand button and the small link line under it; the wordmark at the top left of the page.
-// The login page uses its own fixed palette (measured: card #242429, title #f2f2f2, subtitle #bababc,
-// field #202024 / border #37373d / focus #4d96ee, button #5865f2 414x38) because no user theme applies yet.
-// triscord signs in with a nick (no account elsewhere needed; a new nick creates the account and the password is
-// optional, settable later in Configurações → Conta) or with Google. Discord's e-mail field becomes "Nome de usuário";
-// "Esqueceu sua senha?" has no function (there is no e-mail to recover with), and the QR column is left out.
-// The nick step after Google is triscord's own (Discord has no equivalent screen); it reuses the same box and field.
+// User authentication and login screen.
 export function LoginScreen({ auth, bridge, googleLogin = true }: { auth: AuthState; bridge: Bridge; googleLogin?: boolean }) {
   const [nick, setNick] = useState(auth.suggestedNick ?? '');
   const [error, setError] = useState<string | null>(null);

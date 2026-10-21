@@ -1,4 +1,4 @@
-/* Context menu (ContextMenu.tsx): CSS module _c1e9c4 recovered with REA, measured on motion/ctx-* captures. */
+/* Context menu (ContextMenu.tsx) */
 .tri-menu-layer { position: fixed; z-index: 1003; }
 .tri-menu {
   display: flex; box-sizing: border-box; max-height: calc(100vh - 32px); border: 1px solid var(--border-subtle); border-radius: 8px;
@@ -6,7 +6,7 @@
 }
 .tri-menu:focus, .tri-menu:focus-visible { outline: none; }
 .tri-menu--fixed { width: 220px; }
-/* Second line of an item (Discord menu subtext: 12px, --text-muted). */
+/* Item subtitle */
 .tri-menu__subtext { display: block; margin-top: 2px; overflow: hidden; color: var(--text-muted); font-size: 12px; line-height: 16px; text-overflow: ellipsis; }
 .tri-menu--flexible { min-width: 188px; max-width: 320px; }
 .tri-menu__scroller { flex: 1 1 auto; overflow: hidden auto; padding: 8px; scrollbar-width: none; }
@@ -26,9 +26,7 @@
 .tri-menu__item.is-danger, .tri-menu__item.is-danger .tri-menu__label { color: var(--text-feedback-critical); }
 .tri-menu__item.is-danger.is-focused { background-color: var(--background-feedback-critical); }
 .tri-menu__item.is-danger.is-focused .tri-menu__icon path { fill: var(--text-feedback-critical); }
-/* Checkbox rows (MenuCheckboxItem): iconContainer 20px, 8px after the label. Box observed in the Qt client's Discord
-   menus (CALLS.md): radius 4; checked = filled with the row's checkbox colour (.checkbox_c1e9c4: brand, critical on
-   danger rows) and a white tick (.check_c1e9c4); unchecked = 2px outline. */
+/* Checkbox rows */
 .tri-menu__checkbox { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; box-sizing: border-box; width: 20px; height: 20px;
   margin-inline-start: 8px; border: 2px solid var(--interactive-text-default); border-radius: 4px; color: var(--white); }
 .tri-menu__checkbox.is-checked { border-color: var(--control-brand-foreground-new, #5865f2); background: var(--control-brand-foreground-new, #5865f2); }
@@ -38,7 +36,7 @@
 .tri-menu__separator { box-sizing: border-box; margin: 8px; border-bottom: 1px solid var(--border-subtle); }
 .tri-menu__submenu-anchor { position: absolute; top: -9px; left: calc(100% + 8px); z-index: 1; }
 
-/* Quick reactions row of the message menu (observed): four 40px squares, 1px --border-subtle, radius 8. */
+/* Quick reactions row */
 .tri-menu__reactions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 0 0 4px; }
 .tri-menu__reaction {
   height: 40px; border: 1px solid var(--border-subtle); border-radius: 8px; background: transparent; font-size: 20px; line-height: 24px;
@@ -49,7 +47,7 @@
 /* The moderation mute badge uses the critical icon colour, independently of local volume. */
 .tri-voice-user__muted.is-server, .tri-call-card__pill .is-server { color: var(--icon-feedback-critical); }
 
-/* Slider rows (MenuControlItem): label, range and value, Discord's "Volume do usuário" in the user menu. */
+/* Slider rows */
 .tri-menu__control { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 8px; padding: 6px 8px 8px; }
 .tri-menu__control-label { grid-column: 1 / -1; color: var(--text-default); font-size: 14px; font-weight: var(--font-weight-medium); line-height: 18px; }
 .tri-menu__slider { width: 100%; margin: 0; }

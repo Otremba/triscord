@@ -3,13 +3,7 @@ import type { ChatMessage } from '../protocol';
 import { Modal } from './Modal';
 import { useModalClose } from './ModalLayer';
 
-// "Excluir mensagem" confirmation, from Discord's delete-message modal (chunk b_0ec277134df5e9c9, REA): the design-
-// system modal titled "Excluir mensagem" (MWMcg7) with the subtitle "Deseja mesmo excluir essa mensagem?" (AMvpS4),
-// a non-interactive preview of the message (CSS module _fd14e0 .message: --background-base-low, radius 3, legacy
-// border + high elevation, 10px vertical padding, 20px below), the hint "Fica a dica: você pode pressionar Shift
-// enquanto clica em excluir mensagem para ignorar a confirmação completamente." (IxY7E6, shown when opened from
-// the context menu; "excluir mensagem" in bold), and the actions "Cancelar" (secondary) + "Excluir"
-// (critical-primary). Shift+click on the menu item skips this modal, as the hint says.
+// Modal confirmation to delete a chat message.
 export function DeleteMessageModal({ bridge, message, onClose }: { bridge: Bridge; message: ChatMessage; onClose: () => void }) {
   const { closing, close } = useModalClose(onClose);
   return (

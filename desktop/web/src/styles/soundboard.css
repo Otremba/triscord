@@ -1,9 +1,4 @@
-/* Soundboard popover (Soundboard.tsx). Measured: SOUNDBOARD.md (532x522, anchored 8px above the button). CSS from
-   Discord's modules recovered with REA (out/rea-claude-20261016/css-rules/soundboard-picker.css, soundboard__9be63.css):
-   picker __09f65 (--background-base-low, radius-sm, shadow-border + shadow-high), header __0856d (12px padding,
-   elevation-low), rail _a1e0e0 (48px column, 24px icons in 4px padding, radius-xs, selected --background-base-low,
-   hover --interactive-background-hover, .2s), sections __61424 (sticky, --background-base-low, title margin 0 4px,
-   --interactive-text-default -> active on hover; rows gap 8, padding-left 8, bottom 8), tile __9be63 below. */
+/* Soundboard popover (Soundboard.tsx) */
 .tri-soundboard {
   position: fixed; z-index: 1004; display: flex; flex-direction: column; width: 532px; height: 522px;
   max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow: hidden;

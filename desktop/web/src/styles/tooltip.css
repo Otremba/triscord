@@ -1,5 +1,4 @@
-/* Tooltip (Tooltip.tsx): CSS module _c36707 recovered with REA, primary variant; spring from module 900002.
-   The anchor sits on the target edge (fixed), the tooltip is translated so its pointer side touches it. */
+/* Tooltip (Tooltip.tsx) */
 .tri-tooltip-anchor { position: fixed; z-index: 1002; width: 0; height: 0; pointer-events: none; }
 .tri-tooltip {
   position: absolute; box-sizing: border-box; width: max-content; max-width: 190px; border: 1px solid var(--border-subtle); border-radius: 8px;

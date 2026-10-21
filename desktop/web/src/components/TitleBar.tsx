@@ -2,11 +2,7 @@ import type { Bridge } from '../bridge';
 import type { Server } from '../protocol';
 import { ServerIcon } from './ServerRail';
 
-// Title bar: Discord module _c38106 (bar/title/winButtons) — 32px (--custom-app-top-bar-height), centred
-// title, 32x32 window buttons with a 4px gap; minimise/maximise hover --interactive-background-hover, close
-// hover --control-critical-primary-background-default. Back/forward, inbox and help have no triscord function.
-// The system move starts once the pointer really drags (3px with the button held), so a double click (maximize /
-// restore) is not taken for a drag; a maximized window dragged this way gets its normal size back under the cursor.
+// Custom title bar with draggable region and window controls.
 function dragWindow(down: MouseEvent, bridge: Bridge) {
   const move = (e: MouseEvent) => {
     if (!(e.buttons & 1)) return stop();

@@ -3,15 +3,7 @@ import type { Bridge } from '../bridge';
 import { Icon } from './Icon';
 import { ModalLayer, useModalClose } from './ModalLayer';
 
-// "Criar seu servidor" flow, from Discord's own code and CSS recovered with REA plus captures
-// (SERVIDORES.md, REA_CLAUDE_20261016.md):
-//   start ("Criar seu servidor", observed) -> customize ("Personalize o seu servidor", observed;
-//   CUSTOMIZE_GUILD: name suggestion "Servidor de {username}", primary "Criar" + secondary "Voltar")
-//   start -> join (JOIN_GUILD, module 812633 + 2d1f7e43168351af.css: required "Link de convite", sample chips
-//   that fill the field, primary "Entrar no servidor"; errors shown in the field).
-// Left out as in the Qt client: the community/friends question, templates, server icon upload, the
-// guidelines footer and the Discovery row (no triscord function or never observed).
-// Inferred: modal width 444px and option rows 402x54 measured on the captures (WIDTH_SMALL token unresolved).
+// Server creation and joining modal dialog.
 type Page = 'start' | 'customize' | 'join';
 // Submits read the field itself, so a submit right after a paste never sees a stale state value.
 const field = (event: Event, key: string) =>

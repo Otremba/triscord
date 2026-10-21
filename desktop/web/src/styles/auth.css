@@ -1,12 +1,9 @@
-/* Login (LOGIN.md + auth box module __921c5) and the server modal (SERVIDORES.md + JOIN_GUILD CSS).
-   The login page has Discord's fixed pre-login palette (measured literals, documented in LoginScreen.tsx);
-   the server modal uses the theme tokens. */
+/* Login page and server modal styles */
 
 /* Login */
 .tri-login {
   position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px 16px; overflow: hidden;
-  /* Measured samples #18004d (left) and #2b3dc4 (right) of Discord's animated art; INFERRED as a gradient with slow
-     drifting light blobs standing in for the artwork (still under prefers-reduced-motion). */
+  /* Background gradient */
   background: linear-gradient(90deg, #18004d, #2b3dc4);
 }
 .tri-login__art { position: absolute; inset: 0; pointer-events: none; }
@@ -45,7 +42,7 @@
 .tri-login__google { display: flex; align-items: center; justify-content: center; gap: 10px; height: 38px; border: 1px solid #37373d; border-radius: 6px; background: #2e2e34; color: #f2f2f2; font-size: 15px; font-weight: var(--font-weight-medium); transition: background-color .17s, border-color .17s; }
 .tri-login__google:hover:not(:disabled) { background: #36363d; border-color: #4a4a52; }
 .tri-login__google:disabled { opacity: .6; cursor: default; }
-/* Discord's button spinner ("wanderingCubes" inferred as three pulsing dots). */
+/* Button loading dots spinner */
 .tri-login__dots { --dot: radial-gradient(circle, #fff 60%, transparent 62%); width: 32px; height: 8px; background: var(--dot) 0 0 / 8px 8px no-repeat, var(--dot) 12px 0 / 8px 8px no-repeat, var(--dot) 24px 0 / 8px 8px no-repeat; animation: tri-login-dots 1s ease-in-out infinite; }
 @keyframes tri-login-dots { 50% { opacity: .35; } }
 .tri-required { color: #f23f43; }

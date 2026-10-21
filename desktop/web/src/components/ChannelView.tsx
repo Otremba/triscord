@@ -14,8 +14,7 @@ import { WorkspaceHome } from './WorkspaceHome';
 import { callStatus } from '../call-status';
 import { useEffect, useState } from 'preact/hooks';
 
-// Channel header: module __9293f — 49px (--custom-channel-header-height) with a 1px --border-subtle bottom
-// border, 8px padding, 16px text, --text-default.
+// Channel header layout.
 type ChannelViewProps={ session: Session; bridge: Bridge; store: SessionStore; popout?: boolean; workspace?:boolean };
 export function ChannelView(props:ChannelViewProps) {
   const {session,bridge,popout}=props;

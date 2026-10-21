@@ -3,14 +3,7 @@ import { cloneElement } from 'preact';
 import { createPortal } from 'preact/compat';
 import { useEffect, useId, useRef, useState } from 'preact/hooks';
 
-// Discord's design-system tooltip, recovered with REA:
-// - CSS module _c36707: box 1px --border-subtle, radius 8, --shadow-high, primary = --background-surface-high,
-//   content padding 8px 12px, 14px medium 16px line-height, 5px pointer; transform-origin on the target side.
-// - module 900002: spring {tension 2400, friction 52} on opacity 0 -> 1 and scale .95 -> 1, back on leave
-//   (--tri-spring-tooltip in motion.generated.css); placed `spacing` px from the target, centred on it.
-// - guild list tooltip (GuildTooltip, CSS module _b1f768): position "right", spacing 12, text-md/semibold in
-//   --text-default, max-width 196. Measured on Discord (motion/rail-hover): body 12px right of the tile, pointer
-//   on the vertical centre, 36px tall for one line (so an 18px line box, not the 20px of text-md: measured).
+// Tooltip component with portal positioning and spring animation.
 type Position = 'right' | 'top' | 'bottom';
 export function Tooltip({ text, position = 'top', spacing = 8, guild = false, children }: {
   text: ComponentChildren; position?: Position; spacing?: number; guild?: boolean; children: VNode<any>;

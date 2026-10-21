@@ -1,7 +1,4 @@
-/* App frame. Values from Discord's CSS modules recovered with REA (desktop/out/rea-claude-20261016/css-rules)
-   and the measurements in desktop/out/claude-observations; colours only through generated tokens. */
-
-/* Layout: module __5e434 (.base grid, .sidebar, .sidebarList, .page, .panels) */
+/* App frame layout */
 .tri-app { display: grid; grid-template-rows: var(--custom-app-top-bar-height) 1fr; height: 100vh; }
 .tri-content { display: flex; min-height: 0; min-width: 0; overflow: hidden; }
 .tri-sidebar { position: relative; display: flex; flex: 0 0 auto; width: var(--tri-sidebar-width); min-height: 0; }
@@ -73,7 +70,7 @@
 .tri-page { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; background: var(--background-base-lower); }
 :root[data-theme="midnight"] .tri-page { border-inline-start: 1px solid var(--border-subtle); }
 
-/* Title bar: module _c38106 */
+/* Title bar */
 .tri-titlebar {
   position: relative; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-8);
   min-height: var(--custom-app-top-bar-height); background: var(--background-base-lowest); -webkit-app-region: drag;
@@ -86,7 +83,7 @@
 .tri-winbutton:hover { background: var(--interactive-background-hover); color: var(--interactive-text-hover); }
 .tri-winbutton--close:hover { background: var(--control-critical-primary-background-default); color: var(--white); }
 
-/* Server rail: modules __650eb (listItem), __58105 (pill), __6e9f8 (tile), __5bc7e (circle button) */
+/* Server rail */
 .tri-rail { display: flex; flex-direction: column; flex: 0 0 auto; width: var(--custom-guild-list-width); overflow: hidden auto; scrollbar-width: none; }
 .tri-rail__item { position: relative; display: flex; justify-content: center; width: var(--custom-guild-list-width); margin-bottom: var(--space-8); }
 .tri-rail__pill-wrapper { position: absolute; inset-inline-start: 0; top: 0; display: flex; align-items: center; width: 8px; height: 100%; overflow: hidden; contain: layout size; }
@@ -132,7 +129,7 @@
   background: var(--background-mod-accent, rgba(255, 255, 255, 0.08));
 }
 
-/* Server header: module _f37cb1 */
+/* Server header */
 .tri-server-header {
   display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto;
   height: var(--custom-channel-header-height); padding: var(--space-xs); border-bottom: 1px solid var(--border-subtle);
@@ -147,7 +144,7 @@
 .tri-icon-button { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-sm); color: var(--interactive-text-default); }
 .tri-icon-button:hover { color: var(--interactive-text-hover); background: var(--interactive-background-hover); }
 
-/* Categories: module __29444; channel rows: module __2ea32 */
+/* Categories and channel rows */
 .tri-categories { flex: 1 1 auto; overflow: hidden auto; padding-inline-end: var(--space-8); padding-bottom: 72px; }
 .tri-category { padding-top: var(--custom-category-channel-space-before-category); }
 .tri-category__header {
@@ -175,7 +172,7 @@
 .tri-channel.is-selected .tri-channel__link { background: var(--interactive-background-selected); }
 .tri-channel.is-selected .tri-channel__name, .tri-channel.is-connected .tri-channel__name { color: var(--interactive-text-active); }
 
-/* Panels + account row: modules __5e434 (.panels) and __37e49 */
+/* Panels and account row */
 .tri-panels {
   position: absolute; z-index: 10; inset-inline-start: var(--space-xs); bottom: var(--space-xs); width: calc(100% - var(--space-xs) * 2);
   background: var(--background-base-low); border: 1px solid var(--border-muted); border-radius: var(--radius-sm);
@@ -217,7 +214,7 @@
 .tri-avatar__status--idle { background: var(--icon-status-idle); }
 .tri-avatar__status--dnd { background: var(--icon-status-dnd); }
 
-/* Channel header: module __9293f; composer: module __74017 */
+/* Channel header and composer */
 .tri-channel-header {
   display: flex; align-items: center; gap: var(--space-8); flex: 0 0 auto; height: var(--custom-channel-header-height);
   padding: 8px 8px 8px var(--custom-message-margin-horizontal); border-bottom: 1px solid var(--border-subtle);

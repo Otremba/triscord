@@ -1,5 +1,4 @@
-/* Call UI. Sources: CALLS.md / SHARE.md (captures) and Discord CSS modules _f1ceac (call buttons),
-   _bcc569 (control), recovered with REA. Colours only through generated tokens. */
+/* Call UI */
 
 /* Participants under a voice channel */
 .tri-voice-users { padding: 2px 0 4px; }
@@ -7,7 +6,7 @@
 .tri-voice-user:hover { background: var(--interactive-background-hover); color: var(--interactive-text-hover); }
 .tri-voice-user__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: var(--font-weight-medium); }
 .tri-voice-user__icons { display: flex; gap: 4px; color: var(--interactive-icon-default); }
-/* Own/peer mute icons take the row icon colour; only "Silenciado no servidor" is red (Discord, audit 18/10). */
+/* Server mute indicator */
 .tri-voice-user__muted { color: inherit; }
 .tri-avatar--24 { width: 24px; height: 24px; }
 .tri-avatar--24 .tri-avatar__letter { font-size: 11px; }
@@ -142,12 +141,7 @@
 .tri-share-mode__radio { flex: 0 0 auto; box-sizing: border-box; width: 20px; height: 20px; border: 2px solid var(--interactive-text-default); border-radius: 50%; }
 .tri-share-mode__radio.is-checked { border: 0; background: radial-gradient(circle, var(--white) 4px, var(--control-brand-foreground-new, #5865f2) 4.5px); }
 .tri-share-mode__separator { height: 1px; margin: 18px 8px 7px; background: var(--border-subtle); }
-/* Source grid and cards: Discord's module __2f580 (go-live source picker, current Discord cache, css sha256 5fc7cee3…;
-   JS 316898225cbe6756.js e4/e7/e8): two 1fr columns, gap 24 16; a card is a column up to 447px; the preview is a 16:9
-   black box (radius-sm) inside a container whose ::before draws a 2px ring 4px out (radius-md): transparent,
-   --background-mod-strong on hover, --brand-500 when selected. Hover shows an --opacity-black-40 overlay with the
-   white CTA (--white / --black, radius-sm, padding 12/24, text-sm/medium): Discord's own colours, in every theme.
-   Name row 8px below: 16px icon, 8px gap, text-sm/medium, ellipsis. The grid keeps 4px each side for the ring. */
+/* Source grid and cards */
 .tri-share-grid { flex: 1 1 auto; overflow: hidden auto; display: grid; grid-template-columns: 1fr 1fr; gap: 24px 16px; align-content: start;
   margin: 0 -4px; padding: 20px 4px 16px; }
 .tri-share-source { display: flex; flex-direction: column; max-width: 447px; min-width: 0; text-align: start; }

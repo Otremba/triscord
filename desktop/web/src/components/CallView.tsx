@@ -45,23 +45,7 @@ function ParticipantCard({ user, session, bridge, role = 'grid', style, onFocus 
   );
 }
 
-// Controls bar (CALLS.md + module _f1ceac): centred 16px above the bottom; 50px capsules with a 1px border;
-// 40px buttons, 20px icons, radius 8; microphone = 36px button + 1px gap + 16px caret ("attached"),
-// red glow when muted (--opacity-red-12 / --red-400); camera and share green when active; 64x50 red
-// "Desconectar" (--control-critical-primary-*).
-// Observed (motion/call-controls-show, share-start): two capsules — [microphone, camera] and [share, activities,
-// soundboard, "Mais opções"] — then "Desconectar"; "Convidar para voz" icon at the bottom-left, pop-out and
-// "Tela cheia" at the bottom-right. Camera shows VideoSlash while off. triscord keeps what it can do: no camera
-// caret (no device menu yet), activities, "Mais opções" or pop-out. Fullscreen uses the native window.
-// Bottom-right (module 540462 renderBottomRight): [participant volume], "Mostrar sempre"/"Remover do topo" (only in
-// the popout window, module 619344), the popout button (module 128286: "Nova Janela", or "Voltar para o Discord" with
-// the icon turned 180deg while the popout is open; offered in a call with video), then "Tela cheia" (not while the
-// main window while the call is popped out; the popout window has its own). triscord: "Voltar para o Triscord".
-// Audit 18/10 (Discord today, alone without video): the pop-out button is there without video too; the camera has a
-// caret opening "Câmera" (device submenu), "Prévia da câmera" and "Configurações de vídeo"; the second capsule ends with
-// "Mais opções" (…): "Convidar para voz", checkboxes "Exibição em grade", "Mostrar Minha Própria Câmera", "Mostrar
-// participantes sem vídeo", "Mostrar prévia de novas mensagens", then "Configurações de voz e vídeo". triscord offers the
-// ones it can do (local camera preview; no grid toggle, own-camera toggle or message previews yet).
+// Call action bar and camera options menu.
 function cameraMenu(event: MouseEvent, session: Session, bridge: Bridge) {
   const devices = session.settings?.cameraDevices ?? [], selected = session.settings?.cameraDevice ?? '';
   const name = (id: string) => id ? devices.find(d => d.id === id)?.name ?? 'Dispositivo Indisponível' : 'Padrão do Windows';
@@ -251,9 +235,7 @@ export function CallView({ session, bridge, store, idle = false, inPopout = fals
   const invite = server?.owned && server.id
     ? () => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'invite', serverId: server.id, serverName: server.name } }))
     : undefined;
-  // Participant menu on video cards, as on the other cards (Discord: onContextMenuParticipant, module 540462). Over the
-  // native video the click reaches the core's window, which sends videoContextMenu with the point; elsewhere on the
-  // card (its control bar, a hidden video) the page gets it directly.
+  // Participant context menu on video cards.
   const menuFor = (stream: { ownerId?: string }) => allUsers.find(u => u.id === stream.ownerId);
   useEffect(() => store.onEvent(event => {
     if (event.name !== 'videoContextMenu') return;
@@ -282,7 +264,7 @@ export function CallView({ session, bridge, store, idle = false, inPopout = fals
     const toggle = stage.current?.querySelector<HTMLElement>('.tri-call-film-toggle');
     setOccluders('film-toggle', toggle && !idle ? [toggle.getBoundingClientRect()] : []);
   }, [composition, idle]);
-  // Idle (observed 17/10): names, zoom and the filmstrip toggle disappear; the native windows drop their name pill.
+  // Notify core on idle state changes.
   useEffect(() => { bridge.send({ name: 'videoIdle', idle }); }, [idle, bridge]);
   useEffect(() => () => bridge.send({ name: 'videoIdle', idle: false }), [bridge]);
   useEffect(() => () => setOccluders('film-toggle', []), []);
@@ -294,8 +276,7 @@ export function CallView({ session, bridge, store, idle = false, inPopout = fals
   useEffect(() => () => setStageOccluders([]), []);
   return (
     <div class={`tri-call ${idle ? 'is-idle' : ''}`} ref={stage}>
-      {/* Call in the popout window: the main window keeps the header and controls; the content gives way to Discord's
-          screen message J5bXZU over a 60% black layer (modules 156652/919706/200749, root_e605a1, header_c6e099). */}
+      {/* Placeholder when call is popped out to a separate window */}
       {session.callPopout && !inPopout ? (
         <div class="tri-call-popped-out" role="status">
           <div class="tri-call-popped-out__message"><span class="tri-call-popped-out__header">Você abriu uma janela separada para esta reprodução</span></div>

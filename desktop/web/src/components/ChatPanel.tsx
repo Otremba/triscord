@@ -6,21 +6,7 @@ import { Tooltip } from './Tooltip';
 import { Markdown } from './Markdown';
 import { openContextMenu, type MenuEntry } from './ContextMenu';
 
-// Voice channel chat panel, observed in Discord (CHAT.md, reference/discord-voicechat-1-open.png): 450px on the
-// right, full height under the title bar, --background-base-lower; 48px header (chat icon, channel name, close)
-// over a 1px --border-subtle divider; message list; the same composer as the text channel.
-// Messages from Discord's CSS recovered with REA (out/rea-claude-20261016/css-rules/message_c19a55.css,
-// message__5126c.css): cozy layout, 40px avatar 16px from the edge, content at 72px, 2px vertical padding,
-// header 22px line with the 16px medium username in --text-strong and the 12px --chat-text-muted timestamp;
-// a new group starts 17px lower (group-spacing-16); continuation messages show the time on hover in the 56px
-// gutter; hover background --message-background-hover. Groups: same author, same day, at most 7 minutes apart
-// (bundle: `r=7*Millis.MINUTE`, same-day check `864e5>=|a-b| && same date`). Timestamps: moment calendar
-// formats from the bundle, "[Hoje às] LT", "[Ontem às] LT", otherwise "L LT" (observed 09/09/2026 02:09).
-// Date divider (module __908e2): thin --border-subtle line, 12px semibold --text-muted label on the chat
-// background, 24px above / 8px below. Reactions (module _f8896c): 8px-radius pills, 20px emoji, count 14px
-// semibold. Hover action bar (CHAT.md, observed): 32px box 16px above the message, 14px from its right edge,
-// 28px buttons with 20px glyphs: three quick reactions, a 1px divider, "Adicionar reação".
-// triscord: the six reactions the hub accepts; deleting (Discord: "Mais" menu) waits for the context menu work.
+// Voice and text channel chat panel.
 const REACTIONS = ['\u{1F44D}', '❤️', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F389}'];
 const MINUTE = 60_000;
 const two = (n: number) => String(n).padStart(2, '0');
@@ -123,7 +109,7 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose, ful
   const draftRevision = useRef(0);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const edit = (value: string) => { draftRevision.current++; setText(value); setSendError(false); };
-  // REA composer module __74017: 56px minimum, growing to the 50vh limit.
+  // Auto-resize composer height up to viewport limits.
   useLayoutEffect(() => {
     const input = composer.current;
     if (!input) return;

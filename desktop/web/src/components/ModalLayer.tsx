@@ -3,13 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'preac
 import { suspendOverlays } from '../video';
 import { modalTabTarget } from '../focus-policy';
 
-// Discord's modal layer motion, recovered with REA (motion.generated.css has the springs):
-// - scrim (module 943320, CSS __40128: --background-scrim, fixed): opacity 0 -> 1 with spring hP
-//   {mass 1, tension 1000, friction 48}, and back to 0 on leave with the same spring;
-// - modal (module 150591 kS): opacity 0 -> 1 with the same spring after 64ms; on close opacity 0 and scale(0.9)
-//   with {mass 1, tension 1200, friction 80}; the modal is removed when that spring rests.
-// Measured on Discord (out/claude-observations/motion/modal-create-channel): scrim darkens ~70ms after the click
-// is handled, the modal finishes fading in ~160ms later.
+// Modal overlay and transitions.
 export function useModalClose(onClose: () => void) {
   const [closing, setClosing] = useState(false);
   const close = useCallback(() => setClosing(true), []);

@@ -11,7 +11,7 @@ export function safeWebHref(value?: string): string | undefined {
   } catch { /* Unsupported/invalid links stay inert. */ }
 }
 
-// Port of native formatDiscordTimestamp: retained Moment modules379418,536637.
+// Format relative timestamp in Portuguese.
 export function relativeTimestamp(seconds: number, now = Date.now()): string {
   const date = new Date(seconds * 1000), current = new Date(now);
   const first = date < current ? date : current, last = date < current ? current : date;

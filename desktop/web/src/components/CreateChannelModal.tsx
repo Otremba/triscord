@@ -4,14 +4,7 @@ import { Icon } from './Icon';
 import { Modal } from './Modal';
 import { useModalClose } from './ModalLayer';
 
-// "Criar canal", from Discord's create-channel modal (chunk f8adfb328d505533.js, renderCreateChannelModal, CSS
-// module __62141) and the captures discord-create-channel-text.png / -voice.png (opened from the "+" of
-// "Canais de Voz"): title "Criar canal", subtitle "em {categoria}", "Tipo de canal" radio group, "Nome do canal"
-// field with the type's icon as prefix and placeholder "novo-canal", actions "Cancelar" + "Criar canal"
-// (disabled while the name is empty); the content is a 20px-gap column (createChannelContent__62141).
-// triscord channels are voice rooms, so only the "Voz" option is offered (Texto and Fórum have no triscord
-// function), and the "Canal privado" switch and the emoji button are left out for the same reason.
-// Errors go in the modal footer as a critical message, as Discord's renderError does.
+// Channel creation modal dialog.
 const field = (event: Event, key: string) =>
   (((event.currentTarget as HTMLFormElement).elements.namedItem(key) as HTMLInputElement | null)?.value ?? '').trim();
 
