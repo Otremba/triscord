@@ -86,6 +86,9 @@ Esta memória foi consolidada da conversa do Claude Code `66a8637f-6d60-4f38-b80
 
 - Limpeza de arquivos e comentários obsoletos (21/10): a pedido do usuário, removidos 84 arquivos legados (mais de 11.000 linhas): pasta de notas históricas (`docs/history/`), rascunhos e scripts de propostas de design (`docs/design/*.svg`, `proposal.py`), ferramentas de revisão visual (`desktop/tools/visual-review/`) e testes legados em Python (`desktop/tests/e2e/`). Comentários verbosos de engenharia reversa (IDs de módulos e offsets de bundles legados) foram limpos no código TypeScript e CSS. Preservados scripts essenciais de compilação/deploy (`build.ps1`, `deploy.ps1`), READMEs, regras de agentes e testes unitários (105 testes Rust e todos os testes web verdes).
 
+- Release oficial em Rust (21/10): publicada a `desktop-v0.9.46`, commit `57afdc9`, com instalador `Triscord-Setup-0.9.46.exe` (10.991.419 bytes, SHA-256 `6f3a9fec09a57ebb53e70afca8dbcb1228683fc7543e87661316c4dbfe907eb6`) e `make_latest=false`. O aplicativo nativo foi migrado integralmente para o núcleo em Rust/Tauri (39,4 MB de binário estático standalone, sem Qt, Go ou FFmpeg). GitHub release, tag `desktop-v0.9.46` e site Cloudflare Pages (`triscord.pages.dev`, deploy `50c2f9b3`) confirmados e respondendo 200. Passaram 105 testes unitários em Rust, testes TypeScript e contrato IPC, `runtimeVerified=false`.
+
+
 
 
 
