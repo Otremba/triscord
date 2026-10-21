@@ -66,6 +66,7 @@ export class FixtureBridge implements Bridge {
     this.sent.push(command);
     const requestId = nextRequestId();
     if (command.name === 'requestSnapshot') queueMicrotask(() => this.push());
+    if (command.name === 'selectServer') this.patch({selectedServerId:command.serverId});
     if (command.name === 'selectChannel') this.patch({ selectedChannelId: command.channelId });
     if (command.name === 'setMuted') this.patch({ muted: command.muted });
     if (command.name === 'setDeafened') this.patch({ deafened: command.deafened });
@@ -74,6 +75,11 @@ export class FixtureBridge implements Bridge {
   onMessage(handler: (message: CoreMessage) => void): void { this.handler = handler; this.push(); }
   request<T>(command: Command): Promise<T> {
     this.send(command);
+    if (command.name === 'getOwnProfile') return this.session.profile ? Promise.resolve(this.session.profile as T) : Promise.reject(new Error('Falha de carregamento simulada para revisão.'));
+    if (command.name === 'saveOwnProfile' && this.session.profile) {
+      this.patch({profile:{...this.session.profile,...command.fields}});
+      return Promise.resolve(this.session.profile as T);
+    }
     if (command.name === 'listShareSources')
       return Promise.resolve({ generation: '1', sources: [{ index: 0, kind: 'screen', name: 'Tela 1' }, { index: 1, kind: 'window', name: 'Bloco de notas' }] } as T);
     if (command.name === 'createInvite') return Promise.resolve({ code: '3f9c2a7e5b1d4c8fa06e2b9d7c1f4a53' } as T);

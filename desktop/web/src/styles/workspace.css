@@ -258,7 +258,7 @@
 :root[data-design="workspace"] .tri-connection-note[data-tone="critical"] { border-color:var(--ui-critical-border);color:var(--ui-critical); }
 :root[data-design="workspace"] .tri-connection-note button { flex:none;padding:6px 10px;border:1px solid var(--ui-border);border-radius:6px;color:var(--ui-text); }
 :root[data-design="workspace"] .tri-workspace-home { flex:1;min-width:0;overflow:auto;padding:48px clamp(24px,6vw,96px);background:var(--ui-canvas); }
-:root[data-design="workspace"] .tri-workspace-home__header h1 { max-width:800px;font-size:32px;font-weight:600;letter-spacing:-.7px;line-height:1.3;overflow-wrap:anywhere; }
+:root[data-design="workspace"] .tri-workspace-home__header h1 { max-width:800px;font-size:26px;font-weight:600;letter-spacing:-.5px;line-height:1.3;overflow-wrap:anywhere; }
 :root[data-design="workspace"] .tri-workspace-home__header p { color:var(--ui-muted);font-size:15px;line-height:1.6; }
 :root[data-design="workspace"] .tri-workspace-home__call { display:flex;align-items:center;gap:16px;max-width:850px;margin-top:28px;padding:20px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel); }
 :root[data-design="workspace"] .tri-workspace-home__call>svg { color:var(--ui-positive); }
@@ -383,3 +383,9 @@
 :root[data-design="workspace"] :is(.tri-settings__item,.tri-settings__sub) { font-size:14px;line-height:20px; }
 :root[data-design="workspace"] .tri-settings__group { font-size:12px; }
 :root[data-design="workspace"] .tri-device-select select { font-size:14px; }
+
+:root[data-design="workspace"] .tri-logo { object-fit:contain;background:#282b30;padding:3px;border-radius:7px; }
+
+:root[data-design="workspace"] .tri-modal__title { font-size:20px;line-height:26px;font-weight:600; }
+:root[data-design="workspace"] .tri-modal__subtitle { font-size:14px;line-height:20px;color:var(--ui-muted); }
+:root[data-design="workspace"] .tri-modal__question { font-size:14px;line-height:20px;font-weight:500;color:var(--ui-muted); }

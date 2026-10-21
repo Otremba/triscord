@@ -186,7 +186,6 @@ function CategoryList({ category, session, bridge }: { category: Category; sessi
 export function ChannelSidebar({ session, bridge, workspace=false }: { session: Session; bridge: Bridge; workspace?:boolean }) {
   const isHome = !session.selectedServerId || session.selectedServerId === '@me';
   if(isHome&&workspace)return <section class="tri-sidebar-list tri-sidebar-list--home" aria-label="Navegação do início"><div class="tri-workspace-home-nav">
-    <span class="tri-workspace-label">Organize seu espaço</span>
     <button type="button" aria-current="page"><Icon name="Friends" size={20}/>Visão geral</button>
     <button type="button" onClick={()=>dispatchEvent(new Event('tri-open-profile'))}><Icon name="User" size={20}/>Meu perfil</button>
     <button type="button" onClick={()=>dispatchEvent(new Event('tri-open-settings'))}><Icon name="Settings" size={20}/>Configurações</button>

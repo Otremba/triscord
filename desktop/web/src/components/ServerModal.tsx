@@ -16,7 +16,6 @@ type Page = 'start' | 'customize' | 'join';
 // Submits read the field itself, so a submit right after a paste never sees a stale state value.
 const field = (event: Event, key: string) =>
   (((event.currentTarget as HTMLFormElement).elements.namedItem(key) as HTMLInputElement | null)?.value ?? '').trim();
-const SAMPLE = '3f9c2a7e5b1d4c8fa06e2b9d7c1f4a53';
 
 export function ServerModal({ bridge, displayName, onClose }: { bridge: Bridge; displayName: string; onClose: () => void }) {
   const [page, setPage] = useState<Page>('start');
@@ -31,15 +30,15 @@ export function ServerModal({ bridge, displayName, onClose }: { bridge: Bridge; 
     bridge.request(command).then(close).catch((e: Error) => setError(e.message)).finally(() => setBusy(false));
   };
   // type="button": inside the customize/join forms a plain button submits, and closing created the server (user report).
-  const closeButton = <button type="button" class="tri-modal__close" aria-label="Fechar" onClick={close}><Icon name="Close" size={24} /></button>;
+  const closeButton = <button type="button" class="tri-modal__close" aria-label="Fechar" disabled={busy} onClick={close}><Icon name="Close" size={24} /></button>;
   return (
-    <ModalLayer closing={closing} onRequestClose={close}>
+    <ModalLayer closing={closing} onRequestClose={()=>{if(!busy)close();}}>
       <div class="tri-modal" role="dialog" aria-label={page === 'join' ? 'Entrar em um servidor' : 'Criar seu servidor'}>
         {page === 'start' && (
           <div class="tri-modal__page">
             {closeButton}
             <h1 class="tri-modal__title">Criar seu servidor</h1>
-            <p class="tri-modal__subtitle">Seu servidor é onde você e seus amigos se reúnem. Crie o seu e comece a interagir.</p>
+            <p class="tri-modal__subtitle">Crie um servidor ou entre com um convite.</p>
             <button class="tri-modal__option" onClick={() => go('customize')}>
               <span>Criar o meu</span><Icon name="ChevronSmallRight" size={24} />
             </button>
@@ -51,7 +50,7 @@ export function ServerModal({ bridge, displayName, onClose }: { bridge: Bridge; 
           <form class="tri-modal__page" onSubmit={e => { e.preventDefault(); const value = field(e, 'serverName'); if (value) submit({ name: 'createServer', serverName: value }); }}>
             {closeButton}
             <h1 class="tri-modal__title">Personalize o seu servidor</h1>
-            <p class="tri-modal__subtitle">Deixe seu novo servidor com a sua cara dando um nome e um ícone a ele. Se quiser, é possível mudar depois.</p>
+            <p class="tri-modal__subtitle">Escolha o nome do servidor.</p>
             <label class="tri-modal__label" for="tri-server-name">Nome do servidor <span class="tri-required">*</span></label>
             <input id="tri-server-name" name="serverName" class="tri-modal__input" value={name} maxLength={32} autoFocus onInput={e => setName((e.target as HTMLInputElement).value)} />
             {error && <p class="tri-modal__error" role="alert">{error}</p>}
@@ -67,14 +66,12 @@ export function ServerModal({ bridge, displayName, onClose }: { bridge: Bridge; 
             <h1 class="tri-modal__title">Entrar em um servidor</h1>
             <p class="tri-modal__subtitle tri-modal__subtitle--sm">Insira um convite abaixo para entrar em um servidor existente</p>
             <label class={`tri-modal__label ${error ? 'is-error' : ''}`} for="tri-invite">Link de convite <span class="tri-required">*</span></label>
-            <input id="tri-invite" name="invite" class={`tri-modal__input ${error ? 'has-error' : ''}`} value={invite} placeholder={SAMPLE} maxLength={256} autoFocus
+            <input id="tri-invite" name="invite" class={`tri-modal__input ${error ? 'has-error' : ''}`} value={invite} placeholder="Link ou código de convite" maxLength={256} autoFocus
               onInput={e => setInvite((e.target as HTMLInputElement).value)} aria-invalid={!!error} />
             {error && <p class="tri-modal__error" role="alert">{error}</p>}
-            <p class="tri-modal__samples-title">Convites devem ser mais ou menos assim</p>
-            <div class="tri-modal__samples"><button type="button" class="tri-modal__sample" onClick={() => setInvite(SAMPLE)}>{SAMPLE}</button></div>
             <div class="tri-modal__footer">
               <button type="button" class="tri-modal__back" onClick={() => go('start')}>Voltar</button>
-              <button type="submit" class="tri-modal__primary" disabled={busy}>Entrar no servidor</button>
+              <button type="submit" class="tri-modal__primary" disabled={busy||!invite.trim()}>Entrar no servidor</button>
             </div>
           </form>
         )}

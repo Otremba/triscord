@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
-const bundle=await build({stdin:{contents:`export {WorkspaceNav} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';export {modalTabTarget} from './focus-policy';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
-const {WorkspaceNav,ShimmerButton,DeviceSelect,deviceChoices,modalTabTarget}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
+const bundle=await build({stdin:{contents:`export {WorkspaceNav} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';export {modalTabTarget} from './focus-policy';export {MemberList} from './components/MemberList';export {FixtureBridge} from './bridge';export {fixtureSession} from './fixtures';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,define:{'location.search':'""'},loader:{'.png':'dataurl','.css':'empty'},platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
+const {WorkspaceNav,ShimmerButton,DeviceSelect,deviceChoices,modalTabTarget,MemberList,FixtureBridge,fixtureSession}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
 function nodes(root){if(!root||typeof root!=='object')return [];const children=[root.props?.children].flat(Infinity);return [root,...children.flatMap(nodes)];}
 const sent=[];
 const servers=Array.from({length:8},(_,i)=>({id:`server-${i}`,name:`Espaço ${i}`,owned:i===0}));
@@ -54,3 +54,21 @@ assert.equal(modalTabTarget(focusControls,null,true),focusControls[2]);
 assert.equal(modalTabTarget([],null,false),null,'empty dialogs need a focusable fallback');
 assert.equal(modalTabTarget([focusControls[0]],focusControls[0],false),focusControls[0]);
 console.log('Modal focus policy: wrap, outside focus, empty and single-control dialogs passed without DOM');
+
+const memberSession={servers:[{id:'space',name:'Space',owned:false}],selectedServerId:'space',account:{id:'account-me',displayName:'Alice',username:'alice',status:'invisible'},categories:[{channels:[{users:[
+  {id:'socket-me',self:true,name:'Alice',muted:false,deafened:false},
+  {id:'socket-bob-1',accountId:'account-bob',name:'Bob',muted:false,deafened:false},
+  {id:'socket-bob-2',accountId:'account-bob',name:'Bob',muted:false,deafened:false},
+]}]}]};
+const memberButtons=nodes(MemberList({session:memberSession,bridge:{send:()=>{}}})).filter(node=>node.type==='button').map(node=>node.props['aria-label']);
+assert.deepEqual(memberButtons.sort(),['Abrir perfil de Alice','Abrir perfil de Bob'],'account, self socket and extra sockets must not duplicate a member');
+console.log('Member identities: self socket and repeated account connections deduplicated');
+
+const fixtureBridge=new FixtureBridge(fixtureSession('home'));
+const beforeProfile=await fixtureBridge.request({name:'getOwnProfile'});
+assert.equal(beforeProfile.display_name,'camargo');
+const afterProfile=await fixtureBridge.request({name:'saveOwnProfile',fields:{display_name:'Visual review'}});
+assert.equal(afterProfile.display_name,'Visual review');
+assert.equal(afterProfile.bio,beforeProfile.bio,'review saves must retain fields not edited');
+await assert.rejects(new FixtureBridge(fixtureSession('profile-error')).request({name:'getOwnProfile'}),/simulada/);
+console.log('Review fixtures: local profile save and explicit load failure passed without network');

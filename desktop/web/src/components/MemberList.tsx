@@ -27,12 +27,14 @@ export function MemberList({ session, bridge }: { session: Session; bridge: Brid
   for (const cat of session.categories) {
     for (const ch of cat.channels) {
       for (const u of ch.users) {
-        if (!membersMap.has(u.id)) {
-          membersMap.set(u.id, {
+        // Account and socket ids are different; a voice connection is not a second member.
+        const identity = u.self ? session.account.id : u.accountId ?? u.id;
+        if (!membersMap.has(identity)) {
+          membersMap.set(identity, {
             id: u.id,
             name: u.name,
             avatarUrl: u.avatarUrl,
-            status: u.speaking ? 'online' : 'online',
+            status: 'online',
             role: 'Membro',
             self: u.self,
           });

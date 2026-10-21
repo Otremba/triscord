@@ -1,6 +1,6 @@
 # Auditoria do objetivo de redesign
 
-Esta auditoria mantém o escopo original. Estado em 21/10/2026: implementação em desenvolvimento, sem publicação/substituição da instalação. O usuário liberou revisão visual isolada e depois E2E/áudio. Tela principal e configurações já foram observadas no navegador com fixtures; isso não comprova as demais telas nem a integração nativa.
+Esta auditoria mantém o escopo original. Estado em 21/10/2026: implementação em desenvolvimento, sem publicação/substituição da instalação. O usuário liberou revisão visual isolada e depois E2E/áudio. Tela principal, configurações, perfil e estados vazio/erro foram observados no navegador com fixtures. A entrada foi observada no executável nativo isolado; login completo, popouts e mídia nativa ainda não foram comprovados.
 
 | Requisito | Evidência atual | Estado e limite |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ Esta auditoria mantém o escopo original. Estado em 21/10/2026: implementação 
 | Carregamento/vazio/erro/reconexão | `StatePanel`, nota de conexão persistente, rascunho em falha IPC, retry de envio | Implementado; envio real e entrega individual não comprovados pelo protocolo |
 | Formulários e teclado | Botões nativos, tooltips por foco, seletor nativo, foco visível, regras responsivas | Contratos sem DOM e tipos verificados; política de contenção de foco implementada/testada sem DOM; integração real e navegação completa ainda não verificadas |
 | Preservar funcionalidades | Contratos IPC, capacidades, mídia de perfil, APIs e núcleo mantidos; não adicionar sucesso simulado | Preservação em código não prova paridade completa. A reescrita Rust tem limitações anteriores ao redesign |
-| Acabamento das telas completas | Fontes de login, chat, chamada, perfil, configurações, menus e modais adaptadas | Sem evidência visual suficiente para declarar o objetivo concluído |
+| Acabamento das telas completas | Fontes de login, chat, chamada, perfil, configurações, menus e modais adaptadas | Revisão parcial com evidências em `preview.md`; faltam vídeo/popout/menus sobre superfícies nativas e demais estados para declarar o objetivo concluído |
 
 ## Próximas verificações
 

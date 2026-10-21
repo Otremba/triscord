@@ -21,9 +21,15 @@ export function fixtureSession(name: string): Session {
     selectedChannelId: 'geral',
     muted: false,
     deafened: false,
+    profile: { display_name:'camargo',pronouns:null,bio:'Conversas e jogos com os amigos.',note:null,banner_color:null,profile_theme_start:null,profile_theme_end:null,
+      avatarDataUrl:'',bannerDataUrl:'',hasAvatar:false,hasBanner:false,created_at:Date.UTC(2026,9,1) },
   };
   // In the capture the voice channel is not selected (the open channel is a text channel triscord lacks).
   if (name === 'reference') return { ...base, selectedChannelId: undefined };
+  if (name === 'home') return { ...base, selectedServerId:'@me', categories:[] };
+  if (name === 'empty') return { ...base, servers:[], selectedServerId:'@me', categories:[] };
+  if (name === 'voice-error' || name === 'reconnecting') return { ...fixtureSession('call'), voiceRequested:true, voiceState:name==='voice-error'?'error':'reconnecting' };
+  if (name === 'profile-error') return { ...base, profile:undefined };
   if (name === 'login') return { ...base, auth: { state: 'signedOut' } };
   // In a call with one other participant (UI development and tests of the call view).
   if (name === 'call') return {

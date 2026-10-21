@@ -55,7 +55,7 @@ export function ProfileEditor({session,bridge,onClose}:{session:Session;bridge:B
         }}>
           <fieldset class="tri-profile-editor__fields tri-profile-editor__appearance" disabled={busy||!ready}>
             <legend class="tri-profile-editor__sr">Editar perfil</legend>
-            <h2>Avatar e decorações</h2>
+            <h2>Avatar</h2>
             <div class="tri-profile-editor__media">
               <label class="tri-button tri-button--secondary">Alterar avatar<input aria-label="Alterar avatar" type="file" accept="image/png,image/jpeg,image/gif" onChange={e=>{const f=e.currentTarget.files?.[0];e.currentTarget.value='';if(f)void media('avatar',f);}}/></label>
               <button type="button" class="tri-button tri-button--secondary" disabled={!profile?.hasAvatar} onClick={()=>void media('avatar',undefined,true)}>Remover avatar</button>
@@ -79,7 +79,7 @@ export function ProfileEditor({session,bridge,onClose}:{session:Session;bridge:B
           <div class="tri-profile-preview__text"><h2>{shown}</h2><p>{session.account.username}{draft.pronouns?` · ${draft.pronouns}`:''}</p>
             <h3>Bio</h3><p class={!draft.bio?'is-empty':''}>{draft.bio||'Escreva uma breve introdução'}</p>
             {!!profile?.created_at&&<><h3>Membro desde</h3><p>{new Date(profile.created_at).toLocaleDateString('pt-BR',{day:'numeric',month:'short',year:'numeric'})}</p></>}
-            <h3>Nota (visível apenas para você)</h3><p class={!draft.note?'is-empty':''}>{draft.note||'Clique para adicionar uma nota'}</p>
+            <h3>Nota (visível apenas para você)</h3><p class={!draft.note?'is-empty':''}>{draft.note||'Sem nota'}</p>
           </div>
         </aside>
         <fieldset class="tri-profile-editor__fields tri-profile-editor__details" disabled={busy||!ready}>
