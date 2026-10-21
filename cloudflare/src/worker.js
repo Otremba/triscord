@@ -3,6 +3,7 @@ import sanitize from '../../server/sanitize.js';
 import soundCatalog from '../../shared/soundboard_catalog.json';
 import { handleErrorReports } from './error_reports.js';
 import { consumeControlRate, controlRateLimitReason } from './control_rate.js';
+import { mediaMode, mediaCredentials, removeMediaParticipant } from './media_tokens.js';
 const soundIds = new Set(soundCatalog.map(sound => sound.id));
 
 const { sanitizeUsername, sanitizeUserId, sanitizeColor, sanitizeStatus,
@@ -398,6 +399,16 @@ export class TriscordHub extends DurableObject {
     if (name === 'join-room') return this.join(client, payload);
     if (name === 'leave-room') return this.leave(client);
     if (!room || !client.data.user) return;
+    if (name === 'media-refresh' && client.data.mediaTransport === 'livekit' && client.data.identity && payload.roomId === room.id &&
+        ['voice', 'screen', 'camera'].includes(payload.kind)) {
+      const key = `mediaRefresh_${payload.kind}`;
+      if (Date.now() - (client.data[key] || 0) < 3000) return;
+      client.data[key] = Date.now(); this.attach(client);
+      const media = await mediaCredentials(this.env, client.data.identity.serverId || 'private-group-v1', room.id, client.data.mediaIdentity, client.data.user.username);
+      if (media && client.data.room === room.id && this.clients.get(client.data.sid) === client)
+        this.send(client, 'media-credentials', { roomId: room.id, kind: payload.kind, credentials: media[payload.kind] });
+      return;
+    }
     if (['webrtc-offer','webrtc-answer','webrtc-ice-candidate'].includes(name)) {
       const target = this.clients.get(payload.targetSocketId);
       if (!target || target === client || target.data.room !== client.data.room || !['voice','native-screen','native-camera'].includes(payload.type)) return;
@@ -540,7 +551,22 @@ export class TriscordHub extends DurableObject {
       username = sanitizeUsername(source.username);
       if (await this.nickIsRegistered(username.trim().toLowerCase())) username = 'Convidado';
     }
-    const users = this.users(id).filter(c => c !== client);
+    let users = this.users(id).filter(c => c !== client);
+    const mediaTransport = mediaMode(users, payload.mediaTransport,
+      !!(identity && this.env.LIVEKIT_URL && this.env.LIVEKIT_API_KEY && this.env.LIVEKIT_API_SECRET));
+    if (mediaTransport === 'livekit' && (payload.mediaTransport !== 'livekit' || !identity)) {
+      this.send(client, 'room-join-denied', { message: 'Atualize o Triscord para entrar nesta chamada.' }); return;
+    }
+    // Mint before changing membership: a configuration/signing failure must not leave a phantom user in the room.
+    const mediaIdentity = `${client.data.sid}/${crypto.randomUUID()}`;
+    const media = mediaTransport === 'livekit' ? await mediaCredentials(this.env,
+      identity.serverId || 'private-group-v1', id, mediaIdentity, username) : null;
+    // WebCrypto yields: another join/leave may have changed the room while we signed.
+    users = this.users(id).filter(c => c !== client);
+    if (this.clients.get(client.data.sid) !== client) return;
+    if (mediaMode(users, payload.mediaTransport, !!media) !== mediaTransport) {
+      this.send(client, 'room-join-denied', { message: 'A chamada mudou. Tente entrar novamente.' }); return;
+    }
     // A claimed profile id cannot replace another connection or inherit its role.
     if (users.some(c => c.data.user.userId === userId) || users.length >= room.maxUsers ||
         (room.locked && !(client.data.room === id && this.owner(client, room)))) {
@@ -548,19 +574,23 @@ export class TriscordHub extends DurableObject {
     }
     this.leave(client);
     client.data.room = id;
+    client.data.mediaTransport = mediaTransport;
+    client.data.mediaIdentity = mediaIdentity;
     client.data.user = { socketId: client.data.sid, userId, username, avatar: sanitizeColor(source.avatar),
       isServerMuted: (room.serverMutedUserIds || []).includes(userId), authenticated,
       status: sanitizeStatus(source.status), isMuted: true, isDeafened: false, isScreenSharing: false, isCameraOn: false, isSpeaking: false };
     if (!room.ownerUserId) { room.ownerUserId = userId; this.saveRoom(id); }
     this.attach(client);
     this.send(client, 'room-joined', { roomId: id, existingUsers: users.map(c => c.data.user), chatHistory: this.history(id),
-      isServerMuted: client.data.user.isServerMuted,
+      isServerMuted: client.data.user.isServerMuted, mediaTransport, media,
       ownerUserId: room.ownerUserId, isOwner: this.owner(client, room), locked: room.locked, maxUsers: room.maxUsers });
     this.broadcast('user-joined', { socketId: client.data.sid, userData: client.data.user }, id, client.data.sid);
     this.broadcast('rooms-update', this.directory());
   }
   leave(client) {
     const id = client.data.room, user = client.data.user; if (!id) return;
+    if (client.data.mediaTransport === 'livekit') this.ctx.waitUntil(removeMediaParticipant(this.env,
+      client.data.identity?.serverId || 'private-group-v1', id, client.data.mediaIdentity));
     client.data.room = null; client.data.user = null; this.attach(client);
     const room = this.rooms.get(id);
     if (room && id === 'native-validation' && !this.users(id).length) {

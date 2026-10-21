@@ -11,6 +11,20 @@ VoiceCall::VoiceCall(Signaling* signaling, QObject* parent, AudioMode mode)
     if (useDevices_) {
         for (auto& server : toRtcIceServers(resolveIceServers())) config_.iceServers.push_back(server);
     }
+    connect(&sfu_, &SfuTransport::message, this, &VoiceCall::message);
+    connect(&sfu_, &SfuTransport::audioReset, this, [this](const QString& id) {
+        if (const auto peer = peers_.find(id); peer != peers_.end()) {
+            peer->second->jitter = VoiceJitter{}; devices_.resetPeerAudio(id);
+            if (peer->second->activity.reset()) emit speakingChanged(id, false);
+        }
+    });
+    connect(&sfu_, &SfuTransport::credentialsNeeded, this, [this] {
+        if (!room_.isEmpty()) emit outboundEvent("media-refresh", {{"roomId", room_}, {"kind", "voice"}});
+    });
+    connect(&sfu_, &SfuTransport::audio, this, [this](const QString& id, const QByteArray& opus, quint32 stamp) {
+        const auto peer = peers_.find(id);
+        if (peer != peers_.end() && !serverMutedPeers_.contains(id)) peer->second->jitter.push(stamp, opus);
+    });
     recovery_.setParent(this);
     playout_.setParent(this);
     connect(signaling_, &Signaling::sessionStarted, this, [this](const QString& id) { socketIdentity_ = id; });
@@ -60,6 +74,7 @@ void VoiceCall::setDevices(const QByteArray& input, const QByteArray& output) {
 void VoiceCall::sendOpus(const QByteArray& packet) {
     if (serverMuted_) return;
     if (packet.isEmpty() || packet.size() > 1275) return;
+    if (sfu_.selected()) { sfu_.send("audio", packet, 20000); return; }
     for (auto& [id, session] : peers_) {
         try { session->peer->sendOpus(packet); }
         catch (const std::exception&) { emit message("A voz de um participante precisa reconectar."); }
@@ -85,6 +100,7 @@ void VoiceCall::syntheticTick() {
 }
 void VoiceCall::setDeafened(bool deafened) { devices_.setDeafened(deafened); }
 void VoiceCall::leave() {
+    sfu_.close();
     for (const auto& [id, session] : peers_) {
         if (session->activity.active()) emit speakingChanged(id, false);
         devices_.removePeer(id);
@@ -152,6 +168,9 @@ void VoiceCall::removeMember(const QString& id, bool forgetSettings) {
 }
 void VoiceCall::addMember(const QString& id) {
     if (id.isEmpty() || id == self_ || peers_.contains(id) || peers_.size() >= 9) return;
+    if (sfu_.selected()) {
+        auto session = std::make_unique<Session>(); session->age.start(); peers_[id] = std::move(session); return;
+    }
     auto& session = create(id);
     if (self_ < id) session.peer->offer(); // Exactly one offerer, independent of join order.
 }
@@ -159,7 +178,10 @@ void VoiceCall::event(const QString& name, const QJsonArray& args) {
     if (args.isEmpty()) return;
     const auto payload = args.first().toObject();
     try {
-        if (name == "ice-servers") {
+        if (name == "media-credentials") {
+            if (sfu_.selected() && payload.value("roomId").toString() == room_ && payload.value("kind").toString() == "voice")
+                sfu_.open(payload.value("credentials").toObject());
+        } else if (name == "ice-servers") {
             if (!useDevices_) return; // Injected local tests never contact STUN/TURN services.
             config_.iceTransportPolicy = args.size() > 1 && args.at(1).toString() == "relay"
                 ? rtc::TransportPolicy::Relay : rtc::TransportPolicy::All;
@@ -180,6 +202,9 @@ void VoiceCall::event(const QString& name, const QJsonArray& args) {
             leave();
             self_ = socketIdentity_;
             room_ = payload.value("roomId").toString();
+            if (payload.value("mediaTransport").toString() == "livekit") {
+                sfu_.open(payload.value("media").toObject().value("voice").toObject()); sfu_.publish();
+            }
             serverMuted_ = payload.value("isServerMuted").toBool();
             if (useDevices_) devices_.start(); // Chat and sessions survive unavailable devices.
             else emit activeChanged(true);
@@ -217,6 +242,7 @@ void VoiceCall::event(const QString& name, const QJsonArray& args) {
     }
 }
 void VoiceCall::receiveSignal(const QString& name, const QJsonObject& payload) {
+    if (sfu_.selected()) return;
     const auto kind = payload.value("type").toString();
     if (kind != "voice" && !(kind.isEmpty() && name == "webrtc-ice-candidate" &&
         payload.value("candidate").toObject().value("sdpMid").toString() == "0")) return;
@@ -256,6 +282,7 @@ void VoiceCall::receiveSignal(const QString& name, const QJsonObject& payload) {
     }
 }
 void VoiceCall::recover() {
+    if (sfu_.selected()) return;
     QStringList rebuild;
     for (auto& [id, session] : peers_) {
         if (self_ < id && !session->peer->connected() && session->age.elapsed() > 12000 && session->attempts < 3) rebuild.append(id);

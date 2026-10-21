@@ -8,9 +8,40 @@
 
 namespace triscord {
 ScreenCall::ScreenCall(Signaling* signaling, SourceMode mode, VideoConfig config, QObject* parent, MediaKind media)
-    : QObject(parent), signaling_(signaling), mode_(mode), media_(media), config_(config) {
+    : QObject(parent), sfu_(media == MediaKind::Camera ? "camera" : "screen", this), signaling_(signaling), mode_(mode), media_(media), config_(config) {
     if (!config.valid()) throw std::invalid_argument("Invalid screen configuration");
     if (media_ == MediaKind::Camera && mode_ == SourceMode::Native) throw std::invalid_argument("Camera requires an external video source");
+    connect(&sfu_, &SfuTransport::message, this, &ScreenCall::message);
+    connect(&sfu_, &SfuTransport::audioReset, this, [this](const QString& id) { audio_.remove(id); });
+    connect(&sfu_, &SfuTransport::keyframeRequested, this, &ScreenCall::requestLocalKeyframe);
+    connect(&sfu_, &SfuTransport::bitrateRequested, this, [this](int wanted) {
+        if (!sharing_ || wanted <= 0 || (bitrateClock_.isValid() && bitrateClock_.elapsed() < 2000)) return;
+        bitrateClock_.start();
+        const int target = std::clamp(wanted, ScreenBitrateControl::floor(config_.bitrate), config_.bitrate);
+        try { if (encoder_) encoder_->setBitrate(target); else emit bitrateRequested(target); }
+        catch (const std::exception&) { /* Keep the current encoder on unsupported feedback. */ }
+    });
+    connect(&sfu_, &SfuTransport::credentialsNeeded, this, [this] {
+        if (!room_.isEmpty()) emit outboundEvent("media-refresh", {{"roomId", room_}, {"kind", kind()}});
+    });
+    connect(&sfu_, &SfuTransport::audio, this, [this](const QString& id, const QByteArray& opus, quint32 stamp) {
+        const auto member = members_.find(id);
+        if (media_ == MediaKind::Screen && member != members_.end() && member->second.sharing) audio_.receive(id, opus, stamp);
+    });
+    connect(&sfu_, &SfuTransport::video, this, [this](const QString& id, const QByteArray& bytes, quint32 stamp, bool key, const QJsonObject& metadata) {
+        const auto member = members_.find(id); if (member == members_.end() || !member->second.sharing || disabledVideo_.contains(id)) return;
+        reconcile(id);
+        const auto it = peers_.find(id); if (it == peers_.end()) return;
+        VideoConfig remote{{metadata.value("width").toInt(), metadata.value("height").toInt()}, metadata.value("fps").toInt(), metadata.value("bitrate").toInt()};
+        if (!remote.valid()) return;
+        auto& session = *it->second;
+        if (!session.configured || session.remoteConfig.size != remote.size || session.remoteConfig.fps != remote.fps || session.remote != metadata.value("track").toString()) {
+            session.decoder.reset(); session.clock = {}; session.remoteConfig = remote; session.configured = true;
+            session.remote = metadata.value("track").toString();
+            session.generation = ++nextGeneration_; emit generationChanged(id, session.generation);
+        }
+        receive(id, session.local, bytes, stamp, key);
+    });
     connect(&thumbnails_, &CaptureThumbnails::ready, this, &ScreenCall::thumbnailReady);
     connect(&audio_, &ScreenAudio::captured, this, &ScreenCall::sendAudio);
     connect(&audio_, &ScreenAudio::error, this, &ScreenCall::message);
@@ -29,12 +60,19 @@ ScreenCall::ScreenCall(Signaling* signaling, SourceMode mode, VideoConfig config
     connect(this, &ScreenCall::outboundEvent, signaling_, [signaling](const QString& name, const QJsonObject& payload) { signaling->sendEvent(name, payload); });
 }
 ScreenCall::~ScreenCall() { leave(); }
+void ScreenCall::publishSfu() {
+    if (sfu_.selected()) sfu_.publish(config_.size.width(), config_.size.height(), config_.fps, config_.bitrate);
+}
+void ScreenCall::requestRemoteKeyframe(const QString& id) {
+    if (sfu_.selected()) sfu_.requestKeyframe(id);
+    else if (const auto it = peers_.find(id); it != peers_.end() && it->second->peer) it->second->peer->requestKeyframe();
+}
 void ScreenCall::requestLocalKeyframe() {
     if (encoder_) encoder_->requestKeyframe();
     else if (sharing_) emit keyframeRequested();
 }
 void ScreenCall::adaptBitrate(BitrateSignal signal) {
-    if (!sharing_) return;
+    if (!sharing_ || sfu_.selected()) return;
     int viewers = 0;
     for (const auto& [id, session] : peers_) {
         const auto member = members_.find(id);
@@ -66,8 +104,9 @@ void ScreenCall::setVideoDisabled(const QString& id, bool disabled) {
         auto& session = *found->second;
         session.decoder.reset(); session.clock = {};
         if (disabled) emit generationRemoved(id);
-        else { session.generation = ++nextGeneration_; emit generationChanged(id, session.generation); session.peer->requestKeyframe(); }
+        else { session.generation = ++nextGeneration_; emit generationChanged(id, session.generation); requestRemoteKeyframe(id); }
     }
+    if (sfu_.selected()) sfu_.watch(id, !disabled);
     emit outboundEvent(watchEvent(), {{"targetSocketId", id}, {"watching", !disabled}});
 }
 void ScreenCall::remove(const QString& id) {
@@ -145,6 +184,13 @@ void ScreenCall::reconcile(const QString& id, bool rebuild) {
     if (!sharing_ && !member->second.sharing) { remove(id); return; }
     if (peers_.contains(id) && !rebuild) return;
     if (!peers_.contains(id) && peers_.size() >= 9) return;
+    if (sfu_.selected()) {
+        auto session = std::make_unique<Session>(); session->generation = ++nextGeneration_;
+        session->local = "sfu"; session->age.start();
+        peers_[id] = std::move(session);
+        if (!disabledVideo_.contains(id)) emit generationChanged(id, peers_.at(id)->generation);
+        return;
+    }
     auto& session = create(id);
     if (self_ < id) session.peer->offer();
 }
@@ -157,7 +203,7 @@ void ScreenCall::start(const CaptureSource& source, bool shareAudio, VideoConfig
     config_ = config; captureTimer_.setInterval(screenCaptureInterval(config_));
     try {
         encoder_ = std::make_unique<ScreenEncoder>(source, config_);
-        sharing_ = true; localGeneration_ = ++nextGeneration_;
+        sharing_ = true; publishSfu(); localGeneration_ = ++nextGeneration_;
         emit generationChanged("$local", localGeneration_);
         emit outboundEvent("user-state-change", {{stateKey(), true}});
         for (const auto& [id, member] : members_) { (void)member; reconcile(id, true); }
@@ -177,12 +223,13 @@ void ScreenCall::startExternal() {
 void ScreenCall::startExternal(VideoConfig config) {
     // Native mode also takes external frames: the web client's "Dispositivos" tab encodes a capture device itself.
     if (room_.isEmpty() || !config.valid()) return;
-    stop(false); config_ = config; sharing_ = true;
+    stop(false); config_ = config; sharing_ = true; publishSfu();
     emit outboundEvent("user-state-change", {{stateKey(), true}});
     for (const auto& [id, member] : members_) { (void)member; reconcile(id, true); }
     emit sharingChanged(true);
 }
 void ScreenCall::stop(bool notify) {
+    if (sfu_.selected()) sfu_.unpublish();
     audio_.stopCapture();
     captureTimer_.stop(); encoder_.reset();
     const bool wasSharing = sharing_; sharing_ = false;
@@ -196,6 +243,7 @@ void ScreenCall::stop(bool notify) {
     }
 }
 void ScreenCall::leave() {
+    sfu_.close();
     audio_.clear();
     thumbnails_.cancel();
     stop(); recoveryTimer_.stop();
@@ -204,6 +252,7 @@ void ScreenCall::leave() {
 }
 void ScreenCall::sendFrame(const EncodedVideo& frame) {
     if (!sharing_) return;
+    if (sfu_.selected()) { sfu_.send("video", frame.annexB, frame.duration100ns / 10, 0x40000000u + quint32(frame.time100ns * 9 / 1000)); return; }
     for (auto& [id, session] : peers_) {
         if (const auto member = members_.find(id); member != members_.end() && !member->second.watching) continue;
         try { session->peer->sendVideo(frame); }
@@ -212,6 +261,7 @@ void ScreenCall::sendFrame(const EncodedVideo& frame) {
 }
 void ScreenCall::sendAudio(const QByteArray& opus) {
     if (!sharing_ || media_ != MediaKind::Screen) return;
+    if (sfu_.selected()) { sfu_.send("audio", opus, 20000); return; }
     for (auto& [id, session] : peers_) {
         (void)id; try { session->peer->sendAudio(opus); } catch (const std::exception&) { /* Do not accumulate audio on a stalled connection. */ }
     }
@@ -231,7 +281,7 @@ void ScreenCall::receive(const QString& id, const QString& local, const QByteArr
     auto& session = *it->second;
     try {
         if (!session.decoder) {
-            if (!key) { session.peer->requestKeyframe(); return; }
+            if (!key) { requestRemoteKeyframe(id); return; }
             session.decoder = std::make_unique<VideoDecoder>(session.remoteConfig); session.clock = {};
         }
         const auto time = session.clock.accept(stamp); if (!time) return;
@@ -254,11 +304,12 @@ void ScreenCall::receive(const QString& id, const QString& local, const QByteArr
         if (!session.decoder->submit(sample)) { render(); if (!session.decoder->submit(sample)) throw std::runtime_error("Video decoder busy"); }
         render();
     } catch (const std::exception& error) {
-        session.peer->noteKeyframeReason(QStringLiteral("decoder: ") + QString::fromUtf8(error.what()));
-        session.decoder.reset(); session.clock = {}; session.peer->requestKeyframe();
+        if (session.peer) session.peer->noteKeyframeReason(QStringLiteral("decoder: ") + QString::fromUtf8(error.what()));
+        session.decoder.reset(); session.clock = {}; requestRemoteKeyframe(id);
     }
 }
 void ScreenCall::signal(const QString& name, const QJsonObject& payload) {
+    if (sfu_.selected()) return;
     if (payload.value("type").toString() != wireType()) return;
     const auto id = payload.value("senderSocketId").toString();
     if (!members_.contains(id)) return;
@@ -297,7 +348,10 @@ void ScreenCall::event(const QString& name, const QJsonArray& args) {
     if (args.isEmpty()) return;
     const auto payload = args.first().toObject();
     try {
-        if (name == "ice-servers" && mode_ != SourceMode::Injected) {
+        if (name == "media-credentials") {
+            if (sfu_.selected() && payload.value("roomId").toString() == room_ && payload.value("kind").toString() == kind())
+                sfu_.open(payload.value("credentials").toObject());
+        } else if (name == "ice-servers" && mode_ != SourceMode::Injected) {
             pushedIce_.clear();
             rtcConfig_.iceTransportPolicy = args.size() > 1 && args[1].toString() == "relay" ? rtc::TransportPolicy::Relay : rtc::TransportPolicy::All;
             for (const auto& value : args.first().toArray()) {
@@ -311,6 +365,8 @@ void ScreenCall::event(const QString& name, const QJsonArray& args) {
             }
         } else if (name == "room-joined") {
             leave(); self_ = socket_; room_ = payload.value("roomId").toString();
+            if (payload.value("mediaTransport").toString() == "livekit")
+                sfu_.open(payload.value("media").toObject().value(kind()).toObject());
             for (const auto& value : payload.value("existingUsers").toArray()) {
                 const auto user = value.toObject(); const auto id = user.value("socketId").toString();
                 if (id.isEmpty() || id == self_ || members_.size() >= 9) continue;
@@ -370,6 +426,11 @@ void ScreenCall::logStats() {
 void ScreenCall::recover() {
     adaptBitrate(BitrateSignal::Calm);
     logStats();
+    if (sfu_.selected()) {
+        for (const auto& [id, session] : peers_) if (members_.at(id).sharing && !disabledVideo_.contains(id)
+            && (session->rendered.isValid() ? session->rendered.elapsed() > 3000 : session->age.elapsed() > 2000)) requestRemoteKeyframe(id);
+        return;
+    }
     QStringList rebuild;
     for (const auto& [id, session] : peers_) {
         if (session->peer->connected()) {

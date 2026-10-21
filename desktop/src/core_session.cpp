@@ -1890,6 +1890,9 @@ void CoreSession::onEvent(const QString& event, const QJsonArray& args) {
         }
     } else if (event == "request-error" && !pendingSoundRequest_.isEmpty()) {
         finishSoundRequest("O servidor recusou o som. Aguarde um instante e tente novamente.");
+    } else if (event == "room-join-denied") {
+        const auto reason = data.toObject().value("message").toString();
+        emit notice(reason.isEmpty() ? QStringLiteral("Sala bloqueada ou cheia.") : reason);
     } else if (event == "rooms-update" && data.isArray()) {
         rooms_ = data.toArray();
         publishCategories();

@@ -1,5 +1,6 @@
 #pragma once
 #include "signaling.h"
+#include "sfu_transport.h"
 #include "voice_codec.h"
 #include "voice_activity.h"
 #include "voice_processing.h"
@@ -59,6 +60,7 @@ private:
     bool serverMuted_ = false;
     void receiveSignal(const QString& name, const QJsonObject& payload);
     void recover();
+    SfuTransport sfu_{"voice", this};
     Signaling* signaling_;
     VoiceDevices devices_;
     rtc::Configuration config_;

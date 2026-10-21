@@ -27,7 +27,12 @@ Runtime Library Exception:
 - https://www.gnu.org/licenses/gcc-exception-3.1.html
 
 Windows system APIs and libraries are provided by the user's operating system.
-No libwebrtc or LiveKit runtime is shipped in this preview.
+No libwebrtc runtime is shipped. The optional `triscord-media.exe` adapter uses
+LiveKit server-sdk-go v2.19.0 (Apache 2.0) and Pion WebRTC v4.2.19 (MIT) to
+transport already encoded H.264/Opus. Its module versions and checksums are in
+`desktop/media-bridge/go.mod` and `go.sum`; dependency notices ship under
+`media-licenses/LiveKit`. Go's runtime is BSD licensed. This adapter never
+opens microphones, speakers, cameras or screen capture devices.
 
 Native voice statically links the following source-built libraries. The package
 includes their upstream license texts under `media-licenses`:

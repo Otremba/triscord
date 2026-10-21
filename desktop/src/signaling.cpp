@@ -1,4 +1,5 @@
 #include "signaling.h"
+#include "sfu_transport.h"
 #include <QJsonDocument>
 #include <QUrlQuery>
 #include <algorithm>
@@ -96,7 +97,9 @@ void Signaling::scheduleRetry() {
 
 bool Signaling::sendEvent(const QString& event, const QJsonObject& data) {
     if (!ready_ || event.isEmpty() || socket_.bytesToWrite() > 65536) return false; // Never buffer stale session signals.
-    const auto json = QJsonDocument(QJsonArray{event, data}).toJson(QJsonDocument::Compact);
+    auto payload = data;
+    if (event == "join-room" && SfuTransport::available()) payload.insert("mediaTransport", "livekit");
+    const auto json = QJsonDocument(QJsonArray{event, payload}).toJson(QJsonDocument::Compact);
     return socket_.sendTextMessage("42" + QString::fromUtf8(json)) >= 0;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "screen_quality.h"
 #include "signaling.h"
+#include "sfu_transport.h"
 #include "screen_encoder.h"
 #include "video_peer.h"
 #include "capture_thumbnails.h"
@@ -83,6 +84,9 @@ private:
     const char* wireType() const { return media_ == MediaKind::Camera ? "native-camera" : "native-screen"; }
     const char* stateKey() const { return media_ == MediaKind::Camera ? "isCameraOn" : "isScreenSharing"; }
     const char* watchEvent() const { return media_ == MediaKind::Camera ? "camera-watch" : "screen-watch"; }
+    SfuTransport sfu_;
+    void publishSfu();
+    void requestRemoteKeyframe(const QString& id);
     Signaling* signaling_;
     SourceMode mode_;
     MediaKind media_;

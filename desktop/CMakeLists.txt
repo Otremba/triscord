@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(TriscordNative VERSION 0.9.44 LANGUAGES C CXX)
+project(TriscordNative VERSION 0.9.45 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
@@ -65,6 +65,7 @@ target_include_directories(triscord_auth PUBLIC src)
 target_include_directories(triscord_auth PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(triscord_auth PUBLIC Qt6::Network Qt6::Gui)
 add_library(triscord_core STATIC src/signaling.cpp src/signaling.h src/quality_policy.h src/notification_policy.cpp src/notification_policy.h)
+target_sources(triscord_core PRIVATE src/sfu_transport.cpp src/sfu_transport.h)
 target_sources(triscord_core PRIVATE src/private_settings.cpp src/private_settings.h src/window_lifecycle.cpp src/window_lifecycle.h)
 target_link_libraries(triscord_core PRIVATE crypt32)
 target_include_directories(triscord_core PUBLIC src)
@@ -309,6 +310,16 @@ if(TRISCORD_BUILD_DEV_TOOLS OR TRISCORD_BUILD_WEB_CLIENT)
   target_include_directories(triscord-web PRIVATE src "${TRISCORD_WEBVIEW2_SDK}/include" "${CMAKE_CURRENT_BINARY_DIR}/generated")
   target_compile_definitions(triscord-web PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE TRISCORD_VERSION="${PROJECT_VERSION}")
   target_link_libraries(triscord-web PRIVATE triscord_screen_call triscord_camera triscord_voice triscord_auth triscord_core Qt6::Gui ole32 shlwapi shell32 dwmapi dxgi)
+  find_program(TRISCORD_GO_EXECUTABLE go HINTS "${CMAKE_CURRENT_SOURCE_DIR}/../.toolchain/go/bin" REQUIRED)
+  file(GLOB media_bridge_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/media-bridge/*.go")
+  add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/triscord-media.exe"
+    COMMAND ${CMAKE_COMMAND} -E env GOMAXPROCS=2 CGO_ENABLED=0
+      "${TRISCORD_GO_EXECUTABLE}" build -p 2 -mod=readonly -trimpath "-ldflags=-s -w -H=windowsgui"
+      -o "${CMAKE_CURRENT_BINARY_DIR}/triscord-media.exe" .
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/media-bridge"
+    DEPENDS ${media_bridge_sources} media-bridge/go.mod media-bridge/go.sum VERBATIM)
+  add_custom_target(triscord-media DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/triscord-media.exe")
+  add_dependencies(triscord-web triscord-media)
   add_custom_command(TARGET triscord-web POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
     "${TRISCORD_WEBVIEW2_SDK}/x64/WebView2Loader.dll" "$<TARGET_FILE_DIR:triscord-web>")
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/web/dist/index.html")
