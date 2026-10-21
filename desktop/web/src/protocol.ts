@@ -156,7 +156,7 @@ export interface Session {
   // The Rust (Tauri) core says which features it has; the C++ core never sends this and has them all. A feature that
   // is false is hidden instead of offering a button that cannot work (camera, soundboard, popout window).
   runtime?: { name: 'tauri'; preview: boolean; voice: boolean; screen: boolean; camera: boolean; googleLogin: boolean; screenAudio?: boolean;
-    soundboard?: boolean; popout?: boolean };
+    soundboard?: boolean; popout?: boolean; individualVolume?: boolean };
   rooms?: { id: string; name: string; userCount: number }[];
   textRoomId?: string | null;
   voiceState?: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';

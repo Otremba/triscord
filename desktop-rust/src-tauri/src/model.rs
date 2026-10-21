@@ -1,5 +1,5 @@
 use serde_json::{json, Value};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 
@@ -49,6 +49,14 @@ pub struct Model {
     pub call_focus: Option<Value>,
     /// Hub socket ids this user silenced for themselves (`localMuted`); their audio track is disabled, not unsubscribed.
     pub peer_muted: HashSet<String>,
+    /// Individual peer volume preferences (0..=200, default 100), keyed by hub socket id.
+    pub peer_volume: HashMap<String, u32>,
+    /// Individual peer pan preferences (-100..=100, default 0), keyed by hub socket id.
+    pub peer_pan: HashMap<String, i32>,
+    /// Individual peer stream volume preferences (0..=200, default 100), keyed by hub socket id.
+    pub peer_stream_volume: HashMap<String, u32>,
+    /// Hub socket ids whose stream audio is silenced locally.
+    pub peer_stream_muted: HashSet<String>,
 }
 
 fn truncate(value: &str, limit: usize) -> String {
@@ -133,7 +141,11 @@ impl Model {
                     "id": socket, "name": user["username"], "self": is_self, "profileAvailable": authenticated,
                     "avatarUrl": if is_self { self.profile.as_ref().and_then(|p| p["avatarDataUrl"].as_str()).unwrap_or_default() } else { "" },
                     "accountId": if authenticated { account } else { "" },
-                    "localMuted": self.peer_muted.contains(socket), "volume": 100, "pan": 0, "streamVolume": 100, "streamMuted": false,
+                    "localMuted": self.peer_muted.contains(socket),
+                    "volume": self.peer_volume.get(socket).copied().unwrap_or(100),
+                    "pan": self.peer_pan.get(socket).copied().unwrap_or(0),
+                    "streamVolume": self.peer_stream_volume.get(socket).copied().unwrap_or(100),
+                    "streamMuted": self.peer_stream_muted.contains(socket),
                     "muted": flag(user, "isMuted"), "deafened": flag(user, "isDeafened"),
                     "customStatus": user["status"], "speaking": self.speaking.contains(socket),
                     "camera": flag(user, "isCameraOn"), "live": flag(user, "isScreenSharing") || (is_self && self.sharing),
@@ -193,7 +205,7 @@ impl Model {
             .unwrap_or(nick);
         let mut session = json!({
             "runtime": { "name": "tauri", "preview": false, "voice": true, "screen": true, "camera": false, "googleLogin": crate::oauth::configured(),
-                "screenAudio": true, "soundboard": true, "popout": false },
+                "screenAudio": true, "soundboard": true, "popout": false, "individualVolume": true },
             "soundboard": crate::sound::catalog(),
             "voiceState": if self.voice_state.is_empty() {"idle"} else {&self.voice_state}, "voiceRequested": self.voice_requested,
             "sharing": self.sharing, "sharingName": self.sharing_name,
@@ -248,6 +260,10 @@ impl Model {
         self.self_socket.clear();
         self.speaking.clear();
         self.peer_muted.clear();
+        self.peer_volume.clear();
+        self.peer_pan.clear();
+        self.peer_stream_volume.clear();
+        self.peer_stream_muted.clear();
         self.connected_at = 0;
         self.call_fullscreen = false;
         self.call_focus = None;
@@ -701,6 +717,34 @@ mod tests {
         model.call_focus = Some(json!({"key": "scr:s2", "filmOpen": true}));
         model.reset_connection();
         assert!(model.snapshot()["session"]["callFocus"].is_null());
+    }
+    #[test]
+    fn peer_audio_settings_track_volume_pan_and_stream_settings() {
+        let mut model = signed_in();
+        model.peer_volume.insert("s2".into(), 150);
+        model.peer_pan.insert("s2".into(), -45);
+        model.peer_stream_volume.insert("s2".into(), 80);
+        model.peer_stream_muted.insert("s2".into());
+
+        let snap = model.snapshot();
+        let user = &snap["session"]["categories"][0]["channels"][0]["users"][1];
+        assert_eq!(user["volume"], 150);
+        assert_eq!(user["pan"], -45);
+        assert_eq!(user["streamVolume"], 80);
+        assert_eq!(user["streamMuted"], true);
+
+        // Reset connection clears all peer audio adjustments
+        model.reset_connection();
+        assert!(model.peer_volume.is_empty());
+        assert!(model.peer_pan.is_empty());
+        assert!(model.peer_stream_volume.is_empty());
+        assert!(model.peer_stream_muted.is_empty());
+    }
+    #[test]
+    fn individual_volume_capability_is_reported_in_runtime_snapshot() {
+        let mut model = signed_in();
+        let snap = model.snapshot();
+        assert_eq!(snap["session"]["runtime"]["individualVolume"], true);
     }
 }
 

@@ -17,6 +17,7 @@ pub struct Preferences {
     pub theme: String,
     pub share_hd: bool,
     pub share_mode: String,
+    pub share_audio: bool,
     /// "Status personalizado" of the account menu, shown to the room and beside the name.
     pub custom_status: String,
     pub input_volume: u32,
@@ -40,6 +41,7 @@ impl Default for Preferences {
             theme: "midnight".into(),
             share_hd: false,
             share_mode: "game".into(),
+            share_audio: true,
             custom_status: String::new(),
             input_volume: 100,
             output_volume: 100,
@@ -83,8 +85,7 @@ impl Preferences {
                     .ok_or_else(Error::invalid)?
                     .to_owned()
             }
-            // The screen's own audio is not ported yet; keeping it off is the only state this core can honour.
-            "shareAudio" if value == false => {}
+            "shareAudio" => self.share_audio = boolean(&value)?,
             "noiseSuppression" => self.noise_suppression = boolean(&value)?,
             "automaticGainControl" => self.automatic_gain_control = boolean(&value)?,
             "callSounds" => self.call_sounds = boolean(&value)?,
@@ -137,7 +138,7 @@ impl Preferences {
             "desktopNotifications":self.desktop_notifications,"taskbarAlert":self.taskbar_alert,
             "closeToTray":self.close_to_tray,"startMinimized":self.start_minimized,"openAtLogin":false,"loginSupported":false,
             "errorReports":false,"errorReportsAvailable":false,
-            "shareMode":self.share_mode,"shareHd":self.share_hd,"shareAudio":false})
+            "shareMode":self.share_mode,"shareHd":self.share_hd,"shareAudio":self.share_audio})
     }
 }
 pub struct Store {
@@ -216,8 +217,9 @@ mod tests {
         assert!(preferences.set("mediaUrl", json!("wss://evil")).is_err());
         assert!(preferences.set("noiseSuppression", json!("false")).is_err());
         assert!(preferences.set("theme", json!("invalid")).is_err());
-        assert!(preferences.set("shareAudio", json!(true)).is_err());
+        assert!(preferences.set("shareAudio", json!("true")).is_err());
         assert!(preferences.set("shareAudio", json!(false)).is_ok());
+        assert!(preferences.set("shareAudio", json!(true)).is_ok());
     }
     #[test]
     fn volumes_are_whole_numbers_inside_their_ranges() {
@@ -267,7 +269,7 @@ mod tests {
     fn all_boolean_preference_toggles_accept_booleans_only() {
         let mut preferences = Preferences::default();
         for key in [
-            "shareHd", "noiseSuppression", "automaticGainControl", "callSounds",
+            "shareHd", "shareAudio", "noiseSuppression", "automaticGainControl", "callSounds",
             "desktopNotifications", "taskbarAlert", "closeToTray", "startMinimized",
         ] {
             assert!(preferences.set(key, json!(true)).is_ok(), "{key} should accept true");

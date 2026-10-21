@@ -895,6 +895,10 @@ impl Core {
                 model.chat.clear();
                 model.speaking.clear();
                 model.peer_muted.clear();
+                model.peer_volume.clear();
+                model.peer_pan.clear();
+                model.peer_stream_volume.clear();
+                model.peer_stream_muted.clear();
                 model.connected_at = 0;
                 model.call_focus = None;
                 if std::mem::take(&mut model.call_fullscreen) {
@@ -1157,25 +1161,62 @@ impl Core {
                 stream_muted,
             } => {
                 api::id(&socket_id)?;
-                // Silencing someone is a track switch. Volume and pan need our own mixing, which this core does not
-                // have yet: say so instead of showing a slider that changes nothing.
-                if volume.is_some() || pan.is_some() || stream_volume.is_some() || stream_muted.is_some() {
-                    return Err(Error::unavailable(
-                        "O volume individual ainda não está disponível nesta versão. Você pode silenciar a pessoa.",
-                    ));
+                if let Some(v) = volume {
+                    if v > 200 {
+                        return Err(Error::invalid());
+                    }
                 }
-                if let Some(muted) = muted {
-                    let generation = {
-                        let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(p) = pan {
+                    if !(-100..=100).contains(&p) {
+                        return Err(Error::invalid());
+                    }
+                }
+                if let Some(sv) = stream_volume {
+                    if sv > 200 {
+                        return Err(Error::invalid());
+                    }
+                }
+                let generation = {
+                    let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    if let Some(muted) = muted {
                         if muted {
-                            model.peer_muted.insert(socket_id);
+                            model.peer_muted.insert(socket_id.clone());
                         } else {
                             model.peer_muted.remove(&socket_id);
                         }
-                        model.generation
-                    };
-                    self.media.configure(generation)?;
-                }
+                    }
+                    if let Some(volume) = volume {
+                        if volume == 100 {
+                            model.peer_volume.remove(&socket_id);
+                        } else {
+                            model.peer_volume.insert(socket_id.clone(), volume);
+                        }
+                    }
+                    if let Some(pan) = pan {
+                        if pan == 0 {
+                            model.peer_pan.remove(&socket_id);
+                        } else {
+                            model.peer_pan.insert(socket_id.clone(), pan);
+                        }
+                    }
+                    if let Some(stream_volume) = stream_volume {
+                        if stream_volume == 100 {
+                            model.peer_stream_volume.remove(&socket_id);
+                        } else {
+                            model.peer_stream_volume.insert(socket_id.clone(), stream_volume);
+                        }
+                    }
+                    if let Some(stream_muted) = stream_muted {
+                        if stream_muted {
+                            model.peer_stream_muted.insert(socket_id.clone());
+                        } else {
+                            model.peer_stream_muted.remove(&socket_id);
+                        }
+                    }
+                    model.generation
+                };
+                self.media.configure(generation)?;
+                model::publish(app, &self.model);
                 Ok(Value::Null)
             }
             Command::PlaySound { sound_id } => {
@@ -1309,6 +1350,30 @@ mod tests {
         assert!(matches!(muted, Command::SetMuted { muted: true }));
         let deaf: Command = serde_json::from_value(json!({"name": "setDeafened", "deafened": false})).unwrap();
         assert!(matches!(deaf, Command::SetDeafened { deafened: false }));
+    }
+    #[test]
+    fn command_set_peer_audio_deserializes() {
+        let cmd: Command = serde_json::from_value(json!({
+            "name": "setPeerAudio",
+            "socketId": "sock-peer-1",
+            "volume": 120,
+            "pan": -30,
+            "muted": false,
+            "streamVolume": 180,
+            "streamMuted": true
+        }))
+        .unwrap();
+        assert!(matches!(
+            cmd,
+            Command::SetPeerAudio {
+                socket_id,
+                volume: Some(120),
+                pan: Some(-30),
+                muted: Some(false),
+                stream_volume: Some(180),
+                stream_muted: Some(true)
+            } if socket_id == "sock-peer-1"
+        ));
     }
     #[test]
     fn command_server_management_deserializes() {

@@ -164,7 +164,13 @@ const webEntries=participantMenuEntries(webPeerUser,webSession,tauriBridgeMock);
 const webLabels=webEntries.map(e=>e.label).filter(Boolean);
 assert.ok(webLabels.includes('Volume do usuário'),'Standard runtime includes user volume slider');
 assert.ok(webLabels.includes('Volume da transmissão'),'Standard runtime includes stream volume slider for live users');
-console.log('Call focus, stream hidden and participant actions: stage focus, fixture bridge and Tauri volume omission verified');
+
+const tauriVolumeSession={...fixtureSession('call'),runtime:{name:'tauri',preview:true,voice:true,screen:true,camera:false,googleLogin:true,individualVolume:true}};
+const tauriVolumeEntries=participantMenuEntries(peerUser,tauriVolumeSession,tauriBridgeMock);
+const tauriVolumeLabels=tauriVolumeEntries.map(e=>e.label).filter(Boolean);
+assert.ok(tauriVolumeLabels.includes('Volume do usuário'),'Tauri runtime with individualVolume capability includes user volume slider');
+assert.ok(tauriVolumeLabels.includes('Silenciar para mim'),'Tauri runtime with individualVolume retains local mute');
+console.log('Call focus, stream hidden and participant actions: stage focus, fixture bridge and Tauri volume capability verified');
 
 
 assert.deepEqual(callGridLayout(2,600,220,16),{columns:2,cardWidth:292},'cards reserve the actual gap between columns');

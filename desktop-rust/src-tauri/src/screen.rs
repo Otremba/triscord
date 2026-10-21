@@ -98,7 +98,8 @@ impl Session {
         for participant in self.room.remote_participants().values() {
             for publication in participant.track_publications().values() {
                 if publication.kind() == TrackKind::Video
-                    && publication.source() == TrackSource::Screenshare
+                    && (publication.source() == TrackSource::Screenshare
+                        || publication.source() == TrackSource::Camera)
                 {
                     if publication.is_desired() != (count < 8) { publication.set_subscribed(count < 8); }
                     count += 1;
@@ -237,8 +238,9 @@ impl Screen {
                         match event {
                             Some(RoomEvent::TrackSubscribed {track:RemoteTrack::Video(track),participant,publication})=>{
                                 let sid=publication.sid().to_string();
-                                if !session.readers.contains_key(&sid)&&session.readers.len()<8&&publication.source()==TrackSource::Screenshare {
-                                    if let Ok(reader)=Reader::start(track,participant.name(),crate::media::socket_of(&participant.identity().to_string()).unwrap_or_default(),session.generation,session.membership,model.clone(),app.clone(),presenter.clone()){session.readers.insert(sid,reader);}
+                                if !session.readers.contains_key(&sid)&&session.readers.len()<8&&(publication.source()==TrackSource::Screenshare || publication.source()==TrackSource::Camera) {
+                                    let kind = if publication.source() == TrackSource::Camera { "camera" } else { "screen" };
+                                    if let Ok(reader)=Reader::start(track,kind,participant.name(),crate::media::socket_of(&participant.identity().to_string()).unwrap_or_default(),session.generation,session.membership,model.clone(),app.clone(),presenter.clone()){session.readers.insert(sid,reader);}
                                 }
                             },
                             Some(RoomEvent::TrackUnsubscribed {publication,..})=>{session.readers.remove(&publication.sid().to_string());},

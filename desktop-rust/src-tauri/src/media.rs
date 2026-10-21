@@ -269,14 +269,15 @@ impl Voice {
         })
     }
     fn configure(&mut self, model: &Shared) -> bool {
-        let (muted, deafened, ns, agc, silenced) = {
+        let (muted, deafened, ns, agc, silenced, peer_volume) = {
             let model = model.lock().unwrap_or_else(|e| e.into_inner());
             (
                 model.muted || model.server_muted || model.deafened || !model.voice_requested,
                 model.deafened,
-                model.preferences.noise_suppression,
+                model.preferences.noise_suppression && model.preferences.noise_suppression_strength > 0,
                 model.preferences.automatic_gain_control,
                 model.peer_muted.clone(),
+                model.peer_volume.clone(),
             )
         };
         let preferences = model
@@ -314,6 +315,7 @@ impl Voice {
         if self
             .audio
             .configure_audio_processing(AudioProcessingOptions {
+                echo_cancellation: true,
                 noise_suppression: ns,
                 auto_gain_control: agc,
                 ..Default::default()
@@ -335,7 +337,8 @@ impl Voice {
             self.microphone.unmute();
         }
         for (socket, track) in self.remote.values() {
-            if deafened || silenced.contains(socket) {
+            let zero_volume = peer_volume.get(socket).copied() == Some(0);
+            if deafened || silenced.contains(socket) || zero_volume {
                 track.disable();
             } else {
                 track.enable();

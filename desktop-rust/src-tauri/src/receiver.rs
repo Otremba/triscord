@@ -19,6 +19,7 @@ impl Reader {
     #[expect(clippy::too_many_arguments, reason = "Admission identity, track metadata and UI owners must remain explicit at this actor boundary")]
     pub fn start(
         track: RemoteVideoTrack,
+        kind: &'static str,
         title: String,
         owner: String,
         generation: u64,
@@ -38,7 +39,7 @@ impl Reader {
                 presenter.remove(&id);
                 return Err(Error::invalid());
             }
-            state.streams.push(json!({"id":id,"kind":"screen","ownerId":owner,"title":title,"width":0,"height":0,"loading":true,"hidden":false,"path":"native-overlay"}));
+            state.streams.push(json!({"id":id,"kind":kind,"ownerId":owner,"title":title,"width":0,"height":0,"loading":true,"hidden":false,"path":"native-overlay"}));
         }
         publish(&app, &model);
         let (frame_id, frame_model, frame_presenter, frame_app) =

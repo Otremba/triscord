@@ -22,7 +22,7 @@ export function participantMenuEntries(user: VoiceUser, session: Session, bridge
     entries.push({ kind: 'separator' });
     entries.push({ kind: 'item', label: 'Silenciar para mim', checked: !!user.localMuted,
       action: () => bridge.send({ name: 'setPeerAudio', socketId: user.id, muted: !user.localMuted }) });
-    const hasIndividualVolume = session.runtime?.name !== 'tauri';
+    const hasIndividualVolume = session.runtime?.name !== 'tauri' || !!session.runtime?.individualVolume;
     if (hasIndividualVolume) {
       entries.push({ kind: 'slider', label: 'Volume do usuário', value: user.volume ?? 100, max: 200,
         onChange: volume => bridge.send({ name: 'setPeerAudio', socketId: user.id, volume }) });
@@ -31,7 +31,7 @@ export function participantMenuEntries(user: VoiceUser, session: Session, bridge
     }
   }
   if (peerInCall(session, user.id)) entries.push({ kind: 'item', label: 'Áudio do participante', icon: 'Headphones', action: () => { if (anchor) openPeerAudio(user.id, anchor); } });
-  if (peerInCall(session, user.id) && user.live && session.runtime?.name !== 'tauri') entries.push({ kind: 'item', label: 'Silenciar transmissão', checked: !!user.streamMuted,
+  if (peerInCall(session, user.id) && user.live && (session.runtime?.name !== 'tauri' || !!session.runtime?.individualVolume)) entries.push({ kind: 'item', label: 'Silenciar transmissão', checked: !!user.streamMuted,
     action: () => bridge.send({ name: 'setPeerAudio', socketId: user.id, streamMuted: !user.streamMuted }) });
   for (const stream of session.streams ?? []) if (stream.ownerId === user.id) {
     const noun = stream.kind === 'screen' ? 'transmissão' : 'vídeo';
