@@ -97,6 +97,15 @@ fn clean_room(room: &Value) -> Option<Value> {
 }
 
 impl Model {
+    pub fn room_selected(&self, id: &str) -> bool {
+        self.desired_room.as_deref() == Some(id)
+            && (self.text_room.as_deref() == Some(id) || self.connection == "connected")
+    }
+    pub fn voice_join_in_progress(&self, id: &str) -> bool {
+        self.voice_requested
+            && matches!(self.voice_state.as_str(), "connecting" | "connected" | "reconnecting")
+            && (self.text_room.as_deref() == Some(id) || self.desired_room.as_deref() == Some(id))
+    }
     fn account_id(&self) -> &str {
         self.account
             .as_ref()
@@ -308,6 +317,10 @@ impl Model {
                 };
                 return self.speaking.remove(socket);
             }
+            "room-join-denied" => {
+                self.desired_room = None;
+                if self.voice_requested { self.voice_state = "error".into(); }
+            }
             "room-joined" => {
                 let Some(id) = payload["roomId"].as_str() else {
                     return false;
@@ -396,6 +409,37 @@ pub fn notice(app: &tauri::AppHandle, message: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn selecting_the_current_or_pending_room_preserves_media() {
+        let mut model = Model { connection: "connected", desired_room: Some("voice".into()), ..Default::default() };
+        assert!(model.room_selected("voice"));
+        model.text_room = Some("voice".into());
+        model.voice_requested = true;
+        model.voice_state = "connected".into();
+        assert!(model.room_selected("voice"));
+        assert!(!model.room_selected("other"));
+    }
+    #[test]
+    fn failed_voice_can_be_retried_but_active_joins_are_not_duplicated() {
+        let mut model = Model { voice_requested: true, desired_room: Some("voice".into()), ..Default::default() };
+        for state in ["connecting", "connected", "reconnecting"] {
+            model.voice_state = state.into();
+            assert!(model.voice_join_in_progress("voice"));
+            assert!(!model.voice_join_in_progress("other"));
+        }
+        for state in ["error", "idle", ""] {
+            model.voice_state = state.into();
+            assert!(!model.voice_join_in_progress("voice"));
+        }
+    }
+    #[test]
+    fn denied_admission_does_not_block_selecting_or_retrying_the_room() {
+        let mut model = Model { connection: "connected", voice_requested: true, desired_room: Some("voice".into()), voice_state: "connecting".into(), ..Default::default() };
+        assert!(model.update(0, "room-join-denied", json!({})));
+        assert!(!model.room_selected("voice"));
+        assert!(!model.voice_join_in_progress("voice"));
+        assert_eq!(model.voice_state, "error");
+    }
     fn message(id: usize, room: &str) -> Value {
         json!({"id":id.to_string(),"roomId":room,"senderUserId":"u","senderName":"User","text":"hello","timestamp":1})
     }

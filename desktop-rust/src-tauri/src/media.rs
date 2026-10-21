@@ -134,7 +134,9 @@ impl Media {
                         if active.as_ref().is_some_and(|v| v.generation <= generation) {
                             close(&mut active).await;
                         }
-                        status(&app, &model, generation, "idle");
+                        if !model.lock().unwrap_or_else(|e| e.into_inner()).voice_requested {
+                            status(&app, &model, generation, "idle");
+                        }
                     }
                     Action::Configure(generation) => {
                         if let Some(voice) = active.as_mut().filter(|v| v.generation == generation)
@@ -174,9 +176,9 @@ impl Media {
                                     notice(&app,"Não foi possível iniciar o dispositivo de áudio. Confira o dispositivo e reconecte a voz.");
                                 }
                             }
-                            Err(_) => {
+                            Err(error) => {
                                 status(&app, &model, generation, "error");
-                                notice(&app,"Não foi possível conectar a voz. A conexão de texto permanece disponível.");
+                                notice(&app,error.message);
                             }
                         }
                     }
@@ -224,7 +226,7 @@ struct Voice {
 }
 impl Voice {
     async fn connect(generation: u64, credentials: &Credentials) -> Result<Self> {
-        let audio = PlatformAudio::new().map_err(|_| Error::network())?;
+        let audio = PlatformAudio::new().map_err(|_| Error::unavailable("O Windows não conseguiu inicializar os dispositivos de áudio."))?;
         audio
             .configure_audio_processing(AudioProcessingOptions::default())
             .map_err(|_| Error::network())?;
@@ -236,8 +238,8 @@ impl Voice {
             Room::connect(&credentials.url, &token, options),
         )
         .await
-        .map_err(|_| Error::network())?
-        .map_err(|_| Error::network())?;
+        .map_err(|_| Error::unavailable("A conexão de voz com a VPS excedeu 20 segundos. Use Reconectar voz."))?
+        .map_err(|_| Error::unavailable("Não foi possível estabelecer a conexão de voz com a VPS. Use Reconectar voz."))?;
         let microphone = LocalAudioTrack::create_audio_track("microphone", audio.rtc_source());
         microphone.mute();
         let published = timeout(
@@ -253,7 +255,7 @@ impl Voice {
         .await;
         if !published.is_ok_and(|result| result.is_ok()) {
             let _ = timeout(Duration::from_secs(5), room.close()).await;
-            return Err(Error::network());
+            return Err(Error::unavailable("A VPS não confirmou a publicação do microfone. Use Reconectar voz."));
         }
         Ok(Self {
             generation,
@@ -282,30 +284,32 @@ impl Voice {
             .unwrap_or_else(|e| e.into_inner())
             .preferences
             .clone();
-        if self.input_device != preferences.input_device && !preferences.input_device.is_empty() {
+        let Ok(input_device) = crate::audio_device::resolve(&preferences.input_device, true) else { return false; };
+        let Ok(output_device) = crate::audio_device::resolve(&preferences.output_device, false) else { return false; };
+        if self.input_device != input_device {
             if self
                 .audio
                 .switch_recording_device(&RecordingDeviceId::from_unchecked_guid(
-                    &preferences.input_device,
+                    &input_device,
                 ))
                 .is_err()
             {
                 return false;
             }
-            self.input_device = preferences.input_device;
+            self.input_device = input_device;
         }
-        if self.output_device != preferences.output_device && !preferences.output_device.is_empty()
+        if self.output_device != output_device
         {
             if self
                 .audio
                 .switch_playout_device(&PlayoutDeviceId::from_unchecked_guid(
-                    &preferences.output_device,
+                    &output_device,
                 ))
                 .is_err()
             {
                 return false;
             }
-            self.output_device = preferences.output_device;
+            self.output_device = output_device;
         }
         if self
             .audio
@@ -340,7 +344,9 @@ impl Voice {
         for participant in self.room.remote_participants().values() {
             for publication in participant.track_publications().values() {
                 if publication.kind() == TrackKind::Audio {
-                    publication.set_subscribed(!deafened);
+                    if publication.is_desired() == deafened {
+                        publication.set_subscribed(!deafened);
+                    }
                 }
             }
         }

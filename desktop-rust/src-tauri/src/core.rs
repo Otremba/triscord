@@ -401,8 +401,7 @@ impl Core {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .desired_room = Some(id.clone());
-        // This preview joins membership/chat only, never claims to publish/receive audio.
-        // The hub uses the LiveKit admission format for compatibility with native SFU rooms.
+        // The room response admits screen reception and, after an explicit voice join, audio.
         let status = self.model.lock().unwrap_or_else(|e| e.into_inner()).preferences.custom_status.clone();
         self.send("join-room",json!({"roomId":id,"roomName":name,"mediaTransport":"livekit","userData":{"isMuted":true,"isDeafened":true,"status":status}}))
     }
@@ -837,6 +836,10 @@ impl Core {
                 Ok(Value::Null)
             }
             Command::OpenTextRoom { channel_id } => {
+                // Selecting the current room is navigation, not a new media admission.
+                if self.model.lock().unwrap_or_else(|e| e.into_inner()).room_selected(&channel_id) {
+                    return Ok(Value::Null);
+                }
                 let generation = {
                     let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
                     m.voice_requested = false;
@@ -906,9 +909,7 @@ impl Core {
                 // A second click on the room we are in (or joining) must not tear the call down and start it again.
                 if {
                     let m = self.model.lock().unwrap_or_else(|e| e.into_inner());
-                    m.voice_requested
-                        && (m.text_room.as_deref() == Some(channel_id.as_str())
-                            || m.desired_room.as_deref() == Some(channel_id.as_str()))
+                    m.voice_join_in_progress(&channel_id)
                 } {
                     return Ok(Value::Null);
                 }

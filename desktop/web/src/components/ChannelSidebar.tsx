@@ -139,7 +139,7 @@ function CategoryList({ category, session, bridge }: { category: Category; sessi
                 <div class="tri-channel__link"
                   onContextMenu={e => openContextMenu(e, channelMenu(bridge, server, channel.id, channel.name, connected, category.name), { label: channel.name })}>
                   <button type="button" class="tri-channel__select" aria-current={selected?'page':undefined} aria-label={channel.name}
-                    onClick={() => { bridge.send({ name: 'openTextRoom', channelId: channel.id }); bridge.send({ name: 'selectChannel', channelId: channel.id }); }}>
+                    onClick={() => bridge.send({ name: 'openTextRoom', channelId: channel.id })}>
                   {(() => {
                     const isText = channel.kind === 'text';
                     return <Icon name={isText ? 'TextChannel' : 'VoiceSpeaker'} size={20} className="tri-channel__icon" />;

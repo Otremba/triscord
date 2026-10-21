@@ -79,8 +79,8 @@ impl Session {
             Room::connect(&credentials.url, &credentials.token, options),
         )
         .await
-        .map_err(|_| Error::network())?
-        .map_err(|_| Error::network())?;
+        .map_err(|_| Error::unavailable("A conexão das transmissões com a VPS excedeu 20 segundos. Entre novamente na sala."))?
+        .map_err(|_| Error::unavailable("Não foi possível estabelecer a conexão das transmissões com a VPS. Entre novamente na sala."))?;
         let session = Self {
             generation,
             membership,
@@ -100,10 +100,10 @@ impl Session {
                 if publication.kind() == TrackKind::Video
                     && publication.source() == TrackSource::Screenshare
                 {
-                    publication.set_subscribed(count < 8);
+                    if publication.is_desired() != (count < 8) { publication.set_subscribed(count < 8); }
                     count += 1;
                 } else {
-                    publication.set_subscribed(false);
+                    if publication.is_desired() { publication.set_subscribed(false); }
                 }
             }
         }
@@ -275,11 +275,11 @@ impl Screen {
                                 let mut stale = Some(session);
                                 close(&mut stale).await;
                             }
-                            Err(_) => {
+                            Err(error) => {
                                 if watching(&model, generation, membership, &room) {
                                     notice(
                                         &app,
-                                        "Não foi possível conectar a recepção das transmissões.",
+                                        error.message,
                                     );
                                 }
                             }
