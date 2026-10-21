@@ -44,7 +44,7 @@ export function ServerIcon({ server, size = 40 }: { server: Server; size?: numbe
 // (Discord keeps deletion in the server settings, which triscord does not have).
 const openRemoval = (kind: 'deleteServer' | 'leaveServer', server: Server) =>
   dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind, serverId: server.id, serverName: server.name } }));
-function serverMenu(server: Server, selected: boolean): MenuEntry[] {
+export function serverMenuEntries(server: Server, selected: boolean): MenuEntry[] {
   return [
     ...(server.owned && server.id ? [{ kind: 'item' as const, label: 'Convidar para o servidor',
       action: () => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'invite', serverId: server.id, serverName: server.name } })) }] : []),
@@ -69,7 +69,7 @@ function RailItem({ server, selected, onSelect, voice }: { server: Server; selec
       <Tooltip text={server.name} position="right" spacing={12} guild>
         <button class={`tri-rail__button tri-magnetic-item ${selected ? 'is-selected' : ''}`} aria-label={server.name} aria-current={selected}
           onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={onSelect}
-          onContextMenu={e => openContextMenu(e, serverMenu(server, selected), { width: 'fixed', label: server.name })}>
+          onContextMenu={e => openContextMenu(e, serverMenuEntries(server, selected), { width: 'fixed', label: server.name })}>
           <ServerIcon server={server} />
         </button>
       </Tooltip>

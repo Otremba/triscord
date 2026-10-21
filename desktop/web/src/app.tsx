@@ -2,6 +2,8 @@ import type { Bridge } from './bridge';
 import { type SessionStore, useSession } from './store';
 import { PopoutBar, ResizeEdges, TitleBar } from './components/TitleBar';
 import { ServerRail } from './components/ServerRail';
+import { WorkspaceNav } from './components/WorkspaceNav';
+import { StatePanel } from './components/ui/StatePanel';
 import { ChannelSidebar } from './components/ChannelSidebar';
 import { AccountPopoverHost } from './components/AccountPopover';
 import { PeerAudioHost } from './components/PeerAudio';
@@ -32,7 +34,7 @@ type OpenModal = { kind: 'createChannel'; categoryName: string } | { kind: 'invi
 
 // Grid from Discord's app layout (module __5e434): title bar across the top; guild list and channel list
 // inside the sidebar (the account panel floats over both); the page fills the rest.
-export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) {
+export function App({ store, bridge, workspace = false }: { store: SessionStore; bridge: Bridge; workspace?:boolean }) {
   const session = useSession(store);
   const [serverModal, setServerModal] = useState(false);
   useEffect(() => { const open = () => setServerModal(true); addEventListener('tri-open-server-modal', open); return () => removeEventListener('tri-open-server-modal', open); }, []);
@@ -66,7 +68,7 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
     addEventListener('tri-open-modal', open);
     return () => removeEventListener('tri-open-modal', open);
   }, []);
-  if (!session) return <div class="tri-app tri-app--loading"><PopoutBar bridge={bridge} className="tri-titlebar--overlay" /><ResizeEdges bridge={bridge} /></div>;
+  if (!session) return <div class="tri-app tri-app--loading"><PopoutBar bridge={bridge} className="tri-titlebar--overlay" /><ResizeEdges bridge={bridge} />{workspace&&<StatePanel title="Preparando seu espaço" description="Carregando sua conta, seus servidores e suas conversas." busy><button type="button" onClick={()=>bridge.send({name:'requestSnapshot'})}>Tentar novamente</button></StatePanel>}</div>;
   if (session.auth && session.auth.state !== 'signedIn') return <>
     <LoginScreen auth={session.auth} bridge={bridge} googleLogin={session.runtime?.googleLogin ?? true} />
     <PopoutBar bridge={bridge} className="tri-titlebar--overlay" /><ResizeEdges bridge={bridge} />
@@ -89,18 +91,18 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
     </div>
   );
   return (
-    <div class={`tri-app ${session.callFullscreen ? 'tri-app--call-fullscreen' : ''}`}>
+    <div class={`tri-app ${workspace?'tri-app--workspace':''} ${session.callFullscreen ? 'tri-app--call-fullscreen' : ''}`}>
       {session.callFullscreen && <div class="tri-fullscreen-hint" role="status">Pressione Esc para sair da tela cheia</div>}
       <TitleBar server={server} bridge={bridge} />
       {!session.callFullscreen && <ResizeEdges bridge={bridge} />}
       <div class="tri-content">
-        <aside class="tri-sidebar">
-          <ServerRail servers={session.servers} selectedId={session.selectedServerId} callServerId={session.callServerId} bridge={bridge}
-            voice={session.connectedChannelId ? (session.sharing ? 'screen' : 'voice') : undefined} />
-          <ChannelSidebar session={session} bridge={bridge} />
+        <aside class="tri-sidebar" style={workspace?{'--tri-account-reserve':session.connectedChannelId?(session.sharing?'238px':'194px'):'90px'}:undefined}>
+          {workspace?<WorkspaceNav session={session} bridge={bridge}/>:<ServerRail servers={session.servers} selectedId={session.selectedServerId} callServerId={session.callServerId} bridge={bridge}
+            voice={session.connectedChannelId ? (session.sharing ? 'screen' : 'voice') : undefined} />}
+          <ChannelSidebar session={session} bridge={bridge} workspace={workspace} />
           <AccountPanel session={session} bridge={bridge} />
         </aside>
-        <ChannelView session={session} bridge={bridge} store={store} />
+        <ChannelView session={session} bridge={bridge} store={store} workspace={workspace} />
       </div>
       {modal?.kind === 'createChannel' && <CreateChannelModal bridge={bridge} categoryName={modal.categoryName} onClose={() => setModal(null)} />}
       {modal?.kind === 'deleteMessage' && <DeleteMessageModal bridge={bridge} message={modal.message} onClose={() => setModal(null)} />}

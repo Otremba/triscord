@@ -1,0 +1,273 @@
+/* Revision 02 candidate. Deliberately opt-in (?design=next) until the visual review is settled.
+   Own semantic tokens map onto existing component contracts, so no media/API behavior is replaced. */
+:root[data-design="next"] {
+  color-scheme: dark;
+  --ui-canvas:#1e2021;
+  --ui-sidebar:#232526;
+  --ui-panel:#292c2d;
+  --ui-field:#2d3031;
+  --ui-border:#3b3e3f;
+  --ui-text:#e8eaf0;
+  --ui-muted:#a3aab6;
+  --ui-subtle:#8b93a1;
+  --ui-accent:#deb698;
+  --ui-selected:#44392f;
+  --ui-primary:#73533d;
+  --ui-primary-text:#fff4e9;
+  --ui-positive:#8fc6a9;
+  --ui-critical:#e7a0a8;
+  --ui-motion:140ms;
+  --font-primary:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  --font-display:var(--font-primary);
+  --tri-font-family:var(--font-primary);
+  --tri-sidebar-width:304px;
+  --custom-channel-header-height:64px;
+  --background-base-lowest:var(--ui-canvas);
+  --background-base-lower:var(--ui-canvas);
+  --background-base-low:var(--ui-sidebar);
+  --background-base-card:var(--ui-panel);
+  --background-surface-high:var(--ui-panel);
+  --background-surface-higher:var(--ui-field);
+  --background-surface-highest:var(--ui-field);
+  --background-floating:var(--ui-panel);
+  --background-secondary:var(--ui-sidebar);
+  --background-primary:var(--ui-canvas);
+  --background-brand:var(--ui-primary);
+  --background-mod-subtle:#2b2e2f;
+  --background-mod-normal:#303334;
+  --background-mod-muted:#303334;
+  --background-mod-accent:var(--ui-border);
+  --background-feedback-positive:#29372f;
+  --background-feedback-critical:#352a30;
+  --background-mod-strong:#3a3d3e;
+  --control-brand-foreground-new:var(--ui-accent);
+  --control-primary-background-default:var(--ui-primary);
+  --control-primary-background-hover:#805f46;
+  --control-primary-text-default:var(--ui-primary-text);
+  --control-secondary-background-default:var(--ui-panel);
+  --control-secondary-background-hover:var(--ui-field);
+  --control-secondary-border-default:var(--ui-border);
+  --control-secondary-text-default:var(--ui-text);
+  --control-critical-primary-background-default:#51363f;
+  --control-critical-primary-background-hover:#68424b;
+  --control-critical-primary-text-default:#ffe8ec;
+  --input-background-default:var(--ui-field);
+  --input-border-default:var(--ui-border);
+  --input-border-active:var(--ui-accent);
+  --input-placeholder-text-default:var(--ui-muted);
+  --switch-background-default:#444849;
+  --switch-background-selected-default:var(--ui-primary);
+  --switch-border-default:var(--ui-border);
+  --switch-border-selected-default:var(--ui-accent);
+  --switch-thumb-background-default:var(--ui-text);
+  --radio-background-default:var(--ui-panel);
+  --radio-background-selected-default:var(--ui-selected);
+  --radio-background-selected-hover:#514336;
+  --radio-border-default:var(--ui-border);
+  --radio-border-selected-default:var(--ui-accent);
+  --radio-thumb-background-active:var(--ui-accent);
+  --border-subtle:var(--ui-border);
+  --border-muted:var(--ui-border);
+  --app-frame-border:var(--ui-border);
+  --text-default:var(--ui-text);
+  --text-strong:var(--ui-text);
+  --text-muted:var(--ui-muted);
+  --text-subtle:var(--ui-subtle);
+  --text-feedback-positive:var(--ui-positive);
+  --text-feedback-critical:var(--ui-critical);
+  --text-link:var(--ui-accent);
+  --chat-text-muted:var(--ui-subtle);
+  --channels-default:var(--ui-muted);
+  --channel-icon:var(--ui-subtle);
+  --interactive-text-default:var(--ui-muted);
+  --interactive-text-hover:var(--ui-text);
+  --interactive-text-active:var(--ui-text);
+  --interactive-background-hover:#303334;
+  --interactive-background-selected:var(--ui-selected);
+  --icon-feedback-positive:var(--ui-positive);
+  --icon-feedback-critical:var(--ui-critical);
+  --brand-500:var(--ui-accent);
+  --brand-experiment:var(--ui-primary);
+  --brand-560:var(--ui-primary);
+  --message-background-hover:#252829;
+  --reaction-background-default:var(--ui-panel);
+  --reaction-background-hover:var(--ui-selected);
+  --reaction-border-hover:var(--ui-accent);
+  --scrollbar-auto-thumb:#494d4e;
+  --scrollbar-auto-track:transparent;
+  --tri-space-950:var(--ui-canvas);
+  --tri-space-900:var(--ui-sidebar);
+  --tri-space-850:var(--ui-sidebar);
+  --tri-space-800:var(--ui-panel);
+  --tri-space-700:var(--ui-field);
+  --tri-neon-cyan:var(--ui-accent);
+  --tri-neon-violet:var(--ui-accent);
+  --tri-neon-emerald:var(--ui-positive);
+  --tri-glass-bg:var(--ui-panel);
+  --tri-glass-border:var(--ui-border);
+  --tri-glass-blur:none;
+  --tri-glass-shadow:none;
+  --tri-glow-aurora:none;
+  --tri-glow-cyan:none;
+  --tri-glow-violet:none;
+  --tri-glow-emerald:none;
+}
+
+:root[data-design="next"] body { background:var(--ui-canvas);color:var(--ui-text);font-family:var(--font-primary); }
+:root[data-design="next"] :is(button,input,textarea,select,[role="button"]):focus-visible {
+  outline:2px solid var(--ui-accent);outline-offset:3px;
+}
+:root[data-design="next"] button:disabled { opacity:.5;cursor:not-allowed; }
+:root[data-design="next"] :is(.tri-glass-panel,.tri-floating-dock,.tri-bento-card,.tri-spotlight,.tri-message-action-dock,.tri-composer-floating) {
+  background:var(--ui-panel);border-color:var(--ui-border);box-shadow:none;backdrop-filter:none;filter:none;
+}
+:root[data-design="next"] :is(.tri-border-beam,.tri-audio-ripple,.tri-audio-equalizer),
+:root[data-design="next"] .tri-spotlight::before,
+:root[data-design="next"] .tri-shimmer-btn::before,
+:root[data-design="next"] .tri-shimmer-btn::after { display:none; }
+:root[data-design="next"] :is(.tri-logo,.tri-magnetic-item,.tri-bento-card,.tri-shimmer-btn) { filter:none;box-shadow:none;transform:none;animation:none; }
+:root[data-design="next"] .tri-logo path[stroke] { stroke:var(--ui-accent); }
+:root[data-design="next"] .tri-logo circle { fill:var(--ui-accent); }
+:root[data-design="next"] .tri-shimmer-btn {
+  min-height:38px;border:1px solid #987458;border-radius:8px;background:var(--ui-primary);background-image:none;
+  color:var(--ui-primary-text);text-shadow:none;transition:background-color var(--ui-motion),border-color var(--ui-motion);
+}
+:root[data-design="next"] .tri-shimmer-btn:hover { background:#805f46;transform:none; }
+:root[data-design="next"] .tri-shimmer-btn[data-variant="glass"] { background:var(--ui-panel);border-color:var(--ui-border);color:var(--ui-text); }
+:root[data-design="next"] [class*="shadow-glow"] { box-shadow:none; }
+:root[data-design="next"] [class*="backdrop-blur"] { backdrop-filter:none; }
+:root[data-design="next"] [class*="text-neon-cyan"], :root[data-design="next"] [class*="text-neon-violet"] { color:var(--ui-accent); }
+:root[data-design="next"] [class*="text-neon-emerald"] { color:var(--ui-positive); }
+:root[data-design="next"] .animate-pulse { animation:none; }
+:root[data-design="next"] :is(.tri-workspace-nav,.tri-sidebar-list,.tri-panels,.tri-channel-header,.tri-page,.tri-chat-panel,.tri-members-sidebar) { box-shadow:none;backdrop-filter:none; }
+
+/* A single named workspace navigation replaces the circular server rail. */
+:root[data-design="next"] .tri-app--workspace .tri-sidebar { flex-direction:column;width:var(--tri-sidebar-width);background:var(--ui-sidebar);border-right:1px solid var(--ui-border); }
+:root[data-design="next"] .tri-workspace-nav { padding:24px 16px 16px;flex:none; }
+:root[data-design="next"] .tri-workspace-brand { display:flex;align-items:center;gap:12px;padding:0 4px 24px;font-size:25px;font-weight:700;letter-spacing:-.6px; }
+:root[data-design="next"] .tri-workspace-mark { display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--ui-primary);color:var(--ui-primary-text); }
+:root[data-design="next"] .tri-workspace-label { display:block;margin:0 4px 10px;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ui-muted); }
+:root[data-design="next"] .tri-workspace-current { display:flex;align-items:center;gap:10px;min-height:62px;padding:10px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel); }
+:root[data-design="next"] .tri-workspace-current__icon { display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;overflow:hidden;background:var(--ui-selected);color:var(--ui-accent); }
+:root[data-design="next"] .tri-workspace-current .tri-server-acronym { background:transparent; }
+:root[data-design="next"] .tri-workspace-current select { flex:1;min-width:0;max-width:100%;padding:6px 2px;border:0;background:var(--ui-panel);color:var(--ui-text);font:600 15px var(--font-primary);cursor:pointer; }
+:root[data-design="next"] .tri-workspace-shortcuts { display:flex;gap:8px;margin-top:10px; }
+:root[data-design="next"] .tri-workspace-shortcuts>button { flex:1;min-width:0;padding:9px 10px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-panel);color:var(--ui-muted);font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+:root[data-design="next"] .tri-workspace-shortcuts>button:hover { background:var(--ui-field);color:var(--ui-text); }
+:root[data-design="next"] .tri-workspace-shortcuts .tri-workspace-add { display:grid;place-items:center;flex:0 0 36px;padding:8px; }
+:root[data-design="next"] .tri-app--workspace .tri-sidebar-list { margin-bottom:var(--tri-account-reserve);border:0;border-radius:0;background:transparent; }
+:root[data-design="next"] .tri-server-header { height:40px;margin:0 16px 12px;padding:0;border:0; }
+:root[data-design="next"] .tri-server-header__name { padding:0;font-size:12px;font-weight:600;color:var(--ui-muted); }
+:root[data-design="next"] .tri-categories { padding:0 12px 12px; }
+:root[data-design="next"] .tri-category { padding-top:12px; }
+:root[data-design="next"] .tri-channel { margin:3px 0; }
+:root[data-design="next"] .tri-channel__link { min-height:40px;margin:0;border-radius:8px;padding:8px 10px; }
+:root[data-design="next"] .tri-channel.is-selected>.tri-channel__link { background:var(--ui-selected);color:#f0d8c6;box-shadow:inset 3px 0 var(--ui-accent); }
+:root[data-design="next"] .tri-channel__name { font-size:14px; }
+:root[data-design="next"] .tri-voice-user.is-speaking .tri-avatar { outline:2px solid var(--ui-positive);outline-offset:2px;box-shadow:none;animation:none; }
+
+/* Call/account controls keep their native actions and capability checks. */
+:root[data-design="next"] .tri-app--workspace .tri-panels { left:12px;bottom:12px;width:calc(100% - 24px);border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel); }
+:root[data-design="next"] .tri-account { height:64px;padding:10px 8px;background:transparent; }
+:root[data-design="next"] .tri-voice-panel { padding:12px;border-bottom:1px solid var(--ui-border); }
+:root[data-design="next"] .tri-voice-panel__title { font-size:13px;line-height:18px; }
+:root[data-design="next"] .tri-voice-panel__room { font-size:12px; }
+:root[data-design="next"] .tri-voice-panel__signal { padding:3px;background:transparent; }
+:root[data-design="next"] .tri-voice-panel__buttons { margin-top:10px;gap:8px; }
+:root[data-design="next"] .tri-voice-panel__button { height:34px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-field); }
+:root[data-design="next"] .tri-account__button.is-red { background:#352a30;color:var(--ui-critical);box-shadow:none; }
+
+/* Conversation and call occupy one readable column; people remain supporting context. */
+:root[data-design="next"] .tri-page__main { background:var(--ui-canvas); }
+:root[data-design="next"] .tri-channel-header { position:relative;height:64px;flex:none;padding:0 20px;border-bottom:1px solid var(--ui-border);background:var(--ui-canvas); }
+:root[data-design="next"] .tri-channel-header__title { font-size:18px;font-weight:600; }
+:root[data-design="next"] .tri-channel-header__search { min-width:120px;background:var(--ui-panel);border:1px solid var(--ui-border);border-radius:8px; }
+:root[data-design="next"] .tri-channel-header__search input { width:100%;background:transparent;color:var(--ui-text); }
+:root[data-design="next"] .tri-members-sidebar { width:224px;flex-basis:224px;background:var(--ui-sidebar); }
+:root[data-design="next"] .tri-members-group__title { color:var(--ui-subtle);font-size:11px;letter-spacing:.06em; }
+:root[data-design="next"] .tri-member-item__layout { border-radius:8px; }
+:root[data-design="next"] .tri-app--workspace:not(.tri-app--call-fullscreen) .tri-page__main--call>.tri-call { margin:16px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel);overflow:hidden; }
+:root[data-design="next"] .tri-app--workspace:not(.tri-app--call-fullscreen) .tri-page__main--conversation>.tri-call { flex:0 1 42%;min-height:260px;max-height:460px;margin-bottom:0; }
+:root[data-design="next"] .tri-page__main--conversation>.tri-chat-panel { height:auto;flex:1 1 0; }
+:root[data-design="next"] .tri-app--workspace:not(.tri-app--call-fullscreen) .tri-call-grid { padding:20px 16px 84px; }
+:root[data-design="next"] :is(.tri-call-capsule,.tri-call-attached,.tri-call-button,.tri-call-disconnect) { box-shadow:none;backdrop-filter:none; }
+:root[data-design="next"] .tri-call-capsule { border:1px solid var(--ui-border);background:var(--ui-panel); }
+:root[data-design="next"] .tri-call-button { background:var(--ui-field); }
+:root[data-design="next"] .tri-call-button.is-red { background:#352a30;color:var(--ui-critical); }
+:root[data-design="next"] .tri-call-disconnect { background:#51363f;color:#ffe8ec; }
+:root[data-design="next"] :is(.tri-call-card,.tri-video-tile) { border-radius:10px;box-shadow:none; }
+:root[data-design="next"] .tri-call-card.is-speaking { outline:2px solid var(--ui-positive);box-shadow:none;animation:none; }
+:root[data-design="next"] .tri-app--workspace .tri-call.is-idle .tri-call-bottom,
+:root[data-design="next"] .tri-app--workspace .tri-page__main.is-idle .tri-channel-header { opacity:1;visibility:visible;pointer-events:auto; }
+:root[data-design="next"] .tri-app--workspace .tri-call.is-idle .tri-call-bottom>* { pointer-events:auto; }
+:root[data-design="next"] .tri-chat-panel { background:var(--ui-canvas);min-height:0; }
+:root[data-design="next"] .tri-chat-panel__scroller { padding:12px 0 20px; }
+:root[data-design="next"] .tri-message { padding-right:28px; }
+:root[data-design="next"] .tri-message.is-group-start { margin-top:22px; }
+:root[data-design="next"] .tri-message__content { font-size:15px;line-height:1.6;color:#d3d1cf; }
+:root[data-design="next"] .tri-message__username { font-size:14px;font-weight:600; }
+:root[data-design="next"] .tri-message__timestamp { margin-left:10px;font-size:11px;color:var(--ui-subtle); }
+:root[data-design="next"] .tri-channel-welcome__title { font-size:26px;line-height:1.3;font-weight:600; }
+:root[data-design="next"] .tri-channel-welcome__icon { width:44px;height:44px;border-radius:12px;background:var(--ui-panel);color:var(--ui-accent); }
+:root[data-design="next"] .tri-composer-floating { margin:12px 16px 16px;border-radius:12px;border:1px solid var(--ui-border);background:var(--ui-field); }
+:root[data-design="next"] .tri-composer-floating:focus-within { border-color:var(--ui-accent);box-shadow:none; }
+:root[data-design="next"] .tri-message-action-dock { background:var(--ui-panel);border:1px solid var(--ui-border);border-radius:8px; }
+:root[data-design="next"] .tri-reaction--own { border-color:var(--ui-accent);background:var(--ui-selected); }
+
+/* Shared surfaces: no per-screen palette or decorative animation. */
+:root[data-design="next"] :is(.tri-menu,.tri-modal,.tri-dmodal,.tri-audio-menu,.tri-account-popover,.tri-participant-profile,.tri-peer-audio,.tri-soundboard,.tri-settings) { color:var(--ui-text);border-color:var(--ui-border);box-shadow:0 12px 32px #0004;backdrop-filter:none; }
+:root[data-design="next"] :is(.tri-modal,.tri-dmodal) { border-radius:14px; }
+:root[data-design="next"] :is(.tri-menu,.tri-audio-menu) { border-radius:10px;background:var(--ui-panel); }
+:root[data-design="next"] .tri-menu__item:not(.is-danger):hover { background:var(--ui-selected);color:var(--ui-primary-text); }
+:root[data-design="next"] .tri-login__brand>span { background:none;color:var(--ui-text);-webkit-text-fill-color:var(--ui-text); }
+:root[data-design="next"] :is(.tri-login,.tri-friends) { background:var(--ui-canvas); }
+:root[data-design="next"] .tri-bento-card { border-radius:12px; }
+:root[data-design="next"] .tri-notice { background:var(--ui-panel);color:var(--ui-text);border:1px solid var(--ui-border);border-radius:10px;box-shadow:none; }
+:root[data-design="next"] .tri-state-panel { display:flex;flex:1;min-height:0;flex-direction:column;align-items:flex-start;justify-content:center;gap:20px;padding:32px;max-width:640px; }
+:root[data-design="next"] .tri-state-panel h2 { margin:0 0 8px;font-size:24px;font-weight:600;letter-spacing:-.3px; }
+:root[data-design="next"] .tri-state-panel p { margin:0;color:var(--ui-muted);font-size:15px;line-height:1.6; }
+:root[data-design="next"] .tri-state-panel--error h2 { color:var(--ui-critical); }
+:root[data-design="next"] .tri-state-panel__actions button { padding:10px 14px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-panel);font-size:14px;font-weight:600; }
+:root[data-design="next"] .tri-app--loading .tri-state-panel { align-self:center;justify-self:center; }
+:root[data-design="next"] .tri-connection-note { display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;margin:12px 16px 0;padding:12px 16px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-panel);font-size:13px;color:var(--ui-muted); }
+:root[data-design="next"] .tri-connection-note[data-tone="critical"] { border-color:#754b53;color:var(--ui-critical); }
+:root[data-design="next"] .tri-connection-note button { flex:none;padding:6px 10px;border:1px solid var(--ui-border);border-radius:6px;color:var(--ui-text); }
+:root[data-design="next"] .tri-workspace-home { flex:1;min-width:0;overflow:auto;padding:48px clamp(24px,6vw,96px);background:var(--ui-canvas); }
+:root[data-design="next"] .tri-workspace-home__header h1 { max-width:800px;font-size:32px;font-weight:600;letter-spacing:-.7px;line-height:1.3;overflow-wrap:anywhere; }
+:root[data-design="next"] .tri-workspace-home__header p { color:var(--ui-muted);font-size:15px;line-height:1.6; }
+:root[data-design="next"] .tri-workspace-home__call { display:flex;align-items:center;gap:16px;max-width:850px;margin-top:28px;padding:20px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel); }
+:root[data-design="next"] .tri-workspace-home__call>svg { color:var(--ui-positive); }
+:root[data-design="next"] .tri-workspace-home__call>div { flex:1;min-width:0; }
+:root[data-design="next"] .tri-workspace-home__call p { margin:6px 0 0;color:var(--ui-muted);font-size:13px; }
+:root[data-design="next"] .tri-workspace-home__call>button { padding:8px 10px;border-radius:6px;color:var(--ui-critical);background:#352a30;font-size:13px; }
+:root[data-design="next"] .tri-workspace-home__spaces { max-width:850px;margin-top:40px; }
+:root[data-design="next"] .tri-workspace-home__section { display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px; }
+:root[data-design="next"] .tri-workspace-home__section h2 { margin:0;font-size:18px;font-weight:600; }
+:root[data-design="next"] .tri-workspace-home__section>button { display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ui-accent); }
+:root[data-design="next"] .tri-workspace-home__spaces>ul { display:grid;gap:10px; }
+:root[data-design="next"] .tri-workspace-space { display:flex;align-items:center;gap:16px;width:100%;padding:18px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel);text-align:left;transition:border-color var(--ui-motion),background-color var(--ui-motion); }
+:root[data-design="next"] .tri-workspace-space:hover { border-color:#756351;background:#30302e; }
+:root[data-design="next"] .tri-workspace-space__icon { flex:none;width:40px;height:40px;overflow:hidden;border-radius:10px; }
+:root[data-design="next"] .tri-workspace-space__name { display:flex;flex:1;min-width:0;flex-direction:column;gap:6px; }
+:root[data-design="next"] .tri-workspace-space__name strong { font-size:15px;overflow-wrap:anywhere; }
+:root[data-design="next"] .tri-workspace-space__name>span { color:var(--ui-muted);font-size:12px; }
+:root[data-design="next"] .tri-workspace-home__footer { display:flex;gap:24px;margin:32px 0 0;color:var(--ui-muted);font-size:13px; }
+:root[data-design="next"] .tri-workspace-home-nav { display:flex;flex-direction:column;gap:4px;padding:16px; }
+:root[data-design="next"] .tri-workspace-home-nav>button { display:flex;align-items:center;gap:12px;padding:12px;border-radius:8px;text-align:left;color:var(--ui-muted);font-size:14px; }
+:root[data-design="next"] .tri-workspace-home-nav>button[aria-current="page"] { background:var(--ui-selected);color:var(--ui-primary-text); }
+:root[data-design="next"] .tri-workspace-home-nav>button:hover { background:var(--ui-field); }
+
+@media (max-width:1100px) {
+  :root[data-design="next"] { --tri-sidebar-width:260px; }
+  :root[data-design="next"] .tri-members-sidebar { width:184px;flex-basis:184px; }
+  :root[data-design="next"] .tri-channel-header { padding:0 12px; }
+  :root[data-design="next"] .tri-channel-header__search { width:120px;min-width:0; }
+  :root[data-design="next"] .tri-call-controls { max-width:calc(100% - 24px);gap:6px;flex-wrap:wrap;justify-content:center; }
+  :root[data-design="next"] .tri-app--workspace:not(.tri-app--call-fullscreen) .tri-call-grid { padding-bottom:116px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  :root[data-design="next"] { --ui-motion:0ms; }
+  :root[data-design="next"] *, :root[data-design="next"] *::before, :root[data-design="next"] *::after {
+    animation:none!important;transition:none!important;scroll-behavior:auto!important;
+  }
+}

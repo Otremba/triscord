@@ -9,19 +9,25 @@ import { Tooltip } from './Tooltip';
 import { ChatPanel } from './ChatPanel';
 import { MemberList } from './MemberList';
 import { FriendsView } from './FriendsView';
+import { StatePanel } from './ui/StatePanel';
+import { WorkspaceHome } from './WorkspaceHome';
+import { callStatus } from '../call-status';
 import { useEffect, useState } from 'preact/hooks';
 
 // Channel header: module __9293f — 49px (--custom-channel-header-height) with a 1px --border-subtle bottom
 // border, 8px padding, 16px text, --text-default.
-export function ChannelView({ session, bridge, store, popout = false }: { session: Session; bridge: Bridge; store: SessionStore; popout?: boolean }) {
+type ChannelViewProps={ session: Session; bridge: Bridge; store: SessionStore; popout?: boolean; workspace?:boolean };
+export function ChannelView(props:ChannelViewProps) {
+  const {session,bridge,popout}=props;
   const isHome = !popout && (!session.selectedServerId || session.selectedServerId === '@me');
-  if (isHome) {
-    return <FriendsView session={session} bridge={bridge} />;
-  }
+  return isHome?(props.workspace?<WorkspaceHome session={session} bridge={bridge}/>:<FriendsView session={session} bridge={bridge}/>):<ChannelContent {...props}/>;
+}
+// Keeping the room view mounted as its own component gives its hooks/listeners a real unmount on Home.
+function ChannelContent({ session, bridge, store, popout = false, workspace=false }:ChannelViewProps) {
   const allChannels = session.categories.flatMap(c => c.channels);
   const channel = popout ? callChannelOf(session) : (allChannels.find(c => c.id === session.selectedChannelId) ?? allChannels[0]);
   const inRoom = !!channel && channel.id === session.connectedChannelId && (popout || session.selectedServerId === (session.callServerId ?? session.selectedServerId));
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(workspace);
   const [membersOpen, setMembersOpen] = useState(true);
   const isText = channel ? (channel.kind === 'text' || channel.name.startsWith('#') || channel.name.toLowerCase().includes('chat') || channel.name.toLowerCase().includes('geral') || !channel.name.toLowerCase().includes('jogos')) : false;
 
@@ -30,12 +36,13 @@ export function ChannelView({ session, bridge, store, popout = false }: { sessio
   const setFocus = (next: CallFocus) => bridge.send({ name: 'setCallFocus', key: next.key, filmOpen: next.filmOpen });
   const focused = inRoom && !(session.callPopout && !popout) ? callTiles(session).find(t => t.key === focus.key) : undefined;
   const settings = session.settings;
+  const voiceStatus=callStatus(session);
   const quality = focused?.kind === 'stream' && focused.stream
     ? focused.user?.self && settings ? `${settings.shareHd ? 1080 : 720}p ${settings.shareMode === 'screen' ? 15 : settings.shareHd ? 60 : 30}FPS` : `${focused.stream.height}p`
     : '';
   const { idle, active, leave } = useCallIdle();
   useEffect(()=>{if(!inRoom)return;addEventListener('tri-call-activity',active);return()=>removeEventListener('tri-call-activity',active);},[inRoom,active]);
-  useEffect(() => { if (!session.connectedChannelId) setChatOpen(false); }, [session.connectedChannelId]);
+  useEffect(() => { if (!session.connectedChannelId) setChatOpen(false);else if(workspace)setChatOpen(true); }, [session.connectedChannelId,workspace]);
   useEffect(() => {
     const open = () => setChatOpen(true);
     addEventListener('tri-open-chat', open);
@@ -43,7 +50,7 @@ export function ChannelView({ session, bridge, store, popout = false }: { sessio
   }, []);
   return (
     <main class="tri-page tri-page--row">
-      <div class={`tri-page__main ${inRoom ? 'tri-page__main--call' : ''} ${inRoom && idle ? 'is-idle' : ''}`}
+      <div class={`tri-page__main ${inRoom ? 'tri-page__main--call' : ''} ${workspace&&inRoom&&chatOpen?'tri-page__main--conversation':''} ${inRoom && idle ? 'is-idle' : ''}`}
         onFocusCapture={inRoom ? active : undefined} onKeyDown={inRoom ? active : undefined} onMouseMove={inRoom ? active : undefined} onMouseLeave={inRoom ? leave : undefined}>
       <header class="tri-channel-header">
         {channel && <Icon name={isText ? 'TextChannel' : 'VoiceSpeaker'} size={24} className="tri-channel-header__icon" />}
@@ -59,9 +66,9 @@ export function ChannelView({ session, bridge, store, popout = false }: { sessio
           <span class="tri-header-pill tri-header-pill--live">AO VIVO</span>
         </div>}
         <div class="tri-channel-header__toolbar">
-          {inRoom && !chatOpen && (
-            <Tooltip text="Mostrar chat" position="bottom">
-              <button class="tri-icon-button" aria-label="Mostrar chat" onClick={() => setChatOpen(true)}><Icon name="Chat" size={24} /></button>
+          {inRoom && (!chatOpen||workspace) && (
+            <Tooltip text={chatOpen?'Ocultar chat':'Mostrar chat'} position="bottom">
+              <button class="tri-icon-button" aria-label={chatOpen?'Ocultar chat':'Mostrar chat'} aria-expanded={chatOpen} onClick={() => setChatOpen(!chatOpen)}><Icon name="Chat" size={24} /></button>
             </Tooltip>
           )}
           <Tooltip text="Sino de notificações" position="bottom">
@@ -81,6 +88,10 @@ export function ChannelView({ session, bridge, store, popout = false }: { sessio
           </div>
         </div>
       </header>
+      {workspace&&inRoom&&voiceStatus.state!=='connected'&&<section class="tri-connection-note" data-tone={voiceStatus.tone}>
+        <span role={voiceStatus.state==='error'?'alert':'status'}>{voiceStatus.label}</span>
+        {voiceStatus.state==='error'&&channel&&<button type="button" onClick={()=>bridge.send({name:'joinVoice',channelId:channel.id})}>Reconectar voz</button>}
+      </section>}
       {inRoom ? (
         <CallView session={session} bridge={bridge} store={store} idle={idle} inPopout={popout} focus={focus} onFocus={setFocus} />
       ) : isText && channel ? (
@@ -91,9 +102,12 @@ export function ChannelView({ session, bridge, store, popout = false }: { sessio
           <p class="tri-prejoin__subtitle">{channel.users.length ? channel.users.map(u => u.name).join(', ') : 'Ninguém está em voz'}</p>
           <button class="tri-prejoin__join" onClick={() => bridge.send({ name: 'joinVoice', channelId: channel.id })}>Entrar na chamada de voz</button>
         </div>
-      ) : <div class="tri-chat" />}
+      ) : workspace?<StatePanel title="Escolha uma conversa" description={session.connection==='connected'?'Selecione um canal na lateral ou crie o primeiro canal deste espaço.':'Aguardando a conexão com o servidor para carregar os canais.'} busy={session.connection!=='connected'}>
+        {session.connection==='connected'&&<button type="button" onClick={()=>dispatchEvent(new CustomEvent('tri-open-modal',{detail:{kind:'createChannel',categoryName:'Canais de Voz'}}))}>Criar canal</button>}
+      </StatePanel>:<div class="tri-chat" />}
+      {workspace&&inRoom&&chatOpen&&channel&&<ChatPanel channelName={channel.name} messages={session.chat??[]} avatars={session.avatars} bridge={bridge} full/>}
       </div>
-      {inRoom && chatOpen && channel && (
+      {!workspace&&inRoom && chatOpen && channel && (
         <ChatPanel channelName={channel.name} messages={session.chat ?? []} avatars={session.avatars} bridge={bridge} onClose={() => setChatOpen(false)} />
       )}
       {!popout && membersOpen && (

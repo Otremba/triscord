@@ -12,7 +12,9 @@ interface ShimmerButtonProps extends JSX.HTMLAttributes<HTMLButtonElement> {
 export function ShimmerButton({
   children,
   variant = 'aurora',
+  class: classValue = '',
   className = '',
+  type = 'button',
   ...props
 }: ShimmerButtonProps) {
   const variantStyles = {
@@ -24,8 +26,10 @@ export function ShimmerButton({
 
   return (
     <button
-      class={`tri-shimmer-btn relative inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${variantStyles} ${className}`}
       {...props}
+      type={type}
+      data-variant={variant}
+      class={`tri-shimmer-btn relative inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ${variantStyles} ${classValue} ${className}`}
     >
       {children}
     </button>

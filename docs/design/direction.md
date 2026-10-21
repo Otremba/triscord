@@ -2,6 +2,8 @@
 
 Estado: **proposta para avaliação**, ainda não aplicada ao aplicativo. O objetivo completo continua ativo. A imagem contém dados ilustrativos; não comprova funcionamento de chamada, captura ou transmissão.
 
+Atualização técnica: existe agora uma **implementação candidata isolada** com `?design=next`, sem ativação por padrão. Ela usa os componentes reais; sua aparência em execução ainda não foi inspecionada. O aplicativo instalado não foi substituído. Ver [prévia de implementação](preview.md).
+
 ## Refinamento solicitado — revisão 02
 
 O usuário avaliou a primeira proposta e pediu **“Dar mais personalidade, sem glow”**. A revisão 02 (`main-screen-v2.svg`) mantém o foco em conversa/chamada e propõe uma identidade mais própria:
