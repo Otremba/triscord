@@ -17,7 +17,7 @@ type ChannelViewProps={ session: Session; bridge: Bridge; store: SessionStore; p
 export function ChannelView(props:ChannelViewProps) {
   const {session,bridge,popout}=props;
   const isHome = !popout && (!session.selectedServerId || session.selectedServerId === '@me');
-  return isHome?(props.workspace?<WorkspaceHome session={session} bridge={bridge}/>:<FriendsView session={session} bridge={bridge}/>):<ChannelContent {...props}/>;
+  return isHome ? <FriendsView session={session} bridge={bridge}/> : <ChannelContent {...props}/>;
 }
 // Keeping the room view mounted as its own component gives its hooks/listeners a real unmount on Home.
 function ChannelContent({ session, bridge, store, popout = false, workspace=false, sidebarOpen, onToggleSidebar }:ChannelViewProps) {

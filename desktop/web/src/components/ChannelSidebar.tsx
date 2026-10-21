@@ -162,13 +162,8 @@ function CategoryList({ category, session, bridge }: { category: Category; sessi
   );
 }
 
-export function ChannelSidebar({ session, bridge, workspace=false }: { session: Session; bridge: Bridge; workspace?:boolean }) {
+export function ChannelSidebar({ session, bridge }: { session: Session; bridge: Bridge; workspace?:boolean }) {
   const isHome = !session.selectedServerId || session.selectedServerId === '@me';
-  if(isHome&&workspace)return <section class="tri-sidebar-list tri-sidebar-list--home" aria-label="Navegação do início"><div class="tri-workspace-home-nav">
-    <button type="button" aria-current="page"><Icon name="Friends" size={20}/>Visão geral</button>
-    <button type="button" onClick={()=>dispatchEvent(new Event('tri-open-profile'))}><Icon name="User" size={20}/>Meu perfil</button>
-    <button type="button" onClick={()=>dispatchEvent(new Event('tri-open-settings'))}><Icon name="Settings" size={20}/>Configurações</button>
-  </div></section>;
   if (isHome) {
     return (
       <section class="tri-sidebar-list tri-sidebar-list--home" aria-label="Mensagens Diretas">
@@ -208,7 +203,7 @@ export function ChannelSidebar({ session, bridge, workspace=false }: { session: 
   const server = session.servers.find(s => s.id === session.selectedServerId) ?? session.servers[0];
   return (
     <section class="tri-sidebar-list" aria-label="Canais">
-      {server && !workspace && <ServerHeader server={server} bridge={bridge} />}
+      {server && <ServerHeader server={server} bridge={bridge} />}
       <ul class="tri-categories">
         {session.categories.map(category => <CategoryList key={category.id} category={category} session={session} bridge={bridge} />)}
       </ul>

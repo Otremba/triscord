@@ -142,19 +142,25 @@ export function App({ store, bridge, workspace = true }: { store: SessionStore; 
       <PeerAudioHost session={session} bridge={bridge}/>
     </div>
   );
+  useEffect(() => {
+    if (session?.servers?.length && (!session.selectedServerId || session.selectedServerId === '@me')) {
+      bridge.send({ name: 'selectServer', serverId: session.servers[0].id });
+    }
+  }, [session?.selectedServerId, session?.servers]);
+
   return (
-    <div class={`tri-app ${workspace?'tri-app--workspace':''} ${!sidebarOpen ? 'tri-app--sidebar-collapsed' : ''} ${session.callFullscreen ? 'tri-app--call-fullscreen' : ''}`}>
+    <div class={`tri-app ${!sidebarOpen ? 'tri-app--sidebar-collapsed' : ''} ${session.callFullscreen ? 'tri-app--call-fullscreen' : ''}`}>
       {session.callFullscreen && <FullscreenHint/>}
       <TitleBar server={server} bridge={bridge} />
       {!session.callFullscreen && <ResizeEdges bridge={bridge} />}
       <div class="tri-content">
         <aside class="tri-sidebar">
-          {workspace?<WorkspaceNav session={session} bridge={bridge}/>:<ServerRail servers={session.servers} selectedId={session.selectedServerId} callServerId={session.callServerId} bridge={bridge}
-            voice={session.connectedChannelId ? (session.sharing ? 'screen' : 'voice') : undefined} />}
-          <ChannelSidebar session={session} bridge={bridge} workspace={workspace} />
+          <ServerRail servers={session.servers} selectedId={session.selectedServerId} callServerId={session.callServerId} bridge={bridge}
+            voice={session.connectedChannelId ? (session.sharing ? 'screen' : 'voice') : undefined} />
+          <ChannelSidebar session={session} bridge={bridge} />
           <AccountPanel session={session} bridge={bridge} />
         </aside>
-        <ChannelView session={session} bridge={bridge} store={store} workspace={workspace} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(open => !open)} />
+        <ChannelView session={session} bridge={bridge} store={store} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(open => !open)} />
       </div>
       {modal?.kind === 'createChannel' && <CreateChannelModal bridge={bridge} categoryName={modal.categoryName} onClose={() => setModal(null)} />}
       {modal?.kind === 'deleteMessage' && <DeleteMessageModal bridge={bridge} message={modal.message} onClose={() => setModal(null)} />}

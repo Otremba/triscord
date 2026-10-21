@@ -36,7 +36,7 @@
   --font-primary:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
   --font-display:var(--font-primary);
   --tri-font-family:var(--font-primary);
-  --tri-sidebar-width:304px;
+  --tri-sidebar-width:312px;
   --custom-channel-header-height:64px;
   --background-base-lowest:var(--ui-canvas);
   --background-base-lower:var(--ui-canvas);
@@ -219,18 +219,59 @@
 :root[data-design="workspace"] .animate-pulse { animation:none; }
 :root[data-design="workspace"] :is(.tri-workspace-nav,.tri-sidebar-list,.tri-panels,.tri-channel-header,.tri-page,.tri-chat-panel,.tri-members-sidebar) { box-shadow:none;backdrop-filter:none; }
 
-/* A single named workspace navigation replaces the circular server rail. */
-:root[data-design="workspace"] .tri-app--workspace .tri-sidebar {
+/* Server rail and channel sidebar in AMOLED design */
+:root[data-design="workspace"] .tri-sidebar {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   width: var(--tri-sidebar-width);
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  position: relative;
   background: var(--ui-sidebar);
   border-right: 1px solid var(--ui-border);
   transition: width 180ms cubic-bezier(0.16, 1, 0.3, 1), opacity 140ms ease;
   will-change: width, opacity;
+}
+:root[data-design="workspace"] .tri-rail {
+  width: 72px;
+  min-width: 72px;
+  height: 100%;
+  background: #000000;
+  border-right: 1px solid var(--ui-border);
+  padding: 12px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  flex: none;
+}
+:root[data-design="workspace"] .tri-rail__button,
+:root[data-design="workspace"] .tri-rail__circle,
+:root[data-design="workspace"] .tri-rail__home-button {
+  background: var(--ui-field);
+  color: var(--ui-text);
+  border: 1px solid transparent;
+}
+:root[data-design="workspace"] .tri-rail__button:hover,
+:root[data-design="workspace"] .tri-rail__button.is-selected,
+:root[data-design="workspace"] .tri-rail__circle:hover,
+:root[data-design="workspace"] .tri-rail__home-button:hover,
+:root[data-design="workspace"] .tri-rail__home-button.is-selected {
+  background: var(--ui-accent);
+  color: #ffffff;
+}
+:root[data-design="workspace"] .tri-rail__pill {
+  background: var(--ui-text);
+}
+:root[data-design="workspace"] .tri-server-acronym {
+  background: transparent;
+  color: inherit;
+}
+:root[data-design="workspace"] .tri-rail__separator {
+  background: var(--ui-border);
 }
 
 :root[data-design="workspace"] .tri-app--sidebar-collapsed .tri-sidebar {
@@ -311,23 +352,34 @@
   border-left: none !important;
 }
 :root[data-design="workspace"] .tri-sidebar-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-sidebar);
+  overflow-y: auto;
+  padding-bottom: 64px;
   border-top: none !important;
   border-start-start-radius: 0 !important;
 }
-:root[data-design="workspace"] .tri-app--workspace .tri-sidebar-list {
-  flex: 1 1 0;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  margin-bottom: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+:root[data-design="workspace"] .tri-server-header {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--ui-border);
+  background: transparent;
 }
-:root[data-design="workspace"] .tri-server-header { height:40px;margin:0 16px 12px;padding:0;border:0; }
-:root[data-design="workspace"] .tri-server-header__name { padding:0;font-size:12px;font-weight:600;color:var(--ui-muted); }
+:root[data-design="workspace"] .tri-server-header__name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ui-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 :root[data-design="workspace"] .tri-categories {
   flex: 1 1 auto;
   min-height: 0;
@@ -430,17 +482,16 @@
 }
 
 /* Call/account controls keep their native actions and capability checks. */
-:root[data-design="workspace"] .tri-app--workspace .tri-panels {
-  position: relative;
-  inset: auto;
-  width: 100%;
-  margin-top: auto;
-  flex: 0 0 auto;
+:root[data-design="workspace"] .tri-panels {
+  position: absolute;
+  z-index: 10;
+  inset-inline-start: 72px;
+  bottom: 0;
+  width: calc(100% - 72px);
   border: 0;
   border-top: 1px solid var(--ui-border);
   border-radius: 0;
   background: var(--ui-panel);
-  z-index: 10;
 }
 :root[data-design="workspace"] .tri-account { height:64px;padding:10px 12px;background:transparent; }
 :root[data-design="workspace"] .tri-account__buttons { flex:none;gap:2px; }
