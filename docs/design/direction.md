@@ -1,6 +1,30 @@
-# Proposta de direção visual — revisão 01
+# Proposta de direção visual — revisões 01 e 02
 
 Estado: **proposta para avaliação**, ainda não aplicada ao aplicativo. O objetivo completo continua ativo. A imagem contém dados ilustrativos; não comprova funcionamento de chamada, captura ou transmissão.
+
+## Refinamento solicitado — revisão 02
+
+O usuário avaliou a primeira proposta e pediu **“Dar mais personalidade, sem glow”**. A revisão 02 (`main-screen-v2.svg`) mantém o foco em conversa/chamada e propõe uma identidade mais própria:
+
+- Marca plana e navegação de espaços integrada, substituindo a coluna de círculos da revisão 01.
+- Seletor de espaço com nome e contexto; atalhos recentes continuam próximos dos canais.
+- Grafite levemente quente e destaque cobre suave, substituindo o azul da primeira proposta.
+- Seleção por superfície e pequeno marcador; sem luz, gradiente, vidro ou efeitos contínuos.
+- Mesma hierarquia de mídia, texto e estado; a mudança de personalidade não altera a compreensão dos controles.
+
+As duas propostas são preservadas para comparação. A segunda ainda precisa ser avaliada antes de se tornar o padrão global. O [mapa de implementação](implementation-map.md) registra os componentes, contratos e verificações necessárias para preservar as funcionalidades.
+
+| Papel na revisão 02 | Cor |
+| --- | --- |
+| Fundo principal | `#1E2021` |
+| Navegação e participantes | `#232526` |
+| Superfície de chamada | `#292C2D` |
+| Campo de mensagem | `#2D3031` |
+| Seleção | `#44392F` |
+| Destaque cobre | `#DEB698` |
+| Ação primária | `#73533D`, texto `#FFF4E9` |
+
+Na aplicação real, botões de câmera, soundboard e áudio da transmissão continuam sujeitos às capacidades do núcleo. O desenho não declara esses recursos concluídos.
 
 ## Decisão a avaliar
 
@@ -18,6 +42,8 @@ A proposta mostra uma tela completa em 1600 × 1040: navegação de servidores, 
 Nenhuma dessas bibliotecas precisa ser instalada para a avaliação. A implementação deve preservar Preact/Tauri e os contratos existentes, aproveitando componentes que tenham utilidade demonstrável e licença compatível.
 
 ## Base visual candidata
+
+Os valores abaixo documentam a revisão 01; a revisão 02 acima é a candidata atual após o refinamento solicitado.
 
 | Papel | Cor |
 | --- | --- |
@@ -71,6 +97,7 @@ Nenhum aplicativo, navegador, instalador, microfone ou alto-falante foi aberto p
 
 ```powershell
 ./.toolchain/venv/Scripts/python.exe docs/design/proposal.py --output desktop/out/design-proposal
+./.toolchain/venv/Scripts/python.exe docs/design/proposal.py --revision 02 --output desktop/out/design-proposal-v2
 ```
 
 O script requer Pillow e fontes Segoe UI do Windows. O SVG é editável; o PNG fica na pasta de saída ignorada pelo Git. O script não faz acesso à rede, não executa a aplicação e não lê dados de contas.

@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--output', type=Path, required=True)
+parser.add_argument('--revision', choices=['01','02'], default='01')
 args = parser.parse_args()
 args.output.mkdir(parents=True, exist_ok=True)
 W, H = 1600, 1040
@@ -20,20 +21,35 @@ svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBo
        '<desc>Tela conceitual com navegação, canais, chamada, mensagens e participantes. Dados ilustrativos; não representa mídia em execução.</desc>']
 TEXT, MUTED, SUBTLE = '#E8EAF0', '#A3AAB6', '#8B93A1'
 LINE, ACCENT, GREEN, RED = '#30353E', '#93A9EF', '#8FC6A9', '#E7A0A8'
+PERSONAL=args.revision=='02'
+PALETTE={
+    '#101215':'#141617','#1B1F25':'#1E2021','#191C22':'#1B1D1E',
+    '#20242B':'#232526','#1D2128':'#202223','#232830':'#292C2D',
+    '#282E38':'#2D3031','#282D35':'#2B2E2F','#252A32':'#2B2D2F',
+    '#30353E':'#3B3E3F','#303A50':'#44392F','#3B4C76':'#73533D',
+    '#566C9E':'#987458','#93A9EF':'#DEB698','#DFE7FF':'#F0D8C6',
+    '#DCE5FF':'#F0D8C6','#EDF1FF':'#FFF4E9','#4E618C':'#8B6E55',
+    '#30394D':'#44392F','#D8E2FF':'#F0D8C6','#C9CFD9':'#D3D1CF',
+}
+def color(value):return PALETTE.get(value,value) if PERSONAL else value
 
 def rect(x, y, w, h, fill, radius=0, stroke=None, sw=1):
+    fill=color(fill);stroke=color(stroke)
     draw.rounded_rectangle((x,y,x+w,y+h), radius, fill, stroke, sw)
     svg.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{radius}" fill="{fill}" stroke="{stroke or "none"}" stroke-width="{sw}"/>')
 
 def line(points, fill=LINE, width=1):
+    fill=color(fill)
     draw.line(points, fill, width)
     svg.append(f'<polyline points="{" ".join(f"{x},{y}" for x,y in points)}" fill="none" stroke="{fill}" stroke-width="{width}" stroke-linecap="round" stroke-linejoin="round"/>')
 
 def circle(x, y, r, fill, stroke=None, sw=1):
+    fill=color(fill);stroke=color(stroke)
     draw.ellipse((x-r,y-r,x+r,y+r), fill, stroke, sw)
     svg.append(f'<circle cx="{x}" cy="{y}" r="{r}" fill="{fill}" stroke="{stroke or "none"}" stroke-width="{sw}"/>')
 
 def text(x,y,value,size=14,color=TEXT,bold=False):
+    color=PALETTE.get(color,color) if PERSONAL else color
     path=Path('C:/Windows/Fonts') / ('segoeuib.ttf' if bold else 'segoeui.ttf')
     font=ImageFont.truetype(str(path),size)
     draw.text((x,y),value,font=font,fill=color,anchor='lt')
@@ -85,7 +101,7 @@ def button(x,y,w,label,kind=None,fill='#282D36',color=TEXT,border=LINE):
 # Application frame and neutral chrome.
 rect(0,0,W,H,'#101215')
 text(40,24,'TRISCORD  /  PROPOSTA DE DIREÇÃO VISUAL',12,MUTED,True)
-text(1192,24,'01  ·  Conversa + chamada',13,MUTED)
+text(1192,24,f'{args.revision}  ·  Conversa + chamada',13,MUTED)
 rect(40,70,1520,900,'#1B1F25',14,'#343943')
 rect(41,85,1518,25,'#1B1F25')
 text(61,84,'triscord',13,TEXT,True)
@@ -96,56 +112,94 @@ line([(1530,87),(1540,97)],MUTED);line([(1540,87),(1530,97)],MUTED)
 line([(40,110),(1560,110)])
 
 # Narrow server navigation; one restrained selected treatment.
-rect(41,111,71,845,'#191C22')
-rect(54,130,44,44,'#252B36',12)
-icon('home',66,142,TEXT)
-line([(60,189),(92,189)])
-rect(54,207,44,44,'#34415F',12,'#6178B1')
-text(64,220,'A',18,'#DCE5FF',True)
-rect(41,219,3,20,ACCENT,1)
-rect(54,266,44,44,'#2E343D',12)
-text(64,280,'G',17,'#B7C0CF',True)
-rect(54,325,44,44,'#2D3431',12)
-text(64,339,'T',17,'#BDD1C6',True)
-rect(54,397,44,44,'#20242B',12,LINE)
-icon('plus',66,409)
-circle(76,930,18,'#252A32');icon('settings',66,920)
-line([(112,110),(112,970)])
+if PERSONAL:
+    # A unified workspace sidebar replaces the borrowed circular server rail.
+    rect(41,111,335,858,'#20242B')
+    rect(65,135,25,25,'#73533D',7)
+    line([(72,142),(84,142),(84,153),(77,153),(73,157),(73,153),(72,153),(72,142)],'#F0D8C6',2)
+    text(104,132,'triscord',25,TEXT,True)
+    text(66,183,'SEU ESPAÇO',10,SUBTLE,True)
+    rect(60,210,296,66,'#282D35',12,LINE)
+    avatar(90,243,'A','#6A5143',19)
+    text(123,226,'Amigos',16,TEXT,True)
+    text(123,250,'5 pessoas · 3 na chamada',11,MUTED)
+    icon('chevron',324,235)
+    button(60,292,91,'Jogos',fill='#282D35')
+    button(159,292,118,'Trabalho',fill='#282D35')
+    rect(285,292,71,36,'#282D35',8,LINE);icon('plus',310,300)
+    rect(60,350,296,36,'#282D35',8,LINE)
+    icon('search',72,358);text(101,361,'Encontrar uma conversa',12,MUTED)
+    text(66,418,'CONVERSAS',10,SUBTLE,True);icon('plus',330,414,SUBTLE,16)
+    rect(60,446,296,43,'#303A50',10)
+    rect(60,458,3,19,'#93A9EF',1)
+    icon('hash',75,457,ACCENT);text(108,460,'geral',14,'#DFE7FF',True)
+    icon('hash',75,508);text(108,510,'links-e-clipes',14,MUTED)
+    icon('hash',75,553);text(108,555,'avisos',14,MUTED)
+    text(66,611,'CHAMADAS',10,SUBTLE,True);icon('plus',330,607,SUBTLE,16)
+    icon('voice',75,649,GREEN);text(108,651,'Geral',14,TEXT,True)
+    rect(310,648,31,22,'#2C3732',6);text(321,653,'3',11,GREEN,True)
+    for x,initial,bg in [(124,'C','#48516C'),(156,'D','#5C4B40'),(188,'B','#465C51')]:avatar(x,701,initial,bg,12)
+    text(213,695,'vocês estão aqui',11,MUTED)
+    button(60,756,296,'Convidar pessoas',fill='#282D35')
+    line([(60,818),(356,818)])
+    icon('bars',68,838,GREEN,18);text(98,838,'Voz conectada',13,GREEN,True)
+    text(98,860,'Geral · Amigos',12,MUTED);text(306,839,'24 ms',11,MUTED)
+    rect(60,895,296,58,'#262B34',10)
+    avatar(86,924,'C','#48516C',17,True)
+    text(113,909,'camargo',13,TEXT,True);text(113,930,'Microfone silenciado',10,MUTED)
+    icon('muted',296,914,RED,18);icon('settings',327,914,MUTED,18)
+    line([(376,110),(376,970)])
+else:
+    rect(41,111,71,845,'#191C22')
+    rect(54,130,44,44,'#252B36',12)
+    icon('home',66,142,TEXT)
+    line([(60,189),(92,189)])
+    rect(54,207,44,44,'#34415F',12,'#6178B1')
+    text(64,220,'A',18,'#DCE5FF',True)
+    rect(41,219,3,20,ACCENT,1)
+    rect(54,266,44,44,'#2E343D',12)
+    text(64,280,'G',17,'#B7C0CF',True)
+    rect(54,325,44,44,'#2D3431',12)
+    text(64,339,'T',17,'#BDD1C6',True)
+    rect(54,397,44,44,'#20242B',12,LINE)
+    icon('plus',66,409)
+    circle(76,930,18,'#252A32');icon('settings',66,920)
+    line([(112,110),(112,970)])
 
-# Server and channel navigation.
-rect(113,111,263,858,'#20242B')
-text(136,138,'Amigos',18,TEXT,True);icon('chevron',336,141)
-text(136,168,'Seu espaço para ficar junto.',12,MUTED)
-rect(132,205,224,36,'#282D35',8,LINE)
-icon('search',143,213);text(170,216,'Encontrar um canal',12,MUTED)
-text(136,272,'CONVERSAS',10,SUBTLE,True);icon('plus',332,268,SUBTLE,16)
-rect(128,299,232,40,'#303A50',8)
-icon('hash',141,309,ACCENT);text(174,311,'geral',14,'#DFE7FF',True)
-icon('hash',141,356);text(174,358,'links-e-clipes',14,MUTED)
-icon('hash',141,402);text(174,404,'avisos',14,MUTED)
-text(136,466,'CHAMADAS',10,SUBTLE,True);icon('plus',332,462,SUBTLE,16)
-icon('voice',140,502,GREEN);text(174,504,'Geral',14,TEXT,True)
-rect(309,500,36,23,'#2C3732',6);text(320,506,'3',11,GREEN,True)
-for y,name,initial,bg in [(553,'camargo','C','#48516C'),(591,'Diego','D','#5C4B40'),(629,'Bia','B','#465C51')]:
-    avatar(167,y,initial,bg,12)
-    text(190,y-7,name,13,MUTED)
-icon('muted',330,543,MUTED,16)
-icon('screen',330,581,GREEN,16)
-text(136,704,'CONVITE DO SERVIDOR',10,SUBTLE,True)
-text(136,731,'Uma conversa fica melhor junto.',12,MUTED)
-button(132,758,224,'Convidar pessoas',fill='#282D35')
+    # Server and channel navigation.
+    rect(113,111,263,858,'#20242B')
+    text(136,138,'Amigos',18,TEXT,True);icon('chevron',336,141)
+    text(136,168,'Seu espaço para ficar junto.',12,MUTED)
+    rect(132,205,224,36,'#282D35',8,LINE)
+    icon('search',143,213);text(170,216,'Encontrar um canal',12,MUTED)
+    text(136,272,'CONVERSAS',10,SUBTLE,True);icon('plus',332,268,SUBTLE,16)
+    rect(128,299,232,40,'#303A50',8)
+    icon('hash',141,309,ACCENT);text(174,311,'geral',14,'#DFE7FF',True)
+    icon('hash',141,356);text(174,358,'links-e-clipes',14,MUTED)
+    icon('hash',141,402);text(174,404,'avisos',14,MUTED)
+    text(136,466,'CHAMADAS',10,SUBTLE,True);icon('plus',332,462,SUBTLE,16)
+    icon('voice',140,502,GREEN);text(174,504,'Geral',14,TEXT,True)
+    rect(309,500,36,23,'#2C3732',6);text(320,506,'3',11,GREEN,True)
+    for y,name,initial,bg in [(553,'camargo','C','#48516C'),(591,'Diego','D','#5C4B40'),(629,'Bia','B','#465C51')]:
+        avatar(167,y,initial,bg,12)
+        text(190,y-7,name,13,MUTED)
+    icon('muted',330,543,MUTED,16)
+    icon('screen',330,581,GREEN,16)
+    text(136,704,'CONVITE DO SERVIDOR',10,SUBTLE,True)
+    text(136,731,'Uma conversa fica melhor junto.',12,MUTED)
+    button(132,758,224,'Convidar pessoas',fill='#282D35')
 
-# Persistent connection status and account.
-line([(128,818),(360,818)])
-icon('bars',136,838,GREEN,18)
-text(164,838,'Voz conectada',13,GREEN,True)
-text(164,860,'Geral · Amigos',12,MUTED)
-text(314,839,'24 ms',11,MUTED)
-rect(128,895,232,58,'#262B34',10)
-avatar(153,924,'C','#48516C',17,True)
-text(180,909,'camargo',13,TEXT,True);text(180,930,'Microfone silenciado',10,MUTED)
-icon('muted',301,914,RED,18);icon('settings',332,914,MUTED,18)
-line([(376,110),(376,970)])
+    # Persistent connection status and account.
+    line([(128,818),(360,818)])
+    icon('bars',136,838,GREEN,18)
+    text(164,838,'Voz conectada',13,GREEN,True)
+    text(164,860,'Geral · Amigos',12,MUTED)
+    text(314,839,'24 ms',11,MUTED)
+    rect(128,895,232,58,'#262B34',10)
+    avatar(153,924,'C','#48516C',17,True)
+    text(180,909,'camargo',13,TEXT,True);text(180,930,'Microfone silenciado',10,MUTED)
+    icon('muted',301,914,RED,18);icon('settings',332,914,MUTED,18)
+    line([(376,110),(376,970)])
 
 # Main channel header.
 rect(377,111,927,69,'#1D2128')
@@ -221,7 +275,7 @@ for y,name,initial,bg in [(511,'Rafa','R','#4A5260'),(566,'Lucas','L','#574E60')
     avatar(1347,y,initial,bg,17,True);text(1375,y-8,name,13,MUTED)
 
 text(40,999,'Proposta para revisão · conteúdo ilustrativo · nenhum aplicativo ou dispositivo foi executado',12,MUTED)
-text(1137,999,'Superfícies sólidas. Interações discretas.',12,MUTED)
+text(1137,999,'Identidade própria. Sem excesso visual.',12,MUTED)
 svg.append('</svg>')
 (args.output/'main-screen.svg').write_text('\n'.join(svg),encoding='utf-8')
 image.save(args.output/'main-screen.png')
