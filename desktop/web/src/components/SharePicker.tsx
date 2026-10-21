@@ -142,7 +142,7 @@ export function SharePicker({ bridge, store, onClose }: { bridge: Bridge; store:
                 </button>
               ))}
               <div class="tri-share-mode__separator" role="separator" />
-              <button role="menuitemcheckbox" aria-checked={!audio} class="tri-share-mode__row tri-share-mode__row--single"
+              <button role="menuitemcheckbox" aria-checked={!audio} disabled={store.current?.runtime?.screenAudio === false} class="tri-share-mode__row tri-share-mode__row--single"
                 onClick={() => { setAudio(!audio); save('shareAudio', !audio); }}>
                 <span><strong>Silenciar áudio da transmissão</strong></span>
                 <span class={`tri-menu__checkbox ${!audio ? 'is-checked' : ''}`} aria-hidden="true">

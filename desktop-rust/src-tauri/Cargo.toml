@@ -22,6 +22,8 @@ livekit = { version = "=0.9.6", features = ["rustls-tls-native-roots"] }
 sha2 = "0.10"
 base64 = "0.22"
 open = "5"
+windows-capture = "=2.0.1"
+windows = { version = "0.62.2", features = ["Win32_Media_MediaFoundation", "Win32_System_Com", "Win32_System_Variant", "Win32_System_Ole", "Win32_Graphics_Direct3D10", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi_Common"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["test-util"] }

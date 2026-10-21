@@ -4,6 +4,7 @@ import type { Command } from './protocol';
 import { useSession, type SessionStore } from './store';
 import { LoginScreen } from './components/LoginScreen';
 import { ProfileEditor } from './components/ProfileEditor';
+import { SharePicker } from './components/SharePicker';
 import './styles/rust-preview.css';
 
 export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Bridge }) {
@@ -18,6 +19,7 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
   const [currentPassword, setCurrentPassword] = useState('');
   const [roomName, setRoomName] = useState('');
   const [profileOpen,setProfileOpen]=useState(false);
+  const [sharePickerOpen,setSharePickerOpen]=useState(false);
   const [pendingText, setPendingText] = useState<{ text: string; previousIds: string[] } | null>(null);
   useEffect(() => {
     const handler = (event: Event) => setNotice(String((event as CustomEvent).detail));
@@ -25,7 +27,7 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
     return () => removeEventListener('tri-preview-notice', handler);
   }, []);
   useEffect(() => { setCode(''); setText(''); }, [session?.selectedServerId]);
-  useEffect(() => { setText(''); setPendingText(null); }, [session?.textRoomId]);
+  useEffect(() => { setText(''); setPendingText(null); setSharePickerOpen(false); }, [session?.textRoomId]);
   useEffect(() => { setPassword(''); setCurrentPassword(''); setInvite(''); setCode(''); setName(''); setProfileOpen(false); }, [session?.account.id]);
   useEffect(() => {
     if (pendingText && session?.chat?.some(message => message.own && message.text === pendingText.text && !pendingText.previousIds.includes(message.id))) {
@@ -121,6 +123,10 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
       </section>
       <main class="rust-preview__chat">
         <header><h2>{room ? `# ${room.name}` : 'Chat'}</h2>{room && <button disabled={busy} onClick={() => void run({ name: 'leaveTextRoom' })}>Sair da sala</button>}</header>
+        {room && <div>
+          <button disabled={busy || !connected} onClick={() => session.sharing ? void run({ name: 'stopScreenShare' }) : setSharePickerOpen(true)}>{session.sharing ? 'Parar transmissão' : 'Compartilhar tela'}</button>
+          <p class="rust-preview__hint">Publicação de vídeo por GPU em desenvolvimento. Recepção, prévia e áudio da transmissão ainda pendentes nesta etapa.</p>
+        </div>}
         <div class="rust-preview__messages" role="log" aria-label="Mensagens">
           {!room && <p>Abra uma sala para conversar. A voz é ativada separadamente e o vídeo ainda está em desenvolvimento.</p>}
           {session.chat?.map(message => <article key={message.id}><strong>{message.authorName}</strong> <time>{new Date(message.timestamp).toLocaleTimeString()}</time><p>{message.text}</p>
@@ -137,5 +143,6 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
       </main>
     </div>}
     {signedIn && session && profileOpen && <ProfileEditor session={session} bridge={bridge} onClose={() => setProfileOpen(false)} />}
+    {signedIn && session && sharePickerOpen && <SharePicker bridge={bridge} store={store} onClose={() => setSharePickerOpen(false)} />}
   </div>;
 }

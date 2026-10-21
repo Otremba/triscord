@@ -4,6 +4,7 @@ use crate::{
     error::{Error, Result},
     media::Media,
     model::{notice, publish, Shared},
+    screen::Screen,
 };
 use futures_util::{Sink, SinkExt, StreamExt};
 use serde_json::{json, Value};
@@ -33,9 +34,15 @@ impl Socket {
         token: String,
         generation: u64,
         media: Media,
+        screen: Screen,
     ) -> Self {
         let (sender, mut receiver) = mpsc::channel::<(String, Value)>(32);
         let task = tokio::spawn(async move {
+            let state_notify = model
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .user_state_notify
+                .clone();
             let token = Zeroizing::new(token);
             let mut attempt = 0;
             let mut desired_room: Option<Value> = None;
@@ -81,6 +88,10 @@ impl Socket {
                     let mut terminal = false;
                     loop {
                         tokio::select! {
+                            _=state_notify.notified(), if ready=> {
+                                let payload={let model=model.lock().unwrap_or_else(|e|e.into_inner());json!({"isMuted":model.muted||model.server_muted||model.deafened||!model.voice_requested||model.voice_state!="connected","isDeafened":model.deafened,"isScreenSharing":model.sharing})};
+                                if !send(&mut socket,Message::Text(format!("42{}",json!(["user-state-change",payload])).into())).await {break;}
+                            }
                             _=sleep_until(deadline) => break,
                             outgoing=receiver.recv() => {
                                 let Some((name,payload))=outgoing else { return; };
@@ -109,6 +120,10 @@ impl Socket {
                                             }
                                         }
                                         Ok(Packet::Event(name,payload)) if ready => {
+                                            if name=="media-credentials"&&payload["kind"]=="screen" {
+                                                let valid={let model=model.lock().unwrap_or_else(|e|e.into_inner());model.generation==generation&&model.screen_requested&&!model.screen_admitting&&model.text_room.as_deref()==payload["roomId"].as_str()};
+                                                if valid&&screen.admission(generation,payload["roomId"].as_str().unwrap_or_default().to_owned(),&payload["credentials"]).is_ok() {model.lock().unwrap_or_else(|e|e.into_inner()).screen_admitting=true;}
+                                            }
                                             if name=="room-join-denied" || name=="kicked" { desired_room=None; notice(&app,"A entrada na sala foi recusada ou encerrada pelo servidor."); }
                                             let changed=model.lock().unwrap_or_else(|e|e.into_inner()).update(generation,&name,payload.clone());
                                             if name=="room-joined" {
@@ -118,7 +133,7 @@ impl Socket {
                                                 }
                                                 if !send(&mut socket,Message::Text(format!("42{}",json!(["user-state-change",{"isMuted":muted,"isDeafened":deafened}])).into())).await { break; }
                                             }
-                                            if name=="kicked" {let _=media.stop(generation);}
+                                            if name=="kicked" {let _=media.stop(generation);let _=screen.stop(generation);}
                                             if name=="force-muted" {let _=media.configure(generation);}
                                             if name=="request-error" || name=="service-limit" || name=="chat-rate-limited" { notice(&app,"O servidor recusou a operação. Aguarde antes de tentar novamente."); }
                                             if changed { publish(&app,&model); }
@@ -138,6 +153,7 @@ impl Socket {
                     }
                     clear_membership(&app, &model, generation);
                     let _ = media.stop(generation);
+                    let _ = screen.stop(generation);
                     if terminal {
                         set_status(&app, &model, generation, "offline");
                         notice(&app,"A sessão foi recusada. Entre novamente ou selecione o servidor para tentar outra vez.");
@@ -160,6 +176,9 @@ impl Socket {
         self.sender
             .try_send((name.to_owned(), payload))
             .map_err(|_| Error::network())
+    }
+    pub fn sender(&self) -> mpsc::Sender<(String, Value)> {
+        self.sender.clone()
     }
 }
 async fn send<S: Sink<Message> + Unpin>(socket: &mut S, message: Message) -> bool {

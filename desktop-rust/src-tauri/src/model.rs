@@ -26,6 +26,11 @@ pub struct Model {
     pub output_devices: Vec<Value>,
     pub signing_in: bool,
     pub profile: Option<Value>,
+    pub screen_requested: bool,
+    pub sharing: bool,
+    pub screen_epoch: u64,
+    pub screen_admitting: bool,
+    pub user_state_notify: std::sync::Arc<tokio::sync::Notify>,
 }
 
 impl Model {
@@ -37,8 +42,9 @@ impl Model {
             .and_then(|a| a["nick"].as_str())
             .unwrap_or("Visitante");
         json!({ "v": 1, "type": "snapshot", "revision": self.revision, "session": {
-            "runtime": { "name": "tauri", "preview": true, "voice": true, "screen": false, "camera": false, "googleLogin": crate::oauth::configured() },
+            "runtime": { "name": "tauri", "preview": true, "voice": true, "screen": false, "camera": false, "googleLogin": crate::oauth::configured(), "screenAudio":false },
             "voiceState": if self.voice_state.is_empty() {"idle"} else {&self.voice_state}, "voiceRequested":self.voice_requested,
+            "sharing":self.sharing,
             "settings":self.preferences.snapshot(&self.input_devices,&self.output_devices),
             "profile":self.profile,
             "account": { "id": account_id, "displayName": self.profile.as_ref().and_then(|p|p["display_name"].as_str()).filter(|s|!s.is_empty()).unwrap_or(nick), "username": nick, "avatarUrl":self.profile.as_ref().and_then(|p|p["avatarDataUrl"].as_str()).unwrap_or_default(), "status": if account.is_some() { "online" } else { "offline" } },
@@ -53,6 +59,10 @@ impl Model {
         }})
     }
     pub fn reset_connection(&mut self) -> u64 {
+        self.screen_requested = false;
+        self.screen_admitting = false;
+        self.sharing = false;
+        self.screen_epoch += 1;
         self.generation += 1;
         self.connection = "offline";
         self.rooms.clear();

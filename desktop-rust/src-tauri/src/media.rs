@@ -12,8 +12,8 @@ use tokio::{sync::mpsc, time::timeout};
 use zeroize::{Zeroize, Zeroizing};
 
 pub struct Credentials {
-    url: String,
-    token: String,
+    pub(crate) url: String,
+    pub(crate) token: String,
 }
 impl Drop for Credentials {
     fn drop(&mut self) {
@@ -363,6 +363,7 @@ fn status(app: &tauri::AppHandle, model: &Shared, generation: u64, value: &str) 
             return;
         }
         model.voice_state = value.to_owned();
+        model.user_state_notify.notify_one();
     }
     publish(app, model);
 }

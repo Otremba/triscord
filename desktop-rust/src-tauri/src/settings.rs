@@ -15,6 +15,8 @@ pub struct Preferences {
     pub input_device: String,
     pub output_device: String,
     pub theme: String,
+    pub share_hd: bool,
+    pub share_mode: String,
 }
 impl Default for Preferences {
     fn default() -> Self {
@@ -24,12 +26,23 @@ impl Default for Preferences {
             input_device: String::new(),
             output_device: String::new(),
             theme: "darker".into(),
+            share_hd: false,
+            share_mode: "game".into(),
         }
     }
 }
 impl Preferences {
     pub fn set(&mut self, key: &str, value: Value) -> Result<()> {
         match key {
+            "shareHd" => self.share_hd = value.as_bool().ok_or_else(Error::invalid)?,
+            "shareMode" => {
+                self.share_mode = value
+                    .as_str()
+                    .filter(|mode| ["game", "screen"].contains(mode))
+                    .ok_or_else(Error::invalid)?
+                    .to_owned()
+            }
+            "shareAudio" if value == false => {}
             "noiseSuppression" => {
                 self.noise_suppression = value.as_bool().ok_or_else(Error::invalid)?
             }
@@ -62,7 +75,7 @@ impl Preferences {
     pub fn snapshot(&self, inputs: &[Value], outputs: &[Value]) -> Value {
         json!({"inputDevices":inputs,"outputDevices":outputs,"cameraDevices":[],"inputDevice":self.input_device,"outputDevice":self.output_device,"cameraDevice":"",
             "noiseSuppression":self.noise_suppression,"automaticGainControl":self.automatic_gain_control,"theme":self.theme,
-            "inputVolume":100,"outputVolume":100,"soundboardVolume":100,"desktopNotifications":false,"taskbarAlert":false,"shareMode":"game","shareHd":false,"shareAudio":false})
+            "inputVolume":100,"outputVolume":100,"soundboardVolume":100,"desktopNotifications":false,"taskbarAlert":false,"shareMode":self.share_mode,"shareHd":self.share_hd,"shareAudio":false})
     }
 }
 pub struct Store {

@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod api;
+mod capture;
 mod control;
 mod core;
 mod error;
@@ -7,9 +8,12 @@ mod media;
 mod model;
 mod oauth;
 mod profiles;
+mod screen;
 mod settings;
 mod socket;
 mod vault;
+mod video_codec;
+mod video_gpu;
 
 use tauri::Manager;
 use tokio::sync::Mutex;

@@ -153,7 +153,7 @@ export interface PublicParticipantProfile {
   banner_color?: string; profile_theme_start?: string; profile_theme_end?: string;
 }
 export interface Session {
-  runtime?: { name: 'tauri'; preview: boolean; voice: boolean; screen: boolean; camera: boolean; googleLogin: boolean };
+  runtime?: { name: 'tauri'; preview: boolean; voice: boolean; screen: boolean; camera: boolean; googleLogin: boolean; screenAudio?: boolean };
   rooms?: { id: string; name: string; userCount: number }[];
   textRoomId?: string | null;
   voiceState?: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';

@@ -3,6 +3,7 @@ use crate::{
     error::{Error, Result},
     media::Media,
     model::{self, Model, Shared},
+    screen::Screen,
     settings::Store,
     socket::Socket,
     vault::{Credential, Vault},
@@ -20,6 +21,12 @@ use std::{
 #[serde(tag = "name", rename_all = "camelCase", deny_unknown_fields)]
 pub enum Command {
     RequestSnapshot,
+    ListShareSources,
+    StartScreenShare {
+        generation: String,
+        index: usize,
+    },
+    StopScreenShare,
     GetOwnProfile,
     SaveOwnProfile {
         fields: Value,
@@ -128,6 +135,9 @@ pub struct Core {
     media: Media,
     preferences: Store,
     upload: Option<crate::profiles::Upload>,
+    screen: Screen,
+    sources: Vec<crate::capture::Source>,
+    sources_generation: String,
 }
 impl Core {
     pub fn new(directory: PathBuf, app: tauri::AppHandle) -> Result<Self> {
@@ -135,7 +145,8 @@ impl Core {
             muted: true,
             ..Default::default()
         }));
-        let media = Media::new(app, model.clone());
+        let media = Media::new(app.clone(), model.clone());
+        let screen = Screen::new(app, model.clone());
         let preferences = Store::new(directory.clone())?;
         Ok(Self {
             api: Api::new()?,
@@ -147,9 +158,14 @@ impl Core {
             media,
             preferences,
             upload: None,
+            screen,
+            sources: Vec::new(),
+            sources_generation: String::new(),
         })
     }
     fn reset(&mut self) {
+        self.sources.clear();
+        self.sources_generation.clear();
         self.model
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -160,6 +176,7 @@ impl Core {
             .unwrap_or_else(|e| e.into_inner())
             .generation;
         let _ = self.media.stop(generation);
+        let _ = self.screen.stop(generation);
         self.socket = None;
     }
     fn clear_account(&mut self) {
@@ -288,6 +305,7 @@ impl Core {
             token,
             generation,
             self.media.clone(),
+            self.screen.clone(),
         ));
         Ok(())
     }
@@ -308,6 +326,13 @@ impl Core {
     }
     fn join_text(&self, id: String, name: String) -> Result<()> {
         api::id(&id)?;
+        let generation = {
+            let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+            model.screen_requested = false;
+            model.screen_epoch += 1;
+            model.generation
+        };
+        self.screen.stop(generation)?;
         self.model
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -319,6 +344,109 @@ impl Core {
     pub async fn dispatch(&mut self, app: &tauri::AppHandle, command: Command) -> Result<Value> {
         let deleting = matches!(&command, Command::DeleteServer { .. });
         match command {
+            Command::ListShareSources => {
+                self.sources = crate::capture::sources()?;
+                self.sources_generation = uuid::Uuid::new_v4().to_string();
+                Ok(
+                    json!({"generation":self.sources_generation,"sources":self.sources.iter().enumerate().map(|(index,source)|json!({"index":index,"kind":source.kind,"name":source.name})).collect::<Vec<_>>()}),
+                )
+            }
+            Command::StartScreenShare { generation, index } => {
+                if generation != self.sources_generation {
+                    return Err(Error::invalid());
+                }
+                let source = self
+                    .sources
+                    .get(index)
+                    .cloned()
+                    .ok_or_else(Error::invalid)?;
+                let (generation, epoch) = {
+                    let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    if model.text_room.is_none() {
+                        return Err(Error::invalid());
+                    }
+                    model.screen_requested = true;
+                    model.screen_admitting = false;
+                    model.sharing = false;
+                    model.screen_epoch += 1;
+                    (model.generation, model.screen_epoch)
+                };
+                let preferences = self
+                    .model
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .preferences
+                    .clone();
+                self.screen.start(
+                    generation,
+                    epoch,
+                    source,
+                    crate::video_codec::Config {
+                        width: if preferences.share_hd { 1920 } else { 1280 },
+                        height: if preferences.share_hd { 1080 } else { 720 },
+                        fps: if preferences.share_mode == "screen" {
+                            15
+                        } else if preferences.share_hd {
+                            60
+                        } else {
+                            30
+                        },
+                        bitrate: if preferences.share_hd {
+                            8000000
+                        } else {
+                            2500000
+                        },
+                    },
+                )?;
+                let room = self
+                    .model
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .text_room
+                    .clone()
+                    .ok_or_else(Error::invalid)?;
+                self.send("media-refresh", json!({"kind":"screen","roomId":room}))?;
+                if let Some(socket) = &self.socket {
+                    let sender = socket.sender();
+                    let model = self.model.clone();
+                    let app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        for _ in 0..3 {
+                            tokio::time::sleep(std::time::Duration::from_millis(3100)).await;
+                            if !crate::screen::pending_admission(&model, generation, epoch) {
+                                return;
+                            }
+                            let _ = sender.try_send((
+                                "media-refresh".into(),
+                                json!({"kind":"screen","roomId":room}),
+                            ));
+                        }
+                        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                        if crate::screen::pending_admission(&model, generation, epoch) {
+                            {
+                                let mut model = model.lock().unwrap_or_else(|e| e.into_inner());
+                                if model.generation == generation && model.screen_epoch == epoch {
+                                    model.screen_requested = false;
+                                    model.user_state_notify.notify_one();
+                                }
+                            }
+                            model::publish(&app, &model);
+                            model::notice(&app,"O servidor não respondeu à admissão da transmissão. Tente novamente.");
+                        }
+                    });
+                }
+                Ok(Value::Null)
+            }
+            Command::StopScreenShare => {
+                let generation = {
+                    let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    model.screen_requested = false;
+                    model.screen_epoch += 1;
+                    model.generation
+                };
+                self.screen.stop(generation)?;
+                Ok(Value::Null)
+            }
             Command::GetOwnProfile => {
                 let response = self.authenticated(Method::GET, AUTH, "/me", None).await?;
                 let profile = crate::profiles::project(&self.api, &response["account"]).await;
@@ -683,6 +811,12 @@ impl Core {
                     m.generation
                 };
                 self.media.stop(generation)?;
+                {
+                    let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    model.screen_requested = false;
+                    model.screen_epoch += 1;
+                }
+                self.screen.stop(generation)?;
                 self.send("leave-room", json!({}))?;
                 let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
                 model.text_room = None;
@@ -736,7 +870,11 @@ impl Core {
                     m.generation
                 };
                 self.media.configure(generation)?;
-                let _ = self.send("user-state-change", json!({"isMuted":muted}));
+                self.model
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .user_state_notify
+                    .notify_one();
                 Ok(Value::Null)
             }
             Command::SetDeafened { deafened } => {
@@ -746,7 +884,11 @@ impl Core {
                     m.generation
                 };
                 self.media.configure(generation)?;
-                let _ = self.send("user-state-change", json!({"isDeafened":deafened}));
+                self.model
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .user_state_notify
+                    .notify_one();
                 Ok(Value::Null)
             }
             Command::SetSetting { key, value } => {
@@ -849,12 +991,10 @@ mod tests {
         assert!(clean_name(&"😀".repeat(1001), 2000).is_err());
     }
     #[test]
-    fn media_commands_are_explicitly_unavailable() {
+    fn unknown_commands_cannot_execute_privileged_operations() {
         assert!(matches!(
-            serde_json::from_value::<Command>(
-                json!({"name":"startScreenShare","generation":"x","index":0})
-            )
-            .unwrap(),
+            serde_json::from_value::<Command>(json!({"name":"executeShell","command":"arbitrary"}))
+                .unwrap(),
             Command::Unsupported
         ));
     }
