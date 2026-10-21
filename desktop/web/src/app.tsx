@@ -4,6 +4,7 @@ import { PopoutBar, ResizeEdges, TitleBar } from './components/TitleBar';
 import { ServerRail } from './components/ServerRail';
 import { WorkspaceNav } from './components/WorkspaceNav';
 import { StatePanel } from './components/ui/StatePanel';
+import { FullscreenHint } from './components/FullscreenHint';
 import { ChannelSidebar } from './components/ChannelSidebar';
 import { AccountPopoverHost } from './components/AccountPopover';
 import { PeerAudioHost } from './components/PeerAudio';
@@ -76,7 +77,7 @@ export function App({ store, bridge, workspace = false }: { store: SessionStore;
   const server = session.servers.find(s => s.id === session.selectedServerId);
   if (POPOUT) return (
     <div class={`tri-app tri-app--popout ${fullscreen ? 'tri-app--call-fullscreen' : ''}`}>
-      {fullscreen && <div class="tri-fullscreen-hint" role="status">Pressione Esc para sair da tela cheia</div>}
+      {fullscreen && <FullscreenHint/>}
       <PopoutBar bridge={bridge} />
       {!fullscreen && <ResizeEdges bridge={bridge} />}
       <div class="tri-content">{session.connectedChannelId && <ChannelView session={session} bridge={bridge} store={store} popout />}</div>
@@ -92,7 +93,7 @@ export function App({ store, bridge, workspace = false }: { store: SessionStore;
   );
   return (
     <div class={`tri-app ${workspace?'tri-app--workspace':''} ${session.callFullscreen ? 'tri-app--call-fullscreen' : ''}`}>
-      {session.callFullscreen && <div class="tri-fullscreen-hint" role="status">Pressione Esc para sair da tela cheia</div>}
+      {session.callFullscreen && <FullscreenHint/>}
       <TitleBar server={server} bridge={bridge} />
       {!session.callFullscreen && <ResizeEdges bridge={bridge} />}
       <div class="tri-content">
