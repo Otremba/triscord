@@ -3,6 +3,7 @@ import type { Bridge } from './bridge';
 import type { Command } from './protocol';
 import { useSession, type SessionStore } from './store';
 import { LoginScreen } from './components/LoginScreen';
+import { ProfileEditor } from './components/ProfileEditor';
 import './styles/rust-preview.css';
 
 export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Bridge }) {
@@ -16,6 +17,7 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
   const [password, setPassword] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [roomName, setRoomName] = useState('');
+  const [profileOpen,setProfileOpen]=useState(false);
   const [pendingText, setPendingText] = useState<{ text: string; previousIds: string[] } | null>(null);
   useEffect(() => {
     const handler = (event: Event) => setNotice(String((event as CustomEvent).detail));
@@ -24,7 +26,7 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
   }, []);
   useEffect(() => { setCode(''); setText(''); }, [session?.selectedServerId]);
   useEffect(() => { setText(''); setPendingText(null); }, [session?.textRoomId]);
-  useEffect(() => { setPassword(''); setCurrentPassword(''); setInvite(''); setCode(''); setName(''); }, [session?.account.id]);
+  useEffect(() => { setPassword(''); setCurrentPassword(''); setInvite(''); setCode(''); setName(''); setProfileOpen(false); }, [session?.account.id]);
   useEffect(() => {
     if (pendingText && session?.chat?.some(message => message.own && message.text === pendingText.text && !pendingText.previousIds.includes(message.id))) {
       setText(current => current === pendingText.text ? '' : current); setPendingText(null);
@@ -46,13 +48,14 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
   const room = session?.rooms?.find(r => r.id === session.textRoomId);
   const connected = session?.connection === 'connected';
   return <div class="rust-preview">
-    <div class="rust-preview__banner" role="status">Prévia da reescrita Rust · mídia em desenvolvimento, sem validação em execução · câmera, transmissão e login Google pendentes</div>
+    <div class="rust-preview__banner" role="status">Prévia da reescrita Rust · mídia em desenvolvimento, sem validação em execução · câmera e transmissão pendentes</div>
     {notice && <div class="rust-preview__notice" role="alert">{notice}<button onClick={() => setNotice('')} aria-label="Fechar aviso">×</button></div>}
     {!session ? <div class="rust-preview__loading">Carregando… <button onClick={() => bridge.send({ name: 'requestSnapshot' })}>Tentar novamente</button></div> : !signedIn ?
-      <LoginScreen auth={session.auth ?? { state: 'signedOut' }} bridge={bridge} googleLogin={false} /> : <div class="rust-preview__layout">
+      <LoginScreen auth={session.auth ?? { state: 'signedOut' }} bridge={bridge} googleLogin={session.runtime?.googleLogin ?? false} /> : <div class="rust-preview__layout">
       <aside class="rust-preview__servers">
         <h1>Triscord <small>Rust Preview</small></h1>
         <p>{session.account.displayName}</p>
+        <button disabled={busy} onClick={() => setProfileOpen(true)}>Editar perfil</button>
         <button disabled={busy} onClick={() => void run({ name: 'signOut' })}>Sair da conta</button>
         <h2>Seus servidores</h2>
         <button disabled={busy} onClick={() => void run({ name: 'refreshServers' })}>Atualizar</button>
@@ -133,5 +136,6 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
         </form>}
       </main>
     </div>}
+    {signedIn && session && profileOpen && <ProfileEditor session={session} bridge={bridge} onClose={() => setProfileOpen(false)} />}
   </div>;
 }

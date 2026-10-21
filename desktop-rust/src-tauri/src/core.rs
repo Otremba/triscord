@@ -20,6 +20,35 @@ use std::{
 #[serde(tag = "name", rename_all = "camelCase", deny_unknown_fields)]
 pub enum Command {
     RequestSnapshot,
+    GetOwnProfile,
+    SaveOwnProfile {
+        fields: Value,
+    },
+    BeginProfileMedia {
+        kind: String,
+        size: usize,
+    },
+    AppendProfileMedia {
+        #[serde(rename = "uploadId")]
+        upload_id: String,
+        offset: usize,
+        data: String,
+    },
+    FinishProfileMedia {
+        #[serde(rename = "uploadId")]
+        upload_id: String,
+    },
+    CancelProfileMedia {
+        #[serde(rename = "uploadId")]
+        upload_id: String,
+    },
+    RemoveProfileMedia {
+        kind: String,
+    },
+    SignIn,
+    SetNick {
+        nick: String,
+    },
     SignInNick {
         nick: String,
         password: Option<String>,
@@ -98,6 +127,7 @@ pub struct Core {
     socket: Option<Socket>,
     media: Media,
     preferences: Store,
+    upload: Option<crate::profiles::Upload>,
 }
 impl Core {
     pub fn new(directory: PathBuf, app: tauri::AppHandle) -> Result<Self> {
@@ -116,6 +146,7 @@ impl Core {
             socket: None,
             media,
             preferences,
+            upload: None,
         })
     }
     fn reset(&mut self) {
@@ -132,10 +163,12 @@ impl Core {
         self.socket = None;
     }
     fn clear_account(&mut self) {
+        self.upload = None;
         self.reset();
         self.credential = None;
         let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
         model.account = None;
+        model.profile = None;
         model.servers.clear();
         model.selected_server.clear();
         model.muted = true;
@@ -151,6 +184,44 @@ impl Core {
         let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
         model.account = Some(account);
         model.preferences = preferences;
+    }
+    async fn finish_sign_in(&mut self, app: &tauri::AppHandle, response: Value) -> Result<Value> {
+        let account = public_account(&response["account"])?;
+        let credential = Credential {
+            session: response["session"]
+                .as_str()
+                .filter(|s| !s.is_empty() && s.len() <= 4096)
+                .ok_or_else(Error::network)?
+                .to_owned(),
+            expires_at: response["expires_at"].as_u64().ok_or_else(Error::network)?,
+        };
+        self.vault.save(&credential)?;
+        self.clear_account();
+        self.credential = Some(credential);
+        self.restored = true;
+        self.install_account(account);
+        model::publish(app, &self.model);
+        let profile = crate::profiles::project(&self.api, &response["account"]).await;
+        self.model.lock().unwrap_or_else(|e| e.into_inner()).profile = Some(profile);
+        if self
+            .model
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .account
+            .as_ref()
+            .is_some_and(|a| a["nick"].as_str().is_some_and(|nick| !nick.is_empty()))
+        {
+            if let Err(error) = self.refresh_servers().await {
+                if error.code == "unauthorized" {
+                    return Err(error);
+                }
+                model::notice(
+                    app,
+                    "Login concluído; não foi possível atualizar os servidores. Use Atualizar.",
+                );
+            }
+        }
+        Ok(json!({"created":response["created"].as_bool().unwrap_or(false)}))
     }
     async fn authenticated(
         &mut self,
@@ -248,6 +319,136 @@ impl Core {
     pub async fn dispatch(&mut self, app: &tauri::AppHandle, command: Command) -> Result<Value> {
         let deleting = matches!(&command, Command::DeleteServer { .. });
         match command {
+            Command::GetOwnProfile => {
+                let response = self.authenticated(Method::GET, AUTH, "/me", None).await?;
+                let profile = crate::profiles::project(&self.api, &response["account"]).await;
+                self.model.lock().unwrap_or_else(|e| e.into_inner()).profile =
+                    Some(profile.clone());
+                Ok(profile)
+            }
+            Command::SaveOwnProfile { fields } => {
+                crate::profiles::validate_fields(&fields)?;
+                let response = self
+                    .authenticated(Method::PATCH, AUTH, "/profile", Some(fields))
+                    .await?;
+                let profile = crate::profiles::project(&self.api, &response["account"]).await;
+                self.model.lock().unwrap_or_else(|e| e.into_inner()).profile =
+                    Some(profile.clone());
+                Ok(profile)
+            }
+            Command::BeginProfileMedia { kind, size } => {
+                let account = self
+                    .model
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .account
+                    .as_ref()
+                    .and_then(|a| a["id"].as_str())
+                    .ok_or_else(Error::unauthorized)?
+                    .to_owned();
+                let upload = crate::profiles::Upload::new(kind, size, account)?;
+                let id = upload.id.clone();
+                self.upload = Some(upload);
+                Ok(json!({"uploadId":id}))
+            }
+            Command::AppendProfileMedia {
+                upload_id,
+                offset,
+                data,
+            } => {
+                let account = self
+                    .model
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .account
+                    .as_ref()
+                    .and_then(|a| a["id"].as_str())
+                    .ok_or_else(Error::unauthorized)?
+                    .to_owned();
+                self.upload
+                    .as_mut()
+                    .ok_or_else(Error::invalid)?
+                    .append(&upload_id, &account, offset, &data)?;
+                Ok(Value::Null)
+            }
+            Command::CancelProfileMedia { upload_id } => {
+                if self
+                    .upload
+                    .as_ref()
+                    .is_some_and(|upload| upload.id == upload_id)
+                {
+                    self.upload = None;
+                }
+                Ok(Value::Null)
+            }
+            Command::FinishProfileMedia { upload_id } => {
+                let account = self
+                    .model
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .account
+                    .as_ref()
+                    .and_then(|a| a["id"].as_str())
+                    .ok_or_else(Error::unauthorized)?
+                    .to_owned();
+                let upload = self.upload.take().ok_or_else(Error::invalid)?;
+                let kind = upload.kind.clone();
+                let (mime, bytes) = upload.finish(&upload_id, &account)?;
+                let token = self.credential.as_ref().ok_or_else(Error::unauthorized)?;
+                let response = self
+                    .api
+                    .upload(&format!("/profile/{kind}"), &token.session, mime, bytes)
+                    .await?;
+                let profile = crate::profiles::project(&self.api, &response["account"]).await;
+                self.model.lock().unwrap_or_else(|e| e.into_inner()).profile =
+                    Some(profile.clone());
+                Ok(profile)
+            }
+            Command::RemoveProfileMedia { kind } => {
+                if !["avatar", "banner"].contains(&kind.as_str()) {
+                    return Err(Error::invalid());
+                }
+                let response = self
+                    .authenticated(Method::DELETE, AUTH, &format!("/profile/{kind}"), None)
+                    .await?;
+                let profile = crate::profiles::project(&self.api, &response["account"]).await;
+                self.model.lock().unwrap_or_else(|e| e.into_inner()).profile =
+                    Some(profile.clone());
+                Ok(profile)
+            }
+            Command::SignIn => {
+                self.model
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .signing_in = true;
+                model::publish(app, &self.model);
+                let token = crate::oauth::sign_in().await;
+                self.model
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .signing_in = false;
+                let token = token?;
+                let response = self
+                    .api
+                    .request(
+                        Method::POST,
+                        AUTH,
+                        "/auth/google",
+                        None,
+                        Some(json!({"id_token":token.as_str()})),
+                    )
+                    .await?;
+                self.finish_sign_in(app, response).await
+            }
+            Command::SetNick { nick } => {
+                let nick = clean_name(&nick, 32)?;
+                let response = self
+                    .authenticated(Method::POST, AUTH, "/nick", Some(json!({"nick":nick})))
+                    .await?;
+                self.install_account(public_account(&response["account"])?);
+                self.refresh_servers().await?;
+                Ok(Value::Null)
+            }
             Command::RequestSnapshot => {
                 if !self.restored {
                     self.credential = self.vault.load()?;
@@ -265,9 +466,23 @@ impl Core {
                         // Network failure preserves the encrypted credential and allows retry.
                         let me = self.authenticated(Method::GET, AUTH, "/me", None).await?;
                         self.install_account(public_account(&me["account"])?);
+                        model::publish(app, &self.model);
+                        let profile = crate::profiles::project(&self.api, &me["account"]).await;
+                        self.model.lock().unwrap_or_else(|e| e.into_inner()).profile =
+                            Some(profile);
                     }
                     self.restored = true;
-                    if self.credential.is_some() {
+                    if self.credential.is_some()
+                        && self
+                            .model
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .account
+                            .as_ref()
+                            .is_some_and(|a| {
+                                a["nick"].as_str().is_some_and(|nick| !nick.is_empty())
+                            })
+                    {
                         self.refresh_servers().await?;
                     }
                 }
@@ -288,28 +503,7 @@ impl Core {
                         Some(json!({"nick":nick,"password":password})),
                     )
                     .await?;
-                let account = public_account(&response["account"])?;
-                let credential = Credential {
-                    session: response["session"]
-                        .as_str()
-                        .filter(|s| !s.is_empty() && s.len() <= 4096)
-                        .ok_or_else(Error::network)?
-                        .to_owned(),
-                    expires_at: response["expires_at"].as_u64().ok_or_else(Error::network)?,
-                };
-                self.vault.save(&credential)?;
-                self.clear_account();
-                self.credential = Some(credential);
-                self.restored = true;
-                self.install_account(account);
-                // Sign-in remains successful if the independent directory is temporarily unavailable.
-                if self.refresh_servers().await.is_err() {
-                    model::notice(
-                        app,
-                        "Login concluído; não foi possível atualizar os servidores. Use Atualizar.",
-                    );
-                }
-                Ok(json!({"created":response["created"].as_bool().unwrap_or(false)}))
+                self.finish_sign_in(app, response).await
             }
             Command::SignOut => {
                 self.vault.clear()?; // Do not claim logout persisted if deletion failed.
@@ -624,10 +818,7 @@ fn public_account(value: &Value) -> Result<Value> {
         .as_str()
         .filter(|s| !s.is_empty() && s.len() <= 128)
         .ok_or_else(Error::network)?;
-    let nick = value["nick"]
-        .as_str()
-        .filter(|s| !s.is_empty())
-        .ok_or_else(Error::network)?;
+    let nick = value["nick"].as_str().unwrap_or_default();
     Ok(json!({"id":id,"nick":nick}))
 }
 fn clean_name(value: &str, limit: usize) -> Result<String> {

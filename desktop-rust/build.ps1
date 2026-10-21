@@ -8,10 +8,18 @@ if (-not (Test-Path -LiteralPath (Join-Path $toolchain 'rust/cargo/bin/cargo.exe
 $cargo = Join-Path $toolchain 'rust/cargo/bin/cargo.exe'
 if (-not (Test-Path -LiteralPath $cargo)) { throw 'Rust toolchain not found' }
 $previous = @{}
-foreach ($key in @('CARGO_HOME','RUSTUP_HOME','CARGO_TARGET_DIR','PATH','INCLUDE','LIB','VCToolsInstallDir','WindowsSDKDir','WindowsSDKVersion','VSCMD_ARG_TGT_ARCH','CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS','LK_CUSTOM_WEBRTC')) { $previous[$key] = [Environment]::GetEnvironmentVariable($key,'Process') }
+foreach ($key in @('CARGO_HOME','RUSTUP_HOME','CARGO_TARGET_DIR','PATH','INCLUDE','LIB','VCToolsInstallDir','WindowsSDKDir','WindowsSDKVersion','VSCMD_ARG_TGT_ARCH','CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS','LK_CUSTOM_WEBRTC','TRISCORD_GOOGLE_CLIENT_SECRET_FILE')) { $previous[$key] = [Environment]::GetEnvironmentVariable($key,'Process') }
 Push-Location $repo
 try {
     $env:CARGO_HOME = Join-Path $toolchain 'rust/cargo'
+    if (-not $env:TRISCORD_GOOGLE_CLIENT_SECRET_FILE) {
+        $localGoogle = Join-Path $repo 'desktop/out/google-client-secret.txt'
+        $toolchainItem = Get-Item -LiteralPath $toolchain
+        $physicalTools = if ($toolchainItem.Target) { @($toolchainItem.Target)[0] } else { $toolchain }
+        $sharedGoogle = Join-Path $physicalTools '../desktop/out/google-client-secret.txt'
+        if (Test-Path -LiteralPath $localGoogle) { $env:TRISCORD_GOOGLE_CLIENT_SECRET_FILE = $localGoogle }
+        elseif (Test-Path -LiteralPath $sharedGoogle) { $env:TRISCORD_GOOGLE_CLIENT_SECRET_FILE = [IO.Path]::GetFullPath($sharedGoogle) }
+    }
     $env:RUSTUP_HOME = Join-Path $toolchain 'rust/rustup'
     $env:CARGO_TARGET_DIR = Join-Path $repo 'desktop/out/tauri-target'
     # Short SDK location avoids MSVC include paths exceeding MAX_PATH. The directory must not be

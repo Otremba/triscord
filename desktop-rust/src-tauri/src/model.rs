@@ -24,6 +24,8 @@ pub struct Model {
     pub preferences: crate::settings::Preferences,
     pub input_devices: Vec<Value>,
     pub output_devices: Vec<Value>,
+    pub signing_in: bool,
+    pub profile: Option<Value>,
 }
 
 impl Model {
@@ -35,11 +37,12 @@ impl Model {
             .and_then(|a| a["nick"].as_str())
             .unwrap_or("Visitante");
         json!({ "v": 1, "type": "snapshot", "revision": self.revision, "session": {
-            "runtime": { "name": "tauri", "preview": true, "voice": true, "screen": false, "camera": false, "googleLogin": false },
+            "runtime": { "name": "tauri", "preview": true, "voice": true, "screen": false, "camera": false, "googleLogin": crate::oauth::configured() },
             "voiceState": if self.voice_state.is_empty() {"idle"} else {&self.voice_state}, "voiceRequested":self.voice_requested,
             "settings":self.preferences.snapshot(&self.input_devices,&self.output_devices),
-            "account": { "id": account_id, "displayName": nick, "username": nick, "status": if account.is_some() { "online" } else { "offline" } },
-            "auth": { "state": if account.is_some() { "signedIn" } else { "signedOut" } },
+            "profile":self.profile,
+            "account": { "id": account_id, "displayName": self.profile.as_ref().and_then(|p|p["display_name"].as_str()).filter(|s|!s.is_empty()).unwrap_or(nick), "username": nick, "avatarUrl":self.profile.as_ref().and_then(|p|p["avatarDataUrl"].as_str()).unwrap_or_default(), "status": if account.is_some() { "online" } else { "offline" } },
+            "auth": { "state": if self.signing_in {"signingIn"} else if account.is_some() && nick.is_empty() {"needsNick"} else if account.is_some() { "signedIn" } else { "signedOut" } },
             "servers": self.servers.iter().map(|s| json!({"id": s["id"], "name": s["name"], "owned": s["ownerAccountId"].as_str() == Some(account_id)})).collect::<Vec<_>>(),
             "selectedServerId": self.selected_server,
             "categories": [], "rooms": self.rooms,

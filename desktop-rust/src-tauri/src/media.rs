@@ -202,15 +202,11 @@ impl Voice {
             .configure_audio_processing(AudioProcessingOptions::default())
             .map_err(|_| Error::network())?;
         let token = Zeroizing::new(credentials.token.clone());
-        let mut options=RoomOptions::default();
-        options.auto_subscribe=false;
+        let mut options = RoomOptions::default();
+        options.auto_subscribe = false;
         let (room, events) = timeout(
             Duration::from_secs(20),
-            Room::connect(
-                &credentials.url,
-                &token,
-                options,
-            ),
+            Room::connect(&credentials.url, &token, options),
         )
         .await
         .map_err(|_| Error::network())?

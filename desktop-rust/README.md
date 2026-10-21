@@ -7,7 +7,8 @@ Esta é uma **prévia de desenvolvimento incompleta**, não uma substituição d
 ## Implementado nesta etapa
 
 - Host Tauri/WebView2 e núcleo Rust, sem Qt nem auxiliar Go no novo executável.
-- Login pelo nome/senha com os Workers existentes, restauração/revogação de sessão e definição de senha.
+- Login pelo nome/senha e Google OAuth com PKCE, verificação do retorno local e definição inicial de apelido; restauração/revogação de sessão e definição de senha. A configuração Google fica em arquivo local ignorado e é incorporada somente ao núcleo compilado.
+- Editor de perfil compartilhado com a interface existente, com campos de perfil e upload/remoção de avatar/faixa PNG, JPEG ou GIF. Uploads limitados, sequenciais, vinculados à conta e com expiração; os bytes dos GIFs são preservados. Recursos de imagem são carregados pelo núcleo a partir de hosts permitidos e enviados à interface como data URLs.
 - Sessão em arquivo protegido por DPAPI do usuário Windows, com gravação atômica; tokens e senhas não fazem parte do estado enviado à página.
 - Listagem, criação, seleção, exclusão e saída de servidores; criação e aceitação de convites.
 - Controle WebSocket Engine.IO/Socket.IO compatível com o Worker: heartbeat, reconexão com espera progressiva, fila limitada, descarte de comandos antigos e geração de conexão.
@@ -22,7 +23,7 @@ Esta é uma **prévia de desenvolvimento incompleta**, não uma substituição d
 2. Intensidade de supressão, DSP avançado e retorno automático ao dispositivo padrão.
 3. Captura de tela/janela, codificação por hardware, recepção e renderização acelerada, controle de qualidade e recuperação de vídeo.
 4. Câmera, soundboard e sons da interface.
-5. Google OAuth, perfis/avatares, configurações, moderação, notificações, tray e atualizador.
+5. Perfis dos participantes/cache de avatares, configurações completas, moderação, notificações, tray e atualizador.
 6. Paridade da interface existente e distribuição de prévias antes da substituição da versão estável.
 
 Rust ajuda com memória/concorrência, mas não comprova estabilidade da rede, desempenho em jogos nem aceleração por hardware. Não há promessa de solução das quedas atuais por esta mudança.
@@ -46,3 +47,5 @@ Os testes são unitários sem interface, com credenciais sintéticas e diretóri
 Passaram 15 testes unitários Rust, os testes Node do contrato IPC, TypeScript e os bundles da interface. O executável Windows de desenvolvimento foi compilado com a toolchain GNU existente, sem ser aberto. A inspeção estática dos imports confirmou dependências do Windows e WebView2, sem Qt. O linker GNU emitiu avisos `corrupt .drectve` ao consumir bibliotecas de importação; a linkedição concluiu, mas esses avisos e a distribuição do loader WebView2 devem ser revisitados no empacotamento da prévia. O loader foi gerado ao lado do executável. Nenhum instalador, release, push ou deploy foi feito para a reescrita.
 
 A etapa seguinte integra o SDK LiveKit e passa 19 testes sem interface, TypeScript e testes IPC, além da compilação completa MSVC. Os testes novos cobrem admissão antiga após saída/troca de sala, restrição do endpoint de mídia e preferências persistentes isoladas por conta. O cabeçalho do SDK cujo caminho tinha 261 caracteres impediu a compilação inicial; a pasta curta do SDK corrige a resolução dos includes sem modificar o conteúdo de terceiros. Avisos `corrupt .drectve` permanecem no build script do host GNU; o binário do aplicativo usa MSVC com CRT estático. Não houve execução do aplicativo nem de dispositivos: `runtimeVerified=false`.
+
+Contas/perfis passam 25 testes sem interface e compilação MSVC. Novos casos incluem o vetor PKCE do RFC 7636, retorno com estado/host/parâmetros inválidos, cancelamento de login, limites/ordem/expiração de upload e preservação de bytes. Nenhum navegador foi aberto nem requisição a uma conta real foi feita pelos testes.

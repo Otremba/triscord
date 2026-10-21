@@ -5,6 +5,8 @@ mod core;
 mod error;
 mod media;
 mod model;
+mod oauth;
+mod profiles;
 mod settings;
 mod socket;
 mod vault;
@@ -18,7 +20,7 @@ async fn dispatch(
     state: tauri::State<'_, Mutex<core::Core>>,
     command: serde_json::Value,
 ) -> error::Result<serde_json::Value> {
-    if command.to_string().len() > 16384 {
+    if command.to_string().len() > 65536 {
         return Err(error::Error::invalid());
     }
     let mut core = state.try_lock().map_err(|_| error::Error {

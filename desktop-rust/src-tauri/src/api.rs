@@ -10,6 +10,50 @@ pub struct Api {
     client: Client,
 }
 impl Api {
+    pub async fn upload(
+        &self,
+        path: &str,
+        token: &str,
+        mime: &str,
+        bytes: Vec<u8>,
+    ) -> Result<Value> {
+        let response = self
+            .client
+            .put(format!("{AUTH}{path}"))
+            .bearer_auth(token)
+            .header("content-type", mime)
+            .body(bytes)
+            .send()
+            .await
+            .map_err(|_| Error::network())?;
+        let status = response.status();
+        let value: Value = response.json().await.map_err(|_| Error::network())?;
+        if !status.is_success() {
+            return Err(api_error(status.as_u16(), value["error"].as_str()));
+        }
+        Ok(value)
+    }
+    pub async fn asset(&self, url: &str, limit: usize) -> Result<Vec<u8>> {
+        let response = self
+            .client
+            .get(url)
+            .send()
+            .await
+            .map_err(|_| Error::network())?;
+        if !response.status().is_success() {
+            return Err(Error::network());
+        }
+        let mut bytes = Vec::new();
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|_| Error::network())?;
+            if bytes.len() + chunk.len() > limit {
+                return Err(Error::invalid());
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        Ok(bytes)
+    }
     pub fn new() -> Result<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(12))

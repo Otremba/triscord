@@ -78,6 +78,18 @@ pub fn api_error(status: u16, code: Option<&str>) -> Error {
                 code: "invite_invalid",
                 message: "O convite expirou ou não é válido.",
             },
+            413 => Error {
+                code: "media_too_large",
+                message: "A imagem excede o tamanho permitido.",
+            },
+            415 => Error {
+                code: "unsupported_media",
+                message: "Use uma imagem PNG, JPEG ou GIF válida.",
+            },
+            507 => Error {
+                code: "media_storage_full",
+                message: "O armazenamento de imagens do serviço está cheio.",
+            },
             429 => Error {
                 code: "rate_limited",
                 message: "Muitas solicitações. Aguarde antes de tentar novamente.",
