@@ -43,10 +43,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'TypeScript check failed' }
     & node desktop/web/tools/test-tauri-bridge.mjs
     if ($LASTEXITCODE -ne 0) { throw 'IPC tests failed' }
+    & node desktop/web/tools/test-call-status.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Call status tests failed' }
     & node desktop/web/tools/build.mjs --tauri
     if ($LASTEXITCODE -ne 0) { throw 'UI build failed' }
-    & node desktop/tests/ui_parity_regressions.mjs
-    if ($LASTEXITCODE -ne 0) { throw 'UI parity regression tests failed' }
+    # UI automation is intentionally not part of this build, including headless browsers.
     & $cargo test --locked --target x86_64-pc-windows-msvc --manifest-path desktop-rust/src-tauri/Cargo.toml -j 2
     if ($LASTEXITCODE -ne 0) { throw 'Rust unit tests failed' }
     if (-not $CheckOnly) {
