@@ -1,31 +1,16 @@
 {
   "name": "triscord",
-  "version": "0.9.32",
+  "version": "0.9.46",
   "private": true,
-  "description": "Ferramentas do Triscord C++/Qt com interface Preact/WebView2 e servidor Node de compatibilidade",
+  "description": "Triscord",
   "scripts": {
-    "start": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/scripts/run-web.ps1",
-    "server": "node server/server.js",
-    "setup:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/scripts/setup.ps1",
     "build:web": "npm --prefix desktop/web run build",
     "typecheck": "npm --prefix desktop/web run typecheck",
-    "build:desktop": "npm run build:web && powershell -NoProfile -ExecutionPolicy Bypass -File desktop/scripts/build.ps1 -DevTools",
-    "package:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/scripts/portable-web.ps1",
-    "test": "jest --runInBand server/sanitize.test.js server/sound-library.test.js",
-    "test:server": "jest --runInBand server",
-    "lint": "eslint server --ext .js"
+    "build:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop-rust/build.ps1",
+    "build:release": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop-rust/build.ps1 -Release"
   },
   "license": "MIT",
-  "engines": { "node": ">=22" },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "socket.io": "^4.8.1"
-  },
-  "devDependencies": {
-    "eslint": "^8.57.1",
-    "jest": "^29.7.0",
-    "supertest": "^7.0.0",
-    "socket.io-client": "^4.8.1"
+  "engines": {
+    "node": ">=22"
   }
 }
