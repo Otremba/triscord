@@ -84,5 +84,8 @@ Esta memória foi consolidada da conversa do Claude Code `66a8637f-6d60-4f38-b80
 
 - Menu de espaços e desduplicação (21/10): seletor de servidores na lateral substituído por card interativo `.tri-workspace-current` com menu de contexto estilizado (`workspaceMenuEntries` com Início, espaços com marcação, criação e ações de servidor), eliminando o `<select>` nativo com popup cinza do sistema operacional. O `<select>` nativo permanece com `.tri-sr-only` para acessibilidade/testes. Cabeçalho duplicado `ServerHeader` em `ChannelSidebar` omitido quando `workspace` está ativo. Passaram testes unitários Node de contrato/temas, 105 testes Rust sem interface e compilação MSVC (`runtimeVerified=false`). Binário debug atualizado.
 
+- Limpeza de arquivos e comentários obsoletos (21/10): a pedido do usuário, removidos 84 arquivos legados (mais de 11.000 linhas): pasta de notas históricas (`docs/history/`), rascunhos e scripts de propostas de design (`docs/design/*.svg`, `proposal.py`), ferramentas de revisão visual (`desktop/tools/visual-review/`) e testes legados em Python (`desktop/tests/e2e/`). Comentários verbosos de engenharia reversa (IDs de módulos e offsets de bundles legados) foram limpos no código TypeScript e CSS. Preservados scripts essenciais de compilação/deploy (`build.ps1`, `deploy.ps1`), READMEs, regras de agentes e testes unitários (105 testes Rust e todos os testes web verdes).
+
+
 
 
