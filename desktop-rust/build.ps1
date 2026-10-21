@@ -47,6 +47,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Call status tests failed' }
     & node desktop/web/tools/test-workspace-contract.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Workspace contract tests failed' }
+    & node desktop/web/tools/test-workspace-themes.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Workspace theme tests failed' }
     & node desktop/web/tools/build.mjs --tauri
     if ($LASTEXITCODE -ne 0) { throw 'UI build failed' }
     # UI automation is intentionally not part of this build, including headless browsers.

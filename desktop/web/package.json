@@ -7,7 +7,7 @@
     "build": "node tools/build.mjs",
     "tokens": "node tools/extract-tokens.mjs",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node tools/test-call-status.mjs && node tools/test-tauri-bridge.mjs && node tools/test-workspace-contract.mjs",
+    "test:unit": "node tools/test-call-status.mjs && node tools/test-tauri-bridge.mjs && node tools/test-workspace-contract.mjs && node tools/test-workspace-themes.mjs",
     "test": "playwright test"
   },
   "dependencies": {

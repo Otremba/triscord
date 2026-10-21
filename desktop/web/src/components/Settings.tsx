@@ -66,8 +66,7 @@ const TITLES: Record<Page, string> = { account: 'Conta', notifications: 'Notific
 const THEMES: { id: SettingsState['theme']; name: string }[] = [
   { id: 'light', name: 'Claro' }, { id: 'dark', name: 'Cinza' }, { id: 'darker', name: 'Escuro' }, { id: 'midnight', name: 'Ônix' },
 ];
-// "Temas coloridos" (/xvEMy): Discord's gradient presets (BACKGROUND_GRADIENT_PRESET). triscord offers the pink one,
-// "Algodão-doce" (COTTON_CANDY, godtzA), free; the swatch shows the preset's gradient (styles/custom-theme.css).
+// The optional pastel theme uses the same solid workspace surfaces and controls.
 const COLOR_THEMES: { id: SettingsState['theme']; name: string }[] = [{ id: 'cotton-candy', name: 'Algodão-doce' }];
 
 function Switch({ checked, label, onChange }: { checked: boolean; label: string; onChange: (on: boolean) => void }) {

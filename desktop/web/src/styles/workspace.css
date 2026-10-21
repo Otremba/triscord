@@ -15,6 +15,23 @@
   --ui-primary-text:#f3f6ff;
   --ui-positive:#8fc6a9;
   --ui-critical:#e7a0a8;
+  --ui-hover:#303334;
+  --ui-selected-text:#dce5ff;
+  --ui-primary-hover:#4a6492;
+  --ui-accent-border:#637fae;
+  --ui-critical-bg:#352a30;
+  --ui-critical-button:#51363f;
+  --ui-critical-hover:#68424b;
+  --ui-critical-text:#ffe8ec;
+  --ui-critical-border:#754b53;
+  --ui-warning:#d5b775;
+  --ui-message-text:#d3d9e4;
+  --ui-border-strong:#494d4e;
+  --ui-positive-bg:#29372f;
+  --ui-message-hover:#252829;
+  --ui-selected-hover:#394965;
+  --ui-space-hover:#2d3440;
+  --ui-switch-track:#444849;
   --ui-motion:140ms;
   --font-primary:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
   --font-display:var(--font-primary);
@@ -32,41 +49,52 @@
   --background-secondary:var(--ui-sidebar);
   --background-primary:var(--ui-canvas);
   --background-brand:var(--ui-primary);
-  --background-mod-subtle:#2b2e2f;
-  --background-mod-normal:#303334;
-  --background-mod-muted:#303334;
+  --background-mod-subtle:var(--ui-field);
+  --background-mod-normal:var(--ui-hover);
+  --background-mod-muted:var(--ui-hover);
   --background-mod-accent:var(--ui-border);
-  --background-feedback-positive:#29372f;
-  --background-feedback-critical:#352a30;
-  --background-mod-strong:#3a3d3e;
+  --background-feedback-positive:var(--ui-positive-bg);
+  --background-feedback-critical:var(--ui-critical-bg);
+  --background-mod-strong:var(--ui-border-strong);
   --control-brand-foreground-new:var(--ui-accent);
   --control-primary-background-default:var(--ui-primary);
-  --control-primary-background-hover:#4a6492;
+  --control-primary-background-hover:var(--ui-primary-hover);
   --control-primary-text-default:var(--ui-primary-text);
   --control-secondary-background-default:var(--ui-panel);
   --control-secondary-background-hover:var(--ui-field);
   --control-secondary-border-default:var(--ui-border);
   --control-secondary-text-default:var(--ui-text);
-  --control-critical-primary-background-default:#51363f;
-  --control-critical-primary-background-hover:#68424b;
-  --control-critical-primary-text-default:#ffe8ec;
+  --control-critical-primary-background-default:var(--ui-critical-button);
+  --control-critical-primary-background-hover:var(--ui-critical-hover);
+  --control-critical-primary-text-default:var(--ui-critical-text);
   --input-background-default:var(--ui-field);
   --input-border-default:var(--ui-border);
   --input-border-active:var(--ui-accent);
   --input-placeholder-text-default:var(--ui-muted);
-  --switch-background-default:#444849;
+  --switch-background-default:var(--ui-switch-track);
   --switch-background-selected-default:var(--ui-primary);
   --switch-border-default:var(--ui-border);
   --switch-border-selected-default:var(--ui-accent);
   --switch-thumb-background-default:var(--ui-text);
   --radio-background-default:var(--ui-panel);
   --radio-background-selected-default:var(--ui-selected);
-  --radio-background-selected-hover:#394965;
+  --radio-background-selected-hover:var(--ui-selected-hover);
   --radio-border-default:var(--ui-border);
   --radio-border-selected-default:var(--ui-accent);
   --radio-thumb-background-active:var(--ui-accent);
   --border-subtle:var(--ui-border);
   --border-muted:var(--ui-border);
+  --border-normal:var(--ui-border);
+  --border-strong:var(--ui-border-strong);
+  --header-primary:var(--ui-text);
+  --header-secondary:var(--ui-muted);
+  --text-normal:var(--ui-text);
+  --text-brand:var(--ui-accent);
+  --icon-muted:var(--ui-muted);
+  --interactive-icon-default:var(--ui-muted);
+  --interactive-icon-hover:var(--ui-text);
+  --interactive-icon-active:var(--ui-text);
+  --channeltextarea-background:var(--ui-field);
   --app-frame-border:var(--ui-border);
   --text-default:var(--ui-text);
   --text-strong:var(--ui-text);
@@ -81,18 +109,18 @@
   --interactive-text-default:var(--ui-muted);
   --interactive-text-hover:var(--ui-text);
   --interactive-text-active:var(--ui-text);
-  --interactive-background-hover:#303334;
+  --interactive-background-hover:var(--ui-hover);
   --interactive-background-selected:var(--ui-selected);
   --icon-feedback-positive:var(--ui-positive);
   --icon-feedback-critical:var(--ui-critical);
   --brand-500:var(--ui-accent);
   --brand-experiment:var(--ui-primary);
   --brand-560:var(--ui-primary);
-  --message-background-hover:#252829;
+  --message-background-hover:var(--ui-message-hover);
   --reaction-background-default:var(--ui-panel);
   --reaction-background-hover:var(--ui-selected);
   --reaction-border-hover:var(--ui-accent);
-  --scrollbar-auto-thumb:#494d4e;
+  --scrollbar-auto-thumb:var(--ui-border-strong);
   --scrollbar-auto-track:transparent;
   --tri-space-950:var(--ui-canvas);
   --tri-space-900:var(--ui-sidebar);
@@ -128,10 +156,10 @@
 :root[data-design="workspace"] .tri-logo path[stroke] { stroke:var(--ui-accent); }
 :root[data-design="workspace"] .tri-logo circle { fill:var(--ui-accent); }
 :root[data-design="workspace"] .tri-shimmer-btn {
-  min-height:38px;border:1px solid #637fae;border-radius:8px;background:var(--ui-primary);background-image:none;
+  min-height:38px;border:1px solid var(--ui-accent-border);border-radius:8px;background:var(--ui-primary);background-image:none;
   color:var(--ui-primary-text);text-shadow:none;transition:background-color var(--ui-motion),border-color var(--ui-motion);
 }
-:root[data-design="workspace"] .tri-shimmer-btn:hover { background:#4a6492;transform:none; }
+:root[data-design="workspace"] .tri-shimmer-btn:hover { background:var(--ui-primary-hover);transform:none; }
 :root[data-design="workspace"] .tri-shimmer-btn[data-variant="glass"] { background:var(--ui-panel);border-color:var(--ui-border);color:var(--ui-text); }
 :root[data-design="workspace"] [class*="shadow-glow"] { box-shadow:none; }
 :root[data-design="workspace"] [class*="backdrop-blur"] { backdrop-filter:none; }
@@ -161,7 +189,7 @@
 :root[data-design="workspace"] .tri-category { padding-top:12px; }
 :root[data-design="workspace"] .tri-channel { margin:3px 0; }
 :root[data-design="workspace"] .tri-channel__link { min-height:40px;margin:0;border-radius:8px;padding:8px 10px; }
-:root[data-design="workspace"] .tri-channel.is-selected>.tri-channel__link { background:var(--ui-selected);color:#dce5ff;box-shadow:inset 3px 0 var(--ui-accent); }
+:root[data-design="workspace"] .tri-channel.is-selected>.tri-channel__link { background:var(--ui-selected);color:var(--ui-selected-text);box-shadow:inset 3px 0 var(--ui-accent); }
 :root[data-design="workspace"] .tri-channel__name { font-size:14px; }
 :root[data-design="workspace"] .tri-voice-user.is-speaking .tri-avatar { outline:2px solid var(--ui-positive);outline-offset:2px;box-shadow:none;animation:none; }
 
@@ -174,7 +202,7 @@
 :root[data-design="workspace"] .tri-voice-panel__signal { padding:3px;background:transparent; }
 :root[data-design="workspace"] .tri-voice-panel__buttons { margin-top:10px;gap:8px; }
 :root[data-design="workspace"] .tri-voice-panel__button { height:34px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-field); }
-:root[data-design="workspace"] .tri-account__button.is-red { background:#352a30;color:var(--ui-critical);box-shadow:none; }
+:root[data-design="workspace"] .tri-account__button.is-red { background:var(--ui-critical-bg);color:var(--ui-critical);box-shadow:none; }
 
 /* Conversation and call occupy one readable column; people remain supporting context. */
 :root[data-design="workspace"] .tri-page__main { background:var(--ui-canvas); }
@@ -192,8 +220,8 @@
 :root[data-design="workspace"] :is(.tri-call-capsule,.tri-call-attached,.tri-call-button,.tri-call-disconnect) { box-shadow:none;backdrop-filter:none; }
 :root[data-design="workspace"] .tri-call-capsule { border:1px solid var(--ui-border);background:var(--ui-panel); }
 :root[data-design="workspace"] .tri-call-button { background:var(--ui-field); }
-:root[data-design="workspace"] .tri-call-button.is-red { background:#352a30;color:var(--ui-critical); }
-:root[data-design="workspace"] .tri-call-disconnect { background:#51363f;color:#ffe8ec; }
+:root[data-design="workspace"] .tri-call-button.is-red { background:var(--ui-critical-bg);color:var(--ui-critical); }
+:root[data-design="workspace"] .tri-call-disconnect { background:var(--ui-critical-button);color:var(--ui-critical-text); }
 :root[data-design="workspace"] :is(.tri-call-card,.tri-video-tile) { border-radius:10px;box-shadow:none; }
 :root[data-design="workspace"] .tri-call-card.is-speaking { outline:2px solid var(--ui-positive);box-shadow:none;animation:none; }
 :root[data-design="workspace"] .tri-app--workspace .tri-call.is-idle .tri-call-bottom,
@@ -203,7 +231,7 @@
 :root[data-design="workspace"] .tri-chat-panel__scroller { padding:12px 0 20px; }
 :root[data-design="workspace"] .tri-message { padding-right:28px; }
 :root[data-design="workspace"] .tri-message.is-group-start { margin-top:22px; }
-:root[data-design="workspace"] .tri-message__content { font-size:15px;line-height:1.6;color:#d3d9e4; }
+:root[data-design="workspace"] .tri-message__content { font-size:15px;line-height:1.6;color:var(--ui-message-text); }
 :root[data-design="workspace"] .tri-message__username { font-size:14px;font-weight:600; }
 :root[data-design="workspace"] .tri-message__timestamp { margin-left:10px;font-size:11px;color:var(--ui-subtle); }
 :root[data-design="workspace"] .tri-channel-welcome__title { font-size:26px;line-height:1.3;font-weight:600; }
@@ -229,7 +257,7 @@
 :root[data-design="workspace"] .tri-state-panel__actions button { padding:10px 14px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-panel);font-size:14px;font-weight:600; }
 :root[data-design="workspace"] .tri-app--loading .tri-state-panel { align-self:center;justify-self:center; }
 :root[data-design="workspace"] .tri-connection-note { display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;margin:12px 16px 0;padding:12px 16px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-panel);font-size:13px;color:var(--ui-muted); }
-:root[data-design="workspace"] .tri-connection-note[data-tone="critical"] { border-color:#754b53;color:var(--ui-critical); }
+:root[data-design="workspace"] .tri-connection-note[data-tone="critical"] { border-color:var(--ui-critical-border);color:var(--ui-critical); }
 :root[data-design="workspace"] .tri-connection-note button { flex:none;padding:6px 10px;border:1px solid var(--ui-border);border-radius:6px;color:var(--ui-text); }
 :root[data-design="workspace"] .tri-workspace-home { flex:1;min-width:0;overflow:auto;padding:48px clamp(24px,6vw,96px);background:var(--ui-canvas); }
 :root[data-design="workspace"] .tri-workspace-home__header h1 { max-width:800px;font-size:32px;font-weight:600;letter-spacing:-.7px;line-height:1.3;overflow-wrap:anywhere; }
@@ -238,14 +266,14 @@
 :root[data-design="workspace"] .tri-workspace-home__call>svg { color:var(--ui-positive); }
 :root[data-design="workspace"] .tri-workspace-home__call>div { flex:1;min-width:0; }
 :root[data-design="workspace"] .tri-workspace-home__call p { margin:6px 0 0;color:var(--ui-muted);font-size:13px; }
-:root[data-design="workspace"] .tri-workspace-home__call>button { padding:8px 10px;border-radius:6px;color:var(--ui-critical);background:#352a30;font-size:13px; }
+:root[data-design="workspace"] .tri-workspace-home__call>button { padding:8px 10px;border-radius:6px;color:var(--ui-critical);background:var(--ui-critical-bg);font-size:13px; }
 :root[data-design="workspace"] .tri-workspace-home__spaces { max-width:850px;margin-top:40px; }
 :root[data-design="workspace"] .tri-workspace-home__section { display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px; }
 :root[data-design="workspace"] .tri-workspace-home__section h2 { margin:0;font-size:18px;font-weight:600; }
 :root[data-design="workspace"] .tri-workspace-home__section>button { display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ui-accent); }
 :root[data-design="workspace"] .tri-workspace-home__spaces>ul { display:grid;gap:10px; }
 :root[data-design="workspace"] .tri-workspace-space { display:flex;align-items:center;gap:16px;width:100%;padding:18px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel);text-align:left;transition:border-color var(--ui-motion),background-color var(--ui-motion); }
-:root[data-design="workspace"] .tri-workspace-space:hover { border-color:#637fae;background:#2d3440; }
+:root[data-design="workspace"] .tri-workspace-space:hover { border-color:var(--ui-accent-border);background:var(--ui-space-hover); }
 :root[data-design="workspace"] .tri-workspace-space__icon { flex:none;width:40px;height:40px;overflow:hidden;border-radius:10px; }
 :root[data-design="workspace"] .tri-workspace-space__name { display:flex;flex:1;min-width:0;flex-direction:column;gap:6px; }
 :root[data-design="workspace"] .tri-workspace-space__name strong { font-size:15px;overflow-wrap:anywhere; }
@@ -316,7 +344,7 @@
 :root[data-design="workspace"] .tri-settings__header { min-height:56px; }
 :root[data-design="workspace"] .tri-settings__search-empty { margin:12px 8px;color:var(--ui-muted);font-size:13px;line-height:1.5; }
 :root[data-design="workspace"] .tri-profile-editor__media label:has(input:focus-visible) { outline:2px solid var(--ui-accent);outline-offset:3px;border-radius:8px; }
-:root[data-design="workspace"] .tri-workspace-home__call[data-connection-tone="pending"]>svg { color:#d5b775; }
+:root[data-design="workspace"] .tri-workspace-home__call[data-connection-tone="pending"]>svg { color:var(--ui-warning); }
 :root[data-design="workspace"] .tri-workspace-home__call[data-connection-tone="critical"]>svg { color:var(--ui-critical); }
 :root[data-design="workspace"] .tri-workspace-home__call[data-connection-tone="neutral"]>svg { color:var(--ui-muted); }
 @media (max-width:1000px) {
@@ -337,3 +365,8 @@
   :root[data-design="workspace"] .tri-settings__content { min-height:0; }
   :root[data-design="workspace"] .tri-settings__column { padding:24px 16px; }
 }
+
+:root[data-design="workspace"] .tri-page { background:var(--ui-canvas); }
+:root[data-design="workspace"] .tri-voice-panel__title { color:var(--ui-text); }
+:root[data-design="workspace"] .tri-voice-panel__room { color:var(--ui-muted); }
+:root[data-design="workspace"] .tri-switch.is-on .tri-switch__knob { background:var(--ui-primary-text); }

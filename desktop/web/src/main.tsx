@@ -30,6 +30,7 @@ import './styles/member-list.css';
 import './styles/friends-view.css';
 import './styles/tailwind.generated.css';
 import './styles/workspace.css';
+import './styles/workspace-themes.css';
 
 // Theme comes from the core's settings. Until they arrive, Discord's default for an account with no preference:
 // "Escuro" (ThemeStore maps UNSET to NJ8.DARK, whose class is theme-darker; web bundle, REA). Fixtures/tests may pick

@@ -42,3 +42,9 @@ A barra de chamada agora inclui desativar/reativar áudio e opções de saída, 
 Configurações receberam margens de leitura, uma coluna para campos em larguras menores e navegação superior em janelas estreitas. A busca sem resultados mostra orientação. A seleção da página usa `aria-current=page`; uploads de imagem do perfil mostram foco no rótulo visível. Essas regras foram analisadas e compiladas, não renderizadas para comprovar seu layout.
 
 TypeScript, unidades Node, 104 unidades Rust e compilação MSVC passaram. runtimeVerified=false; sem E2E, app, instalador, captura ou dispositivos. Objetivo ainda em andamento, inclusive auditoria de preservação dos temas configuráveis e conferência visual completa quando permitida.
+
+## Continuação — preferências de aparência
+
+A paleta fixa da primeira aplicação do workspace anulava parte dos temas existentes. `workspace-themes.css` agora adapta Claro, Cinza, Escuro, Ônix e Algodão-doce aos mesmos componentes; Escuro mantém a direção grafite/azul aprovada. Algodão-doce usa superfícies claras suaves e destaque malva, sem camadas animadas ou gradiente de fundo. Os controles continuam gravando as mesmas chaves existentes.
+
+Cores de seleção, hover, mensagens, alertas e botões passam por tokens semânticos, incluindo aliases consumidos pelos componentes antigos. Os testes estáticos leem as duas folhas reais, resolvem aliases e verificam ausência de ciclos nos tokens utilizados, canvas distinto nas cinco preferências e contraste de pelo menos 4,5:1 nos pares de texto especificados (incluindo texto secundário, seleção, ações e erro). Isso não é uma auditoria de todos os elementos renderizados.

@@ -1,0 +1,98 @@
+/* Saved appearance preferences adapt the same component system. No animated gradient layers. */
+:root[data-design="workspace"][data-theme="dark"] {
+  --ui-canvas:#2c2f33;
+  --ui-sidebar:#31353a;
+  --ui-panel:#383d43;
+  --ui-field:#32363b;
+  --ui-border:#535c68;
+  --ui-text:#f0f2f7;
+  --ui-muted:#bdc5d1;
+  --ui-subtle:#b3bdcc;
+  --ui-message-text:#e0e6ef;
+  --ui-hover:#414854;
+  --ui-message-hover:#353b43;
+  --ui-space-hover:#3b4555;
+  --ui-border-strong:#657184;
+}
+:root[data-design="workspace"][data-theme="midnight"] {
+  --ui-canvas:#090b0f;
+  --ui-sidebar:#101318;
+  --ui-panel:#181d24;
+  --ui-field:#202630;
+  --ui-border:#343e4e;
+  --ui-hover:#293242;
+  --ui-message-hover:#161d28;
+  --ui-space-hover:#222e42;
+  --ui-border-strong:#52627b;
+}
+:root[data-design="workspace"][data-theme="light"] {
+  color-scheme:light;
+  --ui-canvas:#f7f8fb;
+  --ui-sidebar:#edf0f5;
+  --ui-panel:#ffffff;
+  --ui-field:#f1f3f7;
+  --ui-border:#c2cad7;
+  --ui-text:#202936;
+  --ui-muted:#4c596c;
+  --ui-subtle:#536176;
+  --ui-accent:#365b95;
+  --ui-selected:#e1eafa;
+  --ui-selected-text:#263f6b;
+  --ui-primary:#405780;
+  --ui-primary-hover:#4a6492;
+  --ui-accent-border:#637fae;
+  --ui-positive:#276445;
+  --ui-critical:#93334c;
+  --ui-critical-bg:#f9e9ee;
+  --ui-critical-button:#8b3048;
+  --ui-critical-hover:#74223a;
+  --ui-critical-text:#ffffff;
+  --ui-critical-border:#af6175;
+  --ui-warning:#78590f;
+  --ui-message-text:#303c4e;
+  --ui-border-strong:#8b99ae;
+  --ui-positive-bg:#e4f2e9;
+  --ui-message-hover:#edf1f7;
+  --ui-selected-hover:#d5e1f7;
+  --ui-space-hover:#e9effa;
+  --ui-switch-track:#c4cad5;
+  --ui-hover:#e3e9f2;
+}
+:root[data-design="workspace"][data-theme="cotton-candy"] {
+  color-scheme:light;
+  --ui-canvas:#faf6fa;
+  --ui-sidebar:#f0eaf3;
+  --ui-panel:#fffbff;
+  --ui-field:#f5edf6;
+  --ui-border:#ccbcd1;
+  --ui-text:#202936;
+  --ui-muted:#4c596c;
+  --ui-subtle:#536176;
+  --ui-accent:#78477c;
+  --ui-selected:#eaddef;
+  --ui-selected-text:#513056;
+  --ui-primary:#704474;
+  --ui-primary-hover:#805086;
+  --ui-accent-border:#926b99;
+  --ui-positive:#276445;
+  --ui-critical:#93334c;
+  --ui-critical-bg:#f9e9ee;
+  --ui-critical-button:#8b3048;
+  --ui-critical-hover:#74223a;
+  --ui-critical-text:#ffffff;
+  --ui-critical-border:#af6175;
+  --ui-warning:#78590f;
+  --ui-message-text:#303c4e;
+  --ui-border-strong:#8b99ae;
+  --ui-positive-bg:#e4f2e9;
+  --ui-message-hover:#f1e8f4;
+  --ui-selected-hover:#e4d3eb;
+  --ui-space-hover:#eee3f1;
+  --ui-switch-track:#c4cad5;
+  --ui-hover:#eee3f1;
+}
+
+:root[data-design="workspace"] .tri-theme--cotton-candy { background:#eaddef; }
+:root[data-design="workspace"] .tri-theme--dark { background:#2c2f33; }
+:root[data-design="workspace"] .tri-theme--darker { background:#1e2021; }
+:root[data-design="workspace"] .tri-theme--midnight { background:#090b0f; }
