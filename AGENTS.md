@@ -82,4 +82,7 @@ Esta memória foi consolidada da conversa do Claude Code `66a8637f-6d60-4f38-b80
 
 - Tema padrão Ônix (21/10): usuário aprovou a interface e escolheu definir o tema padrão para Ônix (`midnight` / canvas `#090B0F` preto profundo estilo AMOLED). Primeiro paint (`main.tsx`), preferências padrão Rust (`settings.rs`) e fixtures (`fixtures.ts`) atualizados para `midnight`. Passaram testes unitários Node de contrato/temas, 105 testes Rust sem interface e compilação MSVC (`runtimeVerified=false`). Binário de desenvolvimento recompilado.
 
+- Menu de espaços e desduplicação (21/10): seletor de servidores na lateral substituído por card interativo `.tri-workspace-current` com menu de contexto estilizado (`workspaceMenuEntries` com Início, espaços com marcação, criação e ações de servidor), eliminando o `<select>` nativo com popup cinza do sistema operacional. O `<select>` nativo permanece com `.tri-sr-only` para acessibilidade/testes. Cabeçalho duplicado `ServerHeader` em `ChannelSidebar` omitido quando `workspace` está ativo. Passaram testes unitários Node de contrato/temas, 105 testes Rust sem interface e compilação MSVC (`runtimeVerified=false`). Binário debug atualizado.
+
+
 

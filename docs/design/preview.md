@@ -96,4 +96,12 @@ A revisão da interface de chamada e das superfícies de vídeo revelou e corrig
 
 Em 21/10, o usuário aprovou a interface e escolheu definir o tema padrão para **Ônix** (`midnight` / canvas `#090B0F` preto profundo estilo AMOLED). O primeiro paint da interface web (`main.tsx`), as preferências padrão no núcleo Rust (`settings.rs`) e os fixtures de desenvolvimento (`fixtures.ts`) agora usam `midnight` por padrão, mantendo compatibilidade com as demais opções na tela de Aparência (Claro, Cinza, Escuro, Ônix e Algodão-doce).
 
+## Menu customizado de espaços e remoção do cabeçalho duplicado
+
+Em 21/10, o usuário apontou que a seleção de servidores na barra lateral exibia o `<select>` nativo do WebView2 (popup cinza clássico do Windows com borda azul brilhante) e um segundo cabeçalho de servidor duplicado logo abaixo.
+
+- `WorkspaceNav`: o card de espaço atual foi transformado em acionador interativo com classe `.tri-workspace-current` e menu de contexto customizado no tema Ônix (`workspaceMenuEntries`), listando "Início", servidores com marcação de seleção, "Adicionar servidor..." e ações de gerenciamento (convite, criar canal, sair/excluir). O elemento `<select>` nativo foi mantido com a classe `.tri-sr-only` para acessibilidade de leitores de tela e conformidade com testes de contrato.
+- `ChannelSidebar`: omitido o `<ServerHeader>` redundante quando `workspace` está ativo, evitando o nome do servidor repetido em duas linhas consecutivas na lateral.
+- Testes unitários Node de contrato/IPC/VNodes, 105 testes Rust sem interface e compilação MSVC passaram (`runtimeVerified=false`). Executável debug e atalho na Área de Trabalho atualizados.
+
 

@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
-const bundle=await build({stdin:{contents:`export {WorkspaceNav} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';export {modalTabTarget} from './focus-policy';export {MemberList} from './components/MemberList';export {FixtureBridge} from './bridge';export {fixtureSession} from './fixtures';export {participantMenuEntries} from './components/ParticipantMenu';export {callTiles} from './components/CallView';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,define:{'location.search':'""'},loader:{'.png':'dataurl','.css':'empty'},platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
-const {WorkspaceNav,ShimmerButton,DeviceSelect,deviceChoices,modalTabTarget,MemberList,FixtureBridge,fixtureSession,participantMenuEntries,callTiles}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
+const bundle=await build({stdin:{contents:`export {WorkspaceNav,workspaceMenuEntries} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';export {modalTabTarget} from './focus-policy';export {MemberList} from './components/MemberList';export {FixtureBridge} from './bridge';export {fixtureSession} from './fixtures';export {participantMenuEntries} from './components/ParticipantMenu';export {callTiles} from './components/CallView';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,define:{'location.search':'""'},loader:{'.png':'dataurl','.css':'empty'},platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
+const {WorkspaceNav,workspaceMenuEntries,ShimmerButton,DeviceSelect,deviceChoices,modalTabTarget,MemberList,FixtureBridge,fixtureSession,participantMenuEntries,callTiles}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
 function nodes(root){if(!root||typeof root!=='object')return [];const children=[root.props?.children].flat(Infinity);return [root,...children.flatMap(nodes)];}
 const sent=[];
 const servers=Array.from({length:8},(_,i)=>({id:`server-${i}`,name:`Espaço ${i}`,owned:i===0}));
@@ -13,6 +13,10 @@ const picker=tree.find(node=>node.type==='select');
 assert.deepEqual(nodes(picker).filter(node=>node.type==='option').map(node=>node.props.value),['@me',...servers.map(server=>server.id)],'every server remains reachable even when recent shortcuts are bounded');
 picker.props.onChange({currentTarget:{value:'server-7'}});
 assert.deepEqual(sent.pop(),{name:'selectServer',serverId:'server-7'});
+const menuEntries=workspaceMenuEntries({servers,selectedServerId:'server-0'},{send:command=>sent.push(command)});
+const itemLabels=menuEntries.filter(e=>e.kind==='item').map(e=>e.label);
+assert.ok(itemLabels.includes('Início')&&itemLabels.includes('Espaço 0')&&itemLabels.includes('Adicionar servidor...'),'menu includes Home, spaces and creation action');
+assert.ok(itemLabels.includes('Convidar para o servidor')&&itemLabels.includes('Criar canal')&&itemLabels.includes('Excluir servidor'),'owned space menu includes server actions');
 const home=tree.find(node=>node.props?.['aria-label']==='Ir para o início');
 home.props.onClick();assert.deepEqual(sent.pop(),{name:'selectServer',serverId:'@me'});
 const empty=WorkspaceNav({session:{servers:[],selectedServerId:''},bridge:{send:()=>{}}});
@@ -23,7 +27,7 @@ assert.match(submit.props.class,/tri-shimmer-btn/,'Preact class must not replace
 assert.match(submit.props.class,/w-full/);assert.match(submit.props.class,/profile-save/);
 assert.equal(submit.props.type,'submit');assert.equal(submit.props.form,'profile');assert.equal(submit.props.disabled,true);
 assert.equal(ShimmerButton({children:'Abrir'}).props.type,'button','an action button must not submit an enclosing form implicitly');
-console.log('Workspace contracts: complete server picker, native commands, empty navigation and button form semantics passed');
+console.log('Workspace contracts: complete server picker, native commands, empty navigation, button form semantics and custom workspace menu passed');
 
 const devices=[{id:'mic-1',name:'Microfone USB',isDefault:true},{id:'mic-2',name:'Microfone da câmera'},{id:'mic-1',name:'Repeated provider entry'},{id:'',name:'Provider default alias'}];
 const choices=deviceChoices('mic-1',devices);

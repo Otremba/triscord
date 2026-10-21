@@ -229,7 +229,7 @@ export function ChannelSidebar({ session, bridge, workspace=false }: { session: 
   const server = session.servers.find(s => s.id === session.selectedServerId) ?? session.servers[0];
   return (
     <section class="tri-sidebar-list" aria-label="Canais">
-      {server && <ServerHeader server={server} bridge={bridge} />}
+      {server && !workspace && <ServerHeader server={server} bridge={bridge} />}
       <ul class="tri-categories">
         {session.categories.map(category => <CategoryList key={category.id} category={category} session={session} bridge={bridge} />)}
       </ul>
