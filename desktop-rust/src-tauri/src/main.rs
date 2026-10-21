@@ -3,7 +3,9 @@ mod api;
 mod control;
 mod core;
 mod error;
+mod media;
 mod model;
+mod settings;
 mod socket;
 mod vault;
 
@@ -40,7 +42,8 @@ fn main() {
         .setup(|app| {
             // Separate identifier/data directory; never read Qt settings or the installed app's session.
             let directory = app.path().app_local_data_dir()?;
-            let core = core::Core::new(directory).map_err(|e| std::io::Error::other(e.message))?;
+            let core = core::Core::new(directory, app.handle().clone())
+                .map_err(|e| std::io::Error::other(e.message))?;
             app.manage(Mutex::new(core));
             Ok(())
         })

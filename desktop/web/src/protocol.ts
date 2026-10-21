@@ -156,6 +156,8 @@ export interface Session {
   runtime?: { name: 'tauri'; preview: boolean; voice: boolean; screen: boolean; camera: boolean; googleLogin: boolean };
   rooms?: { id: string; name: string; userCount: number }[];
   textRoomId?: string | null;
+  voiceState?: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
+  voiceRequested?: boolean;
   avatars?: Record<string, { still?: string; animated?: string }>;   // by account id; animated = GIF
   cameraPending?: boolean;
   callFullscreen?: boolean;

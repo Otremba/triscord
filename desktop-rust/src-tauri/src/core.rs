@@ -1,7 +1,9 @@
 use crate::{
     api::{self, Api, AUTH, HUB},
     error::{Error, Result},
+    media::Media,
     model::{self, Model, Shared},
+    settings::Store,
     socket::Socket,
     vault::{Credential, Vault},
 };
@@ -60,6 +62,22 @@ pub enum Command {
         channel_name: String,
     },
     LeaveTextRoom,
+    JoinVoice {
+        #[serde(rename = "channelId")]
+        channel_id: String,
+    },
+    LeaveVoice,
+    SetMuted {
+        muted: bool,
+    },
+    SetDeafened {
+        deafened: bool,
+    },
+    SetSetting {
+        key: String,
+        value: Value,
+    },
+    RequestDevices,
     SendChatMessage {
         text: String,
     },
@@ -78,16 +96,26 @@ pub struct Core {
     restored: bool,
     pub model: Shared,
     socket: Option<Socket>,
+    media: Media,
+    preferences: Store,
 }
 impl Core {
-    pub fn new(directory: PathBuf) -> Result<Self> {
+    pub fn new(directory: PathBuf, app: tauri::AppHandle) -> Result<Self> {
+        let model = Arc::new(Mutex::new(Model {
+            muted: true,
+            ..Default::default()
+        }));
+        let media = Media::new(app, model.clone());
+        let preferences = Store::new(directory.clone())?;
         Ok(Self {
             api: Api::new()?,
             vault: Vault::new(directory),
             credential: None,
             restored: false,
-            model: Arc::new(Mutex::new(Model::default())),
+            model,
             socket: None,
+            media,
+            preferences,
         })
     }
     fn reset(&mut self) {
@@ -95,6 +123,12 @@ impl Core {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .reset_connection();
+        let generation = self
+            .model
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .generation;
+        let _ = self.media.stop(generation);
         self.socket = None;
     }
     fn clear_account(&mut self) {
@@ -104,6 +138,19 @@ impl Core {
         model.account = None;
         model.servers.clear();
         model.selected_server.clear();
+        model.muted = true;
+        model.deafened = false;
+        model.preferences = Default::default();
+        model.input_devices.clear();
+        model.output_devices.clear();
+    }
+    fn install_account(&mut self, account: Value) {
+        let preferences = self
+            .preferences
+            .account(account["id"].as_str().unwrap_or_default());
+        let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+        model.account = Some(account);
+        model.preferences = preferences;
     }
     async fn authenticated(
         &mut self,
@@ -169,6 +216,7 @@ impl Core {
             id,
             token,
             generation,
+            self.media.clone(),
         ));
         Ok(())
     }
@@ -189,6 +237,10 @@ impl Core {
     }
     fn join_text(&self, id: String, name: String) -> Result<()> {
         api::id(&id)?;
+        self.model
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .desired_room = Some(id.clone());
         // This preview joins membership/chat only, never claims to publish/receive audio.
         // The hub uses the LiveKit admission format for compatibility with native SFU rooms.
         self.send("join-room",json!({"roomId":id,"roomName":name,"mediaTransport":"livekit","userData":{"isMuted":true,"isDeafened":true}}))
@@ -212,8 +264,7 @@ impl Core {
                     if self.credential.is_some() {
                         // Network failure preserves the encrypted credential and allows retry.
                         let me = self.authenticated(Method::GET, AUTH, "/me", None).await?;
-                        self.model.lock().unwrap_or_else(|e| e.into_inner()).account =
-                            Some(public_account(&me["account"])?);
+                        self.install_account(public_account(&me["account"])?);
                     }
                     self.restored = true;
                     if self.credential.is_some() {
@@ -250,7 +301,7 @@ impl Core {
                 self.clear_account();
                 self.credential = Some(credential);
                 self.restored = true;
-                self.model.lock().unwrap_or_else(|e| e.into_inner()).account = Some(account);
+                self.install_account(account);
                 // Sign-in remains successful if the independent directory is temporarily unavailable.
                 if self.refresh_servers().await.is_err() {
                     model::notice(
@@ -398,6 +449,12 @@ impl Core {
                 Ok(Value::Null)
             }
             Command::OpenTextRoom { channel_id } => {
+                let generation = {
+                    let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    m.voice_requested = false;
+                    m.generation
+                };
+                self.media.stop(generation)?;
                 let name = self
                     .model
                     .lock()
@@ -412,6 +469,12 @@ impl Core {
                 Ok(Value::Null)
             }
             Command::CreateTextRoom { channel_name } => {
+                let generation = {
+                    let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    m.voice_requested = false;
+                    m.generation
+                };
+                self.media.stop(generation)?;
                 self.join_text(
                     uuid::Uuid::new_v4().to_string(),
                     clean_name(&channel_name, 64)?,
@@ -419,10 +482,104 @@ impl Core {
                 Ok(Value::Null)
             }
             Command::LeaveTextRoom => {
+                let generation = {
+                    let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    m.voice_requested = false;
+                    m.desired_room = None;
+                    m.generation
+                };
+                self.media.stop(generation)?;
                 self.send("leave-room", json!({}))?;
                 let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
                 model.text_room = None;
                 model.chat.clear();
+                Ok(Value::Null)
+            }
+            Command::JoinVoice { channel_id } => {
+                let name = self
+                    .model
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .rooms
+                    .iter()
+                    .find(|r| r["id"].as_str() == Some(&channel_id))
+                    .and_then(|r| r["name"].as_str())
+                    .map(str::to_owned)
+                    .ok_or_else(Error::invalid)?;
+                let generation = {
+                    let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    m.voice_requested = true;
+                    m.voice_state = "connecting".into();
+                    m.generation
+                };
+                self.media.stop(generation)?;
+                if let Err(error) = self.join_text(channel_id, name) {
+                    self.model
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .voice_requested = false;
+                    return Err(error);
+                }
+                Ok(Value::Null)
+            }
+            Command::LeaveVoice => {
+                let generation = {
+                    let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    m.voice_requested = false;
+                    m.generation
+                };
+                self.media.stop(generation)?;
+                let _ = self.send(
+                    "user-state-change",
+                    json!({"isMuted":true,"isDeafened":true}),
+                );
+                Ok(Value::Null)
+            }
+            Command::SetMuted { muted } => {
+                let generation = {
+                    let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    m.muted = muted;
+                    m.generation
+                };
+                self.media.configure(generation)?;
+                let _ = self.send("user-state-change", json!({"isMuted":muted}));
+                Ok(Value::Null)
+            }
+            Command::SetDeafened { deafened } => {
+                let generation = {
+                    let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    m.deafened = deafened;
+                    m.generation
+                };
+                self.media.configure(generation)?;
+                let _ = self.send("user-state-change", json!({"isDeafened":deafened}));
+                Ok(Value::Null)
+            }
+            Command::SetSetting { key, value } => {
+                let (account, mut preferences, generation) = {
+                    let model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    (
+                        model
+                            .account
+                            .as_ref()
+                            .and_then(|a| a["id"].as_str())
+                            .ok_or_else(Error::unauthorized)?
+                            .to_owned(),
+                        model.preferences.clone(),
+                        model.generation,
+                    )
+                };
+                preferences.set(&key, value)?;
+                self.preferences.save(account, preferences.clone())?;
+                self.model
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .preferences = preferences;
+                self.media.configure(generation)?;
+                Ok(Value::Null)
+            }
+            Command::RequestDevices => {
+                self.media.devices()?;
                 Ok(Value::Null)
             }
             Command::SendChatMessage { text } => {

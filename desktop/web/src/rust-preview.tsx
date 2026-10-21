@@ -46,7 +46,7 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
   const room = session?.rooms?.find(r => r.id === session.textRoomId);
   const connected = session?.connection === 'connected';
   return <div class="rust-preview">
-    <div class="rust-preview__banner" role="status">Prévia da reescrita Rust · contas, servidores e chat · voz, câmera, transmissão e login Google ainda indisponíveis</div>
+    <div class="rust-preview__banner" role="status">Prévia da reescrita Rust · mídia em desenvolvimento, sem validação em execução · câmera, transmissão e login Google pendentes</div>
     {notice && <div class="rust-preview__notice" role="alert">{notice}<button onClick={() => setNotice('')} aria-label="Fechar aviso">×</button></div>}
     {!session ? <div class="rust-preview__loading">Carregando… <button onClick={() => bridge.send({ name: 'requestSnapshot' })}>Tentar novamente</button></div> : !signedIn ?
       <LoginScreen auth={session.auth ?? { state: 'signedOut' }} bridge={bridge} googleLogin={false} /> : <div class="rust-preview__layout">
@@ -74,6 +74,19 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
             <button disabled={busy}>Salvar senha</button>
           </form>
         </details>
+        <details><summary>Áudio</summary>
+          <button disabled={busy} onClick={() => void run({ name: 'requestDevices' })}>Atualizar dispositivos</button>
+          <label>Microfone<select value={session.settings?.inputDevice ?? ''} onChange={event => void run({ name: 'setSetting', key: 'inputDevice', value: event.currentTarget.value })}>
+            <option value="" disabled>Seleção inicial do Windows</option>
+            {session.settings?.inputDevices.map(device => <option value={device.id} key={device.id}>{device.name}</option>)}
+          </select></label>
+          <label>Saída<select value={session.settings?.outputDevice ?? ''} onChange={event => void run({ name: 'setSetting', key: 'outputDevice', value: event.currentTarget.value })}>
+            <option value="" disabled>Seleção inicial do Windows</option>
+            {session.settings?.outputDevices.map(device => <option value={device.id} key={device.id}>{device.name}</option>)}
+          </select></label>
+          <label><input type="checkbox" checked={session.settings?.noiseSuppression ?? true} onChange={event => void run({ name: 'setSetting', key: 'noiseSuppression', value: event.currentTarget.checked })} />Supressão de ruído</label>
+          <label><input type="checkbox" checked={session.settings?.automaticGainControl ?? true} onChange={event => void run({ name: 'setSetting', key: 'automaticGainControl', value: event.currentTarget.checked })} />Ganho automático</label>
+        </details>
       </aside>
       <section class="rust-preview__rooms">
         <h2>{server?.name ?? 'Selecione um servidor'}</h2>
@@ -82,7 +95,15 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
           {!connected && <button disabled={busy} onClick={() => void run({ name: 'selectServer', serverId: server.id })}>Reconectar</button>}
           <nav aria-label="Salas">{session.rooms?.map(r => <button key={r.id} disabled={busy || !connected} class={r.id === room?.id ? 'is-selected' : ''}
             onClick={() => void run({ name: 'openTextRoom', channelId: r.id })}># {r.name} <small>{r.userCount} pessoa(s)</small></button>)}</nav>
-          <p class="rust-preview__hint">Abrir uma sala permite somente conversar por texto nesta prévia. Você aparecerá silenciado na lista de participantes.</p>
+          <p class="rust-preview__hint">Abrir uma sala entra somente no chat. Use Entrar em voz para ativar o áudio pelo SDK LiveKit. O microfone começa silenciado.</p>
+          {room && <section aria-label="Controles de voz">
+            <p role="status">Voz: {{ idle: 'desconectada', connecting: 'conectando', connected: 'conectada', reconnecting: 'reconectando', error: 'falha de conexão' }[session.voiceState ?? 'idle']}</p>
+            {!session.voiceRequested || session.voiceState === 'error' ? <button disabled={busy || !connected} onClick={() => void run({ name: 'joinVoice', channelId: room.id })}>{session.voiceState === 'error' ? 'Reconectar voz' : 'Entrar em voz'}</button> : <>
+              <button disabled={busy} onClick={() => void run({ name: 'leaveVoice' })}>Desconectar voz</button>
+              <button disabled={busy || session.voiceState !== 'connected'} onClick={() => void run({ name: 'setMuted', muted: !session.muted })}>{session.muted ? 'Ativar microfone' : 'Silenciar microfone'}</button>
+              <button disabled={busy || session.voiceState !== 'connected'} onClick={() => void run({ name: 'setDeafened', deafened: !session.deafened })}>{session.deafened ? 'Ativar áudio recebido' : 'Desativar áudio recebido'}</button>
+            </>}
+          </section>}
           <form onSubmit={e => { e.preventDefault(); void run({ name: 'createTextRoom', channelName: roomName }); }}>
             <label>Nova sala<input value={roomName} onInput={e => setRoomName(e.currentTarget.value)} maxLength={64} required /></label>
             <button disabled={busy || !connected || !roomName.trim()}>Criar sala e abrir chat</button>
@@ -98,7 +119,7 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
       <main class="rust-preview__chat">
         <header><h2>{room ? `# ${room.name}` : 'Chat'}</h2>{room && <button disabled={busy} onClick={() => void run({ name: 'leaveTextRoom' })}>Sair da sala</button>}</header>
         <div class="rust-preview__messages" role="log" aria-label="Mensagens">
-          {!room && <p>Abra uma sala para conversar. O áudio e o vídeo ainda não fazem parte desta prévia.</p>}
+          {!room && <p>Abra uma sala para conversar. A voz é ativada separadamente e o vídeo ainda está em desenvolvimento.</p>}
           {session.chat?.map(message => <article key={message.id}><strong>{message.authorName}</strong> <time>{new Date(message.timestamp).toLocaleTimeString()}</time><p>{message.text}</p>
             {message.own && <button disabled={busy} onClick={() => void run({ name: 'deleteChatMessage', messageId: message.id })}>Excluir</button>}</article>)}
         </div>

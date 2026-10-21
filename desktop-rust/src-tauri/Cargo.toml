@@ -18,6 +18,7 @@ futures-util = "0.3"
 zeroize = "1"
 tempfile = "3"
 uuid = { version = "1", features = ["v4"] }
+livekit = { version = "=0.9.6", features = ["rustls-tls-native-roots"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["test-util"] }

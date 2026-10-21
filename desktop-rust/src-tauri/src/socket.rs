@@ -2,6 +2,7 @@ use crate::{
     api::HUB,
     control::{self, Packet},
     error::{Error, Result},
+    media::Media,
     model::{notice, publish, Shared},
 };
 use futures_util::{Sink, SinkExt, StreamExt};
@@ -31,6 +32,7 @@ impl Socket {
         server: String,
         token: String,
         generation: u64,
+        media: Media,
     ) -> Self {
         let (sender, mut receiver) = mpsc::channel::<(String, Value)>(32);
         let task = tokio::spawn(async move {
@@ -108,11 +110,17 @@ impl Socket {
                                         }
                                         Ok(Packet::Event(name,payload)) if ready => {
                                             if name=="room-join-denied" || name=="kicked" { desired_room=None; notice(&app,"A entrada na sala foi recusada ou encerrada pelo servidor."); }
+                                            let changed=model.lock().unwrap_or_else(|e|e.into_inner()).update(generation,&name,payload.clone());
                                             if name=="room-joined" {
-                                                if !send(&mut socket,Message::Text(format!("42{}",json!(["user-state-change",{"isMuted":true,"isDeafened":true}])).into())).await { break; }
+                                                let (voice_requested,muted,deafened)={let m=model.lock().unwrap_or_else(|e|e.into_inner());(m.voice_requested,m.muted||m.server_muted||!m.voice_requested,m.deafened)};
+                                                if voice_requested {
+                                                    if payload["mediaTransport"]!="livekit" || media.connect(generation,payload["roomId"].as_str().unwrap_or_default().to_owned(),&payload["media"]["voice"]).is_err() {notice(&app,"Esta sala não forneceu uma admissão de voz válida. Atualize os clientes ou entre em uma sala nova.");}
+                                                }
+                                                if !send(&mut socket,Message::Text(format!("42{}",json!(["user-state-change",{"isMuted":muted,"isDeafened":deafened}])).into())).await { break; }
                                             }
+                                            if name=="kicked" {let _=media.stop(generation);}
+                                            if name=="force-muted" {let _=media.configure(generation);}
                                             if name=="request-error" || name=="service-limit" || name=="chat-rate-limited" { notice(&app,"O servidor recusou a operação. Aguarde antes de tentar novamente."); }
-                                            let changed=model.lock().unwrap_or_else(|e|e.into_inner()).update(generation,&name,payload);
                                             if changed { publish(&app,&model); }
                                         }
                                         Ok(Packet::Closed) | Err(_) => break,
@@ -129,6 +137,7 @@ impl Socket {
                         }
                     }
                     clear_membership(&app, &model, generation);
+                    let _ = media.stop(generation);
                     if terminal {
                         set_status(&app, &model, generation, "offline");
                         notice(&app,"A sessão foi recusada. Entre novamente ou selecione o servidor para tentar outra vez.");

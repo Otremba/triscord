@@ -15,6 +15,15 @@ pub struct Model {
     pub text_room: Option<String>,
     pub chat: Vec<Value>,
     pub connection: &'static str,
+    pub voice_requested: bool,
+    pub desired_room: Option<String>,
+    pub voice_state: String,
+    pub muted: bool,
+    pub deafened: bool,
+    pub server_muted: bool,
+    pub preferences: crate::settings::Preferences,
+    pub input_devices: Vec<Value>,
+    pub output_devices: Vec<Value>,
 }
 
 impl Model {
@@ -26,7 +35,9 @@ impl Model {
             .and_then(|a| a["nick"].as_str())
             .unwrap_or("Visitante");
         json!({ "v": 1, "type": "snapshot", "revision": self.revision, "session": {
-            "runtime": { "name": "tauri", "preview": true, "voice": false, "screen": false, "camera": false, "googleLogin": false },
+            "runtime": { "name": "tauri", "preview": true, "voice": true, "screen": false, "camera": false, "googleLogin": false },
+            "voiceState": if self.voice_state.is_empty() {"idle"} else {&self.voice_state}, "voiceRequested":self.voice_requested,
+            "settings":self.preferences.snapshot(&self.input_devices,&self.output_devices),
             "account": { "id": account_id, "displayName": nick, "username": nick, "status": if account.is_some() { "online" } else { "offline" } },
             "auth": { "state": if account.is_some() { "signedIn" } else { "signedOut" } },
             "servers": self.servers.iter().map(|s| json!({"id": s["id"], "name": s["name"], "owned": s["ownerAccountId"].as_str() == Some(account_id)})).collect::<Vec<_>>(),
@@ -35,7 +46,7 @@ impl Model {
             "textRoomId": self.text_room,
             "chat": self.chat.iter().map(|m| json!({ "id":m["id"], "authorId":m["senderUserId"], "authorName":m["senderName"], "text":m["text"], "timestamp":m["timestamp"], "own":m["senderUserId"].as_str()==Some(account_id), "reactions":[] })).collect::<Vec<_>>(),
             "connection": if self.connection.is_empty() { "offline" } else { self.connection },
-            "muted": true, "deafened": true
+            "muted": self.muted || self.server_muted || self.deafened, "deafened": self.deafened
         }})
     }
     pub fn reset_connection(&mut self) -> u64 {
@@ -44,6 +55,10 @@ impl Model {
         self.rooms.clear();
         self.text_room = None;
         self.chat.clear();
+        self.voice_requested = false;
+        self.desired_room = None;
+        self.voice_state = "idle".into();
+        self.server_muted = false;
         self.generation
     }
     pub fn update(&mut self, generation: u64, event: &str, payload: Value) -> bool {
@@ -66,6 +81,7 @@ impl Model {
                     return false;
                 };
                 self.text_room = Some(id.to_owned());
+                self.server_muted = payload["isServerMuted"].as_bool().unwrap_or(false);
                 self.chat = payload["chatHistory"]
                     .as_array()
                     .into_iter()
@@ -92,9 +108,14 @@ impl Model {
             "chat-message-deleted" if payload["roomId"].as_str() == self.text_room.as_deref() => {
                 self.chat.retain(|m| m["id"] != payload["messageId"]);
             }
+            "force-muted" => {
+                self.server_muted = payload["muted"].as_bool().unwrap_or(true);
+            }
             "kicked" => {
                 self.text_room = None;
                 self.chat.clear();
+                self.voice_requested = false;
+                self.desired_room = None;
             }
             _ => return false,
         }
@@ -163,6 +184,6 @@ mod tests {
         let snapshot = model.snapshot().to_string();
         assert!(!snapshot.contains("secret"));
         assert!(!snapshot.contains("private"));
-        assert!(snapshot.contains("\"voice\":false"));
+        assert!(snapshot.contains("\"screen\":false"));
     }
 }
