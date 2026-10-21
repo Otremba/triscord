@@ -92,6 +92,23 @@ pub fn verify_sha256(data: &[u8], expected_hex: &str) -> bool {
     !clean_expected.is_empty() && computed_hex == clean_expected
 }
 
+/// Asynchronously queries GitHub Releases for updates newer than current_version.
+#[allow(dead_code)]
+pub async fn check_for_updates(current_version: &str) -> Option<UpdateInfo> {
+    let client = reqwest::Client::builder()
+        .user_agent("Triscord-Desktop")
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .ok()?;
+    let res = client
+        .get("https://api.github.com/repos/Otremba/triscord/releases?per_page=10")
+        .send()
+        .await
+        .ok()?;
+    let releases: serde_json::Value = res.json().await.ok()?;
+    parse_latest_release(releases.as_array()?, current_version)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

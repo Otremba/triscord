@@ -183,7 +183,7 @@ impl Model {
             .filter(|s| !s.is_empty())
             .unwrap_or(nick);
         let mut session = json!({
-            "runtime": { "name": "tauri", "preview": true, "voice": true, "screen": true, "camera": false, "googleLogin": crate::oauth::configured(),
+            "runtime": { "name": "tauri", "preview": false, "voice": true, "screen": true, "camera": false, "googleLogin": crate::oauth::configured(),
                 "screenAudio": true, "soundboard": true, "popout": false },
             "soundboard": crate::sound::catalog(),
             "voiceState": if self.voice_state.is_empty() {"idle"} else {&self.voice_state}, "voiceRequested": self.voice_requested,

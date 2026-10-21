@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Triscord",
-  "version": "0.1.0",
-  "identifier": "app.triscord.rust-preview",
+  "version": "0.9.46",
+  "identifier": "app.triscord.desktop",
   "build": { "frontendDist": "../../desktop/web/dist-rust" },
   "app": {
     "withGlobalTauri": true,

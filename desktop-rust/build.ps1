@@ -52,10 +52,10 @@ try {
     & node desktop/web/tools/build.mjs --tauri
     if ($LASTEXITCODE -ne 0) { throw 'UI build failed' }
     # UI automation is intentionally not part of this build, including headless browsers.
-    & $cargo test --locked --target x86_64-pc-windows-msvc --manifest-path desktop-rust/src-tauri/Cargo.toml -j 2
+    & $cargo test --offline --target x86_64-pc-windows-msvc --manifest-path desktop-rust/src-tauri/Cargo.toml -j 2
     if ($LASTEXITCODE -ne 0) { throw 'Rust unit tests failed' }
     if (-not $CheckOnly) {
-        $buildArgs = @('build', '--locked', '--target', 'x86_64-pc-windows-msvc', '--manifest-path', 'desktop-rust/src-tauri/Cargo.toml', '-j', '2')
+        $buildArgs = @('build', '--offline', '--target', 'x86_64-pc-windows-msvc', '--manifest-path', 'desktop-rust/src-tauri/Cargo.toml', '-j', '2')
         if ($Release) { $buildArgs += '--release' }
         & $cargo @buildArgs
         if ($LASTEXITCODE -ne 0) { throw 'Rust executable build failed' }
