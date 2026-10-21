@@ -1,7 +1,7 @@
 param([switch]$CheckOnly)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
-$toolchain = Join-Path $repo '.toolchain'
+$toolchain = if ($env:TRISCORD_TOOLCHAIN_DIR) { $env:TRISCORD_TOOLCHAIN_DIR } else { Join-Path $repo '.toolchain' }
 if (-not (Test-Path -LiteralPath (Join-Path $toolchain 'rust/cargo/bin/cargo.exe'))) {
     $toolchain = Join-Path $env:USERPROFILE '.codex/worktrees/native-desktop/triscord/.toolchain'
 }
@@ -21,10 +21,12 @@ try {
         elseif (Test-Path -LiteralPath $sharedGoogle) { $env:TRISCORD_GOOGLE_CLIENT_SECRET_FILE = [IO.Path]::GetFullPath($sharedGoogle) }
     }
     $env:RUSTUP_HOME = Join-Path $toolchain 'rust/rustup'
-    $env:CARGO_TARGET_DIR = Join-Path $repo 'desktop/out/tauri-target'
+    # TRISCORD_RUST_TARGET_DIR / TRISCORD_WEBRTC_DIR let a second checkout (a long worktree path) reuse the first one's
+    # build cache and short SDK folder instead of recompiling the LiveKit SDK from scratch.
+    $env:CARGO_TARGET_DIR = if ($env:TRISCORD_RUST_TARGET_DIR) { $env:TRISCORD_RUST_TARGET_DIR } else { Join-Path $repo 'desktop/out/tauri-target' }
     # Short SDK location avoids MSVC include paths exceeding MAX_PATH. The directory must not be
     # pre-created on a clean checkout: webrtc-sys downloads its pinned artifact when it is absent.
-    $env:LK_CUSTOM_WEBRTC = Join-Path $repo 'desktop/out/webrtc-89d790b'
+    $env:LK_CUSTOM_WEBRTC = if ($env:TRISCORD_WEBRTC_DIR) { $env:TRISCORD_WEBRTC_DIR } else { Join-Path $repo 'desktop/out/webrtc-89d790b' }
     $msvc = Join-Path $toolchain 'msvc'
     $vc = Get-ChildItem (Join-Path $msvc 'VC/Tools/MSVC') -Directory | Sort-Object Name -Descending | Select-Object -First 1
     $sdk = Get-ChildItem (Join-Path $msvc 'Windows Kits/10/Include') -Directory | Sort-Object Name -Descending | Select-Object -First 1
