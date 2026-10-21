@@ -877,6 +877,7 @@ impl Core {
                     m.generation
                 };
                 self.media.stop(generation)?;
+                crate::sound::play_cue(crate::sound::CallSound::Leave);
                 {
                     let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
                     model.screen_requested = false;
@@ -935,6 +936,7 @@ impl Core {
                         .voice_requested = false;
                     return Err(error);
                 }
+                crate::sound::play_cue(crate::sound::CallSound::Join);
                 Ok(Value::Null)
             }
             Command::SetMuted { muted } => {
@@ -944,6 +946,11 @@ impl Core {
                     m.generation
                 };
                 self.media.configure(generation)?;
+                crate::sound::play_cue(if muted {
+                    crate::sound::CallSound::Mute
+                } else {
+                    crate::sound::CallSound::Unmute
+                });
                 self.model
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
@@ -958,6 +965,11 @@ impl Core {
                     m.generation
                 };
                 self.media.configure(generation)?;
+                crate::sound::play_cue(if deafened {
+                    crate::sound::CallSound::Deafen
+                } else {
+                    crate::sound::CallSound::Undeafen
+                });
                 self.model
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
@@ -1170,19 +1182,24 @@ impl Core {
                 }
                 if let Some(socket) = &self.socket {
                     let _ = socket.sender().try_send((
-                        "play-sound".into(),
+                        "soundboard-play".into(),
                         serde_json::json!({"soundId": sound_id}),
                     ));
                 }
+                crate::sound::play_sound(&sound_id);
                 Ok(Value::Null)
             }
             Command::PreviewSound { sound_id } => {
                 if !crate::sound::catalog().iter().any(|s| s["id"] == sound_id) {
                     return Err(Error::invalid());
                 }
+                crate::sound::play_sound(&sound_id);
                 Ok(Value::Null)
             }
-            Command::StopSoundPreview => Ok(Value::Null),
+            Command::StopSoundPreview => {
+                crate::sound::stop_playback();
+                Ok(Value::Null)
+            },
             Command::Unsupported => Err(Error::unsupported()),
         }
     }

@@ -1,8 +1,0 @@
-#pragma once
-namespace triscord::groupConnection {
-inline constexpr bool automatic = @TRISCORD_AUTOMATIC_GROUP@;
-inline constexpr char server[] = "https://triscord-control.triscord-cloudflare-control.workers.dev";
-// A private group build carries its invitation. Anyone with that build can join.
-// The generated header stays in the ignored build directory, never in source control.
-inline constexpr char invite[] = "@TRISCORD_GROUP_INVITE@";
-}

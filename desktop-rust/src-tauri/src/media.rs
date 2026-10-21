@@ -230,7 +230,7 @@ impl Voice {
             .map_err(|_| Error::network())?;
         let token = Zeroizing::new(credentials.token.clone());
         let mut options = RoomOptions::default();
-        options.auto_subscribe = false;
+        options.auto_subscribe = true;
         let (room, events) = timeout(
             Duration::from_secs(20),
             Room::connect(&credentials.url, &token, options),

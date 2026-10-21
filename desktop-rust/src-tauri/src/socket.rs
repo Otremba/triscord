@@ -138,6 +138,11 @@ impl Socket {
                                                 }
                                                 if !send(&mut socket,Message::Text(format!("42{}",json!(["user-state-change",{"isMuted":muted,"isDeafened":deafened}])).into())).await { break; }
                                             }
+                                            if name=="soundboard-played" {
+                                                if let Some(sound_id) = payload["soundId"].as_str() {
+                                                    crate::sound::play_sound(sound_id);
+                                                }
+                                            }
                                             if name=="kicked" {let _=media.stop(generation);let _=screen.leave(generation);}
                                             if name=="force-muted" {let _=media.configure(generation);}
                                             if name=="request-error" || name=="service-limit" || name=="chat-rate-limited" { notice(&app,"O servidor recusou a operação. Aguarde antes de tentar novamente."); }
