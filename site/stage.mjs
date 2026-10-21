@@ -1,6 +1,6 @@
 // Builds the Cloudflare Pages site (triscord.pages.dev) into desktop/out/site-dist: the pages from this folder plus the
 // current installer under /download/, with its version, size and SHA-256 filled in. The installer comes from
-// desktop/out/portable-web-package.json (written by scripts/portable-web.ps1), never from the repository.
+// desktop/out/portable-web-package.json (written by desktop-rust/package.ps1), never from the repository.
 // Deploy (only with the owner's OK): npx wrangler pages deploy desktop/out/site-dist --project-name triscord --branch main
 import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
