@@ -78,7 +78,7 @@
 .tri-titlebar__title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: var(--space-8); pointer-events: none; }
 .tri-titlebar__title .tri-server-acronym, .tri-titlebar__title .tri-server-icon { border-radius: var(--radius-xs); font-size: 7px; }
 .tri-titlebar__name { font-size: 14px; font-weight: var(--font-weight-medium); color: var(--text-default); }
-.tri-titlebar__buttons { position: relative; display: flex; gap: var(--space-4); color: var(--interactive-text-default); -webkit-app-region: no-drag; }
+.tri-titlebar__buttons { position: relative; display: flex; margin-left: auto; gap: var(--space-4); color: var(--interactive-text-default); -webkit-app-region: no-drag; }
 .tri-winbutton { display: flex; align-items: center; justify-content: center; width: var(--custom-app-top-bar-height); height: var(--custom-app-top-bar-height); }
 .tri-winbutton:hover { background: var(--interactive-background-hover); color: var(--interactive-text-hover); }
 .tri-winbutton--close:hover { background: var(--control-critical-primary-background-default); color: var(--white); }

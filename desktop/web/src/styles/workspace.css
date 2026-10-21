@@ -356,17 +356,37 @@
   justify-content: space-between;
   height: 32px;
   min-height: 32px;
-  padding: 0 0 0 16px;
+  padding: 0;
   background: var(--ui-canvas);
   border-bottom: 1px solid var(--ui-border);
   user-select: none;
+}
+:root[data-design="workspace"] .tri-titlebar--bare {
+  justify-content: flex-end;
+  padding: 0;
+}
+:root[data-design="workspace"] .tri-titlebar--overlay {
+  position: fixed;
+  z-index: 100;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: transparent;
+  border-bottom: none;
 }
 :root[data-design="workspace"] .tri-titlebar__left {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  padding-left: 16px;
   pointer-events: none;
+}
+:root[data-design="workspace"] .tri-titlebar__buttons {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0;
 }
 :root[data-design="workspace"] .tri-titlebar__brand {
   display: flex;
