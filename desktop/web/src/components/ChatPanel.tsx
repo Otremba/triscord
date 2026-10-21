@@ -147,7 +147,7 @@ export function ChatPanel({ channelName, messages, avatars, bridge, onClose }: {
     const prev = messages[i - 1];
     const newDay = !prev || !sameDay(new Date(prev.timestamp), new Date(m.timestamp));
     if (newDay) items.push(<li key={`d-${m.id}`} class="tri-divider" role="separator"><span class="tri-divider__content">{dayLabel(m.timestamp)}</span></li>);
-    const groupStart = newDay || prev.authorId !== m.authorId || m.timestamp - prev.timestamp >= 7 * MINUTE;
+    const groupStart = newDay || prev.authorId !== m.authorId || m.timestamp - prev.timestamp >= 5 * MINUTE;
     items.push(<Message key={m.id} message={m} groupStart={groupStart} bridge={bridge} avatars={avatars} />);
   });
   return (

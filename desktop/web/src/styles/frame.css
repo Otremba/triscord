@@ -32,24 +32,32 @@
 .tri-rail__pill-wrapper { position: absolute; inset-inline-start: 0; top: 0; display: flex; align-items: center; width: 8px; height: 100%; overflow: hidden; contain: layout size; }
 .tri-rail__pill {
   display: block; width: 8px; height: 8px; margin-inline-start: -4px; border-radius: 0 4px 4px 0;
-  background: var(--text-strong); opacity: 0; transform: translateX(-4px) translateZ(0);
-  transition: height .2s ease-out, opacity .2s ease-out, transform .2s ease-out;
+  background: var(--text-strong, #fff); opacity: 0; transform: translateX(-4px) translateZ(0);
+  transition: height .15s cubic-bezier(0.4, 0, 0.2, 1), opacity .15s cubic-bezier(0.4, 0, 0.2, 1), transform .15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .tri-rail__pill--unread, .tri-rail__pill--hovered, .tri-rail__pill--selected { opacity: 1; transform: translateX(0) translateZ(0); }
 .tri-rail__pill--hovered { height: 20px; }
 .tri-rail__pill--selected { height: 40px; }
-.tri-rail__button, .tri-rail__circle { display: flex; width: var(--guildbar-avatar-size); height: var(--guildbar-avatar-size); border-radius: var(--radius-md); overflow: hidden; }
+.tri-rail__button, .tri-rail__circle {
+  display: flex; width: var(--guildbar-avatar-size); height: var(--guildbar-avatar-size);
+  border-radius: 50%; overflow: hidden;
+  transition: border-radius .2s cubic-bezier(0.4, 0, 0.2, 1), background-color .15s ease-out, color .15s ease-out;
+}
+.tri-rail__button:hover, .tri-rail__button.is-selected, .tri-rail__circle:hover {
+  border-radius: 16px;
+}
 .tri-server-acronym {
   display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 100%; height: 100%; border-radius: inherit;
   background: var(--background-mod-subtle); color: var(--text-default);
   font-size: 16px; font-weight: var(--font-weight-medium); line-height: 1.2em; white-space: nowrap;
   transition: background-color .15s ease-out, color .15s ease-out;
 }
 .tri-rail__button:hover .tri-server-acronym, .tri-rail__button.is-selected .tri-server-acronym { background: var(--background-brand); color: var(--white); }
-.tri-server-icon { display: block; object-fit: cover; }
+.tri-server-icon { display: block; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
 .tri-rail__circle {
   align-items: center; justify-content: center; background: var(--background-mod-subtle); color: var(--text-default);
-  transition: color .15s ease-out, background-color .15s ease-out;
+  transition: border-radius .2s cubic-bezier(0.4, 0, 0.2, 1), color .15s ease-out, background-color .15s ease-out;
 }
 .tri-rail__circle:hover { background: var(--background-brand); color: var(--white); }
 
@@ -77,7 +85,7 @@
 }
 .tri-category__toggle { display: flex; align-items: center; gap: 4px; height: 100%; min-width: 0; color: inherit; }
 .tri-category__name { font-size: 14px; font-weight: var(--font-weight-medium); white-space: nowrap; }
-.tri-category__chevron { transition: transform .1s linear; }
+.tri-category__chevron { transition: transform .15s cubic-bezier(0.4, 0, 0.2, 1); }
 .tri-category__chevron.is-collapsed { transform: rotate(-90deg); }
 .tri-category__header:hover .tri-category__toggle { color: var(--interactive-text-hover); }
 .tri-category__add { display: flex; width: 16px; height: 16px; color: var(--channels-default); }

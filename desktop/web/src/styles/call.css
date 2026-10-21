@@ -11,8 +11,17 @@
 .tri-voice-user__muted { color: inherit; }
 .tri-avatar--24 { width: 24px; height: 24px; }
 .tri-avatar--24 .tri-avatar__letter { font-size: 11px; }
-.tri-voice-user.is-speaking .tri-avatar { box-shadow: 0 0 0 2px var(--status-positive); }
-.tri-live-badge { flex: 0 0 auto; padding: 0 4px; border-radius: var(--radius-xs); background: var(--status-danger); color: var(--white); font-size: 11px; font-weight: var(--font-weight-bold); line-height: 16px; }
+.tri-voice-user.is-speaking .tri-avatar {
+  box-shadow: 0 0 0 2px #23a55a;
+  animation: tri-speaking-pulse 1.5s infinite ease-in-out;
+  transition: box-shadow .15s ease-out;
+}
+@keyframes tri-speaking-pulse {
+  0% { box-shadow: 0 0 0 2px #23a55a; }
+  50% { box-shadow: 0 0 0 2px #23a55a, 0 0 6px rgba(35, 165, 90, 0.55); }
+  100% { box-shadow: 0 0 0 2px #23a55a; }
+}
+.tri-live-badge { flex: 0 0 auto; padding: 0 6px; border-radius: 8px; background: var(--badge-notification-background, #d22d39); color: var(--white); font-size: 11px; font-weight: var(--font-weight-bold); line-height: 16px; text-transform: uppercase; letter-spacing: .02em; }
 
 /* Stage: black, cards centred (CALLS.md "fundo preto") */
 .tri-call { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--black); }
@@ -22,7 +31,15 @@
   position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-sm); overflow: hidden;
   display: flex; align-items: center; justify-content: center; background: var(--background-surface-high);
 }
-.tri-call-card.is-speaking, .tri-call-grid .tri-video-tile.is-speaking { box-shadow: inset 0 0 0 2px var(--status-positive); }
+.tri-call-card.is-speaking, .tri-call-grid .tri-video-tile.is-speaking {
+  box-shadow: inset 0 0 0 2px #23a55a;
+  animation: tri-stage-speaking 1.5s infinite ease-in-out;
+}
+@keyframes tri-stage-speaking {
+  0% { box-shadow: inset 0 0 0 2px #23a55a; }
+  50% { box-shadow: inset 0 0 0 2px #23a55a, inset 0 0 10px rgba(35, 165, 90, 0.45); }
+  100% { box-shadow: inset 0 0 0 2px #23a55a; }
+}
 .tri-avatar--80 { width: 80px; height: 80px; }
 .tri-avatar--80 .tri-avatar__letter { font-size: 32px; }
 .tri-call-card__pill {
@@ -31,10 +48,15 @@
 }
 
 /* Controls bar */
-.tri-call-controls { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; }
-/* Capsules: Discord .buttonSection_a83780 (current cache): --background-mod-subtle over the black call, --border-muted,
-   radius 12, padding 4; sections 12px apart (.panelRow). Measured near-black in the call (audit 18/10). */
-.tri-call-capsule { display: flex; align-items: center; gap: 8px; height: 50px; padding: 4px; border: 1px solid var(--border-muted); border-radius: 12px; background: var(--background-mod-subtle); }
+.tri-call-controls { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; z-index: 10; }
+/* Capsules: Discord translucent with backdrop-filter blur */
+.tri-call-capsule {
+  display: flex; align-items: center; gap: 8px; height: 50px; padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;
+  background: rgba(30, 31, 34, 0.8);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
 .tri-call-button {
   display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px;
   color: var(--interactive-text-default); transition: background .15s ease-in-out, color .15s ease-in-out;
@@ -48,9 +70,12 @@
 .tri-call-button.is-green { background: var(--green-360); color: var(--white); }
 .tri-call-disconnect {
   display: flex; align-items: center; justify-content: center; width: 64px; height: 50px; border-radius: 12px;
-  background: var(--control-critical-primary-background-default); color: var(--control-critical-primary-text-default); transition: background .15s ease-in-out;
+  background: var(--control-critical-primary-background-default); color: var(--control-critical-primary-text-default);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: background .15s ease-in-out, transform .1s ease;
 }
 .tri-call-disconnect:hover { background: var(--control-critical-primary-background-hover); }
+.tri-call-disconnect:active { transform: scale(0.97); }
 
 /* "Voz conectada" section of the account panel */
 .tri-voice-panel { padding: 12px 11px 13px; border-bottom: 1px solid var(--border-subtle); }

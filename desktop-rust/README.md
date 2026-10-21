@@ -56,3 +56,6 @@ Recepção de vídeo: conexão de tela permanece ativa ao parar a publicação; 
 
 Estabilização e produção a custo zero: suporte a endpoints de mídia redundantes (`sslip.io`, `nip.io`, `duckdns`), sincronização de estados de usuários em chamada via LiveKit Data Channels (`RoomEvent::DataReceived`), módulo de áudio loopback por processo (`audio_loopback.rs`), catálogo de soundboard e tons nativos (`sound.rs`) e módulo de auto-atualização silenciosa com verificação SHA-256 e semver (`updater.rs`). Passaram 63 testes unitários sem interface, contrato IPC, TypeScript e compilação MSVC. Nenhum app/dispositivo foi aberto: `runtimeVerified=false`.
 
+Paridade visual e acabamento estético com REA: tokens extraídos com evidências computadas do Discord (`tokens.generated.css`), animação do pill branco do guild rail com curvas bezier oficiais (hover 20px / ativo 40px), transição de squircle suave no hover de ícones de servidores (50% circular para 16px arredondado), anel de fala verde pulsante (`#23a55a`) no avatar ativado pelo LiveKit, badge vermelho "AO VIVO", agrupamento temporal de mensagens em janelas de 5 minutos, parser client-side de Markdown com blocos de código com destaque de sintaxe, botão de cópia de código e revelação de spoilers (`||texto||`), e barra de controles flutuantes translúcida com `backdrop-filter: blur(12px)`.
+
+

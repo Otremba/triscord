@@ -20,3 +20,13 @@
 .tri-markdown__spoiler.is-revealed>.tri-markdown__spoiler-content { visibility:visible; }
 .tri-markdown__spoiler:focus-visible { outline:2px solid var(--text-link); outline-offset:2px; }
 .tri-markdown__error { display:block; color:var(--text-feedback-critical); font-size:14px; }
+
+.tri-codeblock-wrapper { position: relative; margin: .25rem 0; }
+.tri-codeblock-lang { position: absolute; top: 6px; right: 36px; font-size: 11px; font-weight: 600; color: var(--text-muted); font-family: var(--font-code); text-transform: lowercase; pointer-events: none; }
+.tri-codeblock-copy { position: absolute; top: 4px; right: 4px; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; background: rgba(0, 0, 0, 0.4); color: var(--interactive-icon-default); border: none; cursor: pointer; opacity: 0; transition: opacity .15s ease, background-color .15s ease, color .15s ease; }
+.tri-codeblock-wrapper:hover .tri-codeblock-copy { opacity: 1; }
+.tri-codeblock-copy:hover { color: var(--interactive-icon-hover); background: rgba(0, 0, 0, 0.7); }
+.tri-code-keyword { color: #f47067; font-weight: 600; }
+.tri-code-string { color: #96d0ff; }
+.tri-code-comment { color: #8b949e; font-style: italic; }
+.tri-code-number { color: #d2a8ff; }

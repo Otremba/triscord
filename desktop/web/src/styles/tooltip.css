@@ -3,7 +3,7 @@
 .tri-tooltip-anchor { position: fixed; z-index: 1002; width: 0; height: 0; pointer-events: none; }
 .tri-tooltip {
   position: absolute; box-sizing: border-box; width: max-content; max-width: 190px; border: 1px solid var(--border-subtle); border-radius: 8px;
-  background-color: var(--background-surface-high); box-shadow: var(--shadow-high); color: var(--text-default);
+  background-color: var(--background-surface-high); box-shadow: var(--shadow-high, 0 8px 16px rgba(0, 0, 0, 0.24)); color: var(--text-default);
   font-size: 14px; font-weight: var(--font-weight-medium); line-height: 16px; word-wrap: break-word; white-space: nowrap; text-align: center;
   animation: tri-tooltip-in var(--tri-spring-tooltip-duration) var(--tri-spring-tooltip) both;
 }

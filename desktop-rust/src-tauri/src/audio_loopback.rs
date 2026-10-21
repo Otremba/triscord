@@ -10,6 +10,7 @@ pub struct LoopbackConfig {
     pub channels: u16,
 }
 
+#[allow(dead_code)]
 impl LoopbackConfig {
     pub fn new(target_pid: u32, sample_rate: u32, channels: u16) -> Result<Self> {
         if target_pid == 0 || target_pid == std::process::id() {
