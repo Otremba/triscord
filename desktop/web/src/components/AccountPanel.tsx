@@ -52,17 +52,17 @@ export function AccountPanel({ session, bridge }: { session: Session; bridge: Br
         </div>
       )}
       {channel && (
-        <div class="tri-voice-panel tri-glass-panel border-b border-white/10" data-connection-tone={status.tone}>
+        <div class="tri-voice-panel" data-connection-tone={status.tone}>
           <div class="tri-voice-panel__top">
             <div class="flex items-center gap-2">
               <Icon name="ConnectionFine" size={20} className="tri-voice-panel__signal" />
             </div>
             <div class="tri-voice-panel__texts" role="status" aria-live="polite" aria-atomic="true">
-              <span class="tri-voice-panel__title font-semibold text-white">{status.label}</span>
-              <span class="tri-voice-panel__room text-xs text-slate-400">{channel.name} / {server?.name ?? 'Triscord'}</span>
+              <span class="tri-voice-panel__title">{status.label}</span>
+              <span class="tri-voice-panel__room">{channel.name} / {server?.name ?? 'Triscord'}</span>
             </div>
             <Tooltip text="Desconectar">
-              <button class="tri-account__button hover:text-red-400" aria-label="Desconectar" onClick={() => bridge.send({ name: 'leaveVoice' })}>
+              <button class="tri-account__button" aria-label="Desconectar" onClick={() => bridge.send({ name: 'leaveVoice' })}>
                 <Icon name="Disconnect" size={20} />
               </button>
             </Tooltip>

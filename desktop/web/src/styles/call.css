@@ -23,58 +23,59 @@
 .tri-live-badge { flex: 0 0 auto; padding: 0 6px; border-radius: 8px; background: var(--badge-notification-background, #d22d39); color: var(--white); font-size: 11px; font-weight: var(--font-weight-bold); line-height: 16px; text-transform: uppercase; letter-spacing: .02em; }
 
 /* Stage: black, cards centred (CALLS.md "fundo preto") */
-.tri-call { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--black); }
+.tri-call { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; background: var(--ui-canvas, #0b0c10); }
 /* 64px above the cards: the call header floats over the stage (measured: first card 64px below the page top). */
-.tri-call-grid { flex: 1 1 auto; min-height: 0; display: grid; gap: 8px; align-content: center; justify-content: center; padding: 64px 16px 90px; overflow: hidden; }
+.tri-call-grid { flex: 1 1 auto; min-height: 0; display: grid; gap: 10px; align-content: center; justify-content: center; padding: 64px 16px 90px; overflow: hidden; }
 .tri-call-card, .tri-call-grid .tri-video-tile {
-  position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-sm); overflow: hidden;
-  display: flex; align-items: center; justify-content: center; background: var(--background-surface-high);
+  position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; background: var(--ui-panel, #161822);
+  border: 1px solid var(--ui-border, #3b3e3f); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: box-shadow .15s ease-out, border-color .15s ease-out;
 }
 .tri-call-card.is-speaking, .tri-call-grid .tri-video-tile.is-speaking {
-  box-shadow: inset 0 0 0 2px #23a55a;
-  animation: tri-stage-speaking 1.5s infinite ease-in-out;
+  box-shadow: inset 0 0 0 2px var(--ui-positive, #8fc6a9), inset 0 0 14px rgba(143, 198, 169, 0.2);
+  border-color: var(--ui-positive, #8fc6a9);
 }
-@keyframes tri-stage-speaking {
-  0% { box-shadow: inset 0 0 0 2px #23a55a; }
-  50% { box-shadow: inset 0 0 0 2px #23a55a, inset 0 0 10px rgba(35, 165, 90, 0.45); }
-  100% { box-shadow: inset 0 0 0 2px #23a55a; }
-}
-.tri-avatar--80 { width: 80px; height: 80px; }
-.tri-avatar--80 .tri-avatar__letter { font-size: 32px; }
+.tri-avatar--80 { width: 80px; height: 80px; border-radius: 50%; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); }
+.tri-avatar--80 .tri-avatar__letter { font-size: 32px; font-weight: var(--font-weight-bold); }
 .tri-call-card__pill {
-  position: absolute; inset-inline-start: 12px; bottom: 12px; display: flex; align-items: center; gap: 4px; height: 32px;
-  padding: 0 8px; border-radius: var(--radius-sm); background: rgb(0 0 0 / .6); color: var(--white); font-size: 16px; font-weight: var(--font-weight-medium);
+  position: absolute; inset-inline-start: 12px; bottom: 12px; display: flex; align-items: center; gap: 6px; height: 28px;
+  padding: 0 10px; border-radius: 6px; background: rgba(11, 12, 16, 0.78); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08); color: var(--ui-text, #f0f2f5); font-size: 13px; font-weight: var(--font-weight-medium);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); pointer-events: none;
 }
 
 /* Controls bar */
-.tri-call-controls { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; z-index: 10; }
-/* Capsules: Discord translucent with backdrop-filter blur */
+.tri-call-controls { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; z-index: 10; }
+/* Capsules: sleek translucent pill with backdrop blur and border */
 .tri-call-capsule {
-  display: flex; align-items: center; gap: 8px; height: 50px; padding: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;
-  background: rgba(30, 31, 34, 0.8);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  display: flex; align-items: center; gap: 6px; height: 50px; padding: 5px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px;
+  background: rgba(22, 24, 34, 0.88);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 .tri-call-button {
-  display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px;
-  color: var(--interactive-text-default); transition: background .15s ease-in-out, color .15s ease-in-out;
+  display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px;
+  color: var(--ui-muted, #a3aab6); transition: background-color .12s ease-out, color .12s ease-out, transform .1s ease-out;
 }
-.tri-call-button:hover { background: var(--background-mod-muted); color: var(--interactive-text-active); }
+.tri-call-button:hover { background: rgba(255, 255, 255, 0.08); color: var(--ui-text, #ffffff); }
+.tri-call-button:active { transform: scale(0.94); }
 .tri-call-attached { display: flex; align-items: center; }
-.tri-call-button--mic { width: 36px; border-radius: 8px 0 0 8px; }
-.tri-call-button--caret { width: 16px; margin-inline-start: 1px; border-radius: 0 8px 8px 0; }
-.tri-call-button.is-red { background: var(--opacity-red-12); color: var(--red-400); }
-.tri-call-button.is-red:hover { background: var(--opacity-red-16); }
-.tri-call-button.is-green { background: var(--green-360); color: var(--white); }
+.tri-call-button--mic { width: 38px; border-radius: 10px 0 0 10px; }
+.tri-call-button--caret { width: 18px; margin-inline-start: 1px; border-radius: 0 10px 10px 0; }
+.tri-call-button.is-red { background: rgba(231, 160, 168, 0.16); color: var(--ui-critical, #e7a0a8); }
+.tri-call-button.is-red:hover { background: rgba(231, 160, 168, 0.24); color: #ffffff; }
+.tri-call-button.is-green { background: rgba(143, 198, 169, 0.18); color: var(--ui-positive, #8fc6a9); }
+.tri-call-button.is-green:hover { background: rgba(143, 198, 169, 0.26); color: #ffffff; }
 .tri-call-disconnect {
-  display: flex; align-items: center; justify-content: center; width: 64px; height: 50px; border-radius: 12px;
-  background: var(--control-critical-primary-background-default); color: var(--control-critical-primary-text-default);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  transition: background .15s ease-in-out, transform .1s ease;
+  display: flex; align-items: center; justify-content: center; width: 60px; height: 50px; border-radius: 14px;
+  background: #da373c; color: #ffffff;
+  box-shadow: 0 4px 16px rgba(218, 55, 60, 0.35);
+  transition: background-color .12s ease-out, box-shadow .12s ease-out, transform .1s ease-out;
 }
-.tri-call-disconnect:hover { background: var(--control-critical-primary-background-hover); }
-.tri-call-disconnect:active { transform: scale(0.97); }
+.tri-call-disconnect:hover { background: #c03135; box-shadow: 0 6px 20px rgba(218, 55, 60, 0.5); }
+.tri-call-disconnect:active { transform: scale(0.95); }
 
 /* "Voz conectada" section of the account panel */
 .tri-voice-panel { padding: 12px 11px 13px; border-bottom: 1px solid var(--border-subtle); }

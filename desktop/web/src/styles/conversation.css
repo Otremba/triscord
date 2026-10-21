@@ -27,18 +27,55 @@
 :root[data-design="workspace"] .tri-app--workspace:not(.tri-app--call-fullscreen) .tri-page__main--conversation.tri-page__main--focused>.tri-call { flex-basis:60%;min-height:240px;max-height:none; }
 :root[data-design="workspace"] .tri-page__main--conversation>.tri-chat-panel { height:auto;flex:1 1 0; }
 :root[data-design="workspace"] .tri-app--workspace:not(.tri-app--call-fullscreen) .tri-call-grid { padding:24px 16px 80px;gap:16px; }
-:root[data-design="workspace"] :is(.tri-call-capsule,.tri-call-attached,.tri-call-button,.tri-call-disconnect) { box-shadow:none;backdrop-filter:none; }
-:root[data-design="workspace"] .tri-call-capsule { border:1px solid var(--ui-border);background:var(--ui-panel); }
-:root[data-design="workspace"] .tri-call-button { background:var(--ui-field); }
-:root[data-design="workspace"] .tri-call-button.is-red { background:var(--ui-critical-bg);color:var(--ui-critical); }
-:root[data-design="workspace"] .tri-call-disconnect { background:var(--ui-critical-button);color:var(--ui-critical-text); }
-:root[data-design="workspace"] :is(.tri-call-card,.tri-video-tile) { border-radius:12px;box-shadow:none; }
-:root[data-design="workspace"] .tri-call-card { background:var(--ui-panel);border:1px solid var(--ui-border); }
-:root[data-design="workspace"] .tri-call-card--grid { padding-bottom:24px; }
-:root[data-design="workspace"] .tri-call-card.is-speaking { outline:2px solid var(--ui-positive);box-shadow:none;animation:none; }
-:root[data-design="workspace"] .tri-app--workspace .tri-call.is-idle .tri-call-bottom,
-:root[data-design="workspace"] .tri-app--workspace .tri-page__main.is-idle .tri-channel-header { opacity:1;visibility:visible;pointer-events:auto; }
-:root[data-design="workspace"] .tri-app--workspace .tri-call.is-idle .tri-call-bottom>* { pointer-events:auto; }
+:root[data-design="workspace"] .tri-call-capsule {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(22, 24, 34, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+:root[data-design="workspace"] .tri-call-button {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ui-muted);
+}
+:root[data-design="workspace"] .tri-call-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ui-text);
+}
+:root[data-design="workspace"] .tri-call-button.is-red {
+  background: rgba(231, 160, 168, 0.18);
+  color: var(--ui-critical);
+}
+:root[data-design="workspace"] .tri-call-button.is-green {
+  background: rgba(143, 198, 169, 0.2);
+  color: var(--ui-positive);
+}
+:root[data-design="workspace"] .tri-call-disconnect {
+  background: #da373c;
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(218, 55, 60, 0.35);
+}
+:root[data-design="workspace"] .tri-call-disconnect:hover {
+  background: #c03135;
+  box-shadow: 0 6px 20px rgba(218, 55, 60, 0.5);
+}
+:root[data-design="workspace"] :is(.tri-call-card,.tri-video-tile) {
+  border-radius: 12px;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+:root[data-design="workspace"] .tri-call-card.is-speaking {
+  outline: 2px solid var(--ui-positive);
+  outline-offset: -2px;
+  box-shadow: inset 0 0 14px rgba(143, 198, 169, 0.2);
+}
+:root[data-design="workspace"] .tri-app--workspace .tri-call.is-idle:not(:hover):not(:focus-within) .tri-call-bottom,
+:root[data-design="workspace"] .tri-app--workspace .tri-page__main.is-idle:not(:hover):not(:focus-within) .tri-channel-header {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
 
 :root[data-design="workspace"] .tri-chat-panel { display:flex;flex-direction:column;background:var(--ui-canvas);min-height:0;overflow:hidden; }
 :root[data-design="workspace"] .tri-chat-panel__scroller { flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:16px 8px 24px; }
