@@ -129,7 +129,6 @@
 :root[data-design="workspace"] .tri-composer__send:hover:not(:disabled) { background:var(--ui-primary-hover); }
 :root[data-design="workspace"] .tri-composer__send:not(:disabled):active { transform:scale(0.97); }
 :root[data-design="workspace"] .tri-composer__send:disabled { opacity:0.4;cursor:not-allowed;border-color:var(--ui-border);background:var(--ui-field);color:var(--ui-muted); }
-:root[data-design="workspace"] .tri-composer__hint { display:block;margin-top:8px;color:var(--ui-subtle);font-size:12px;line-height:16px; }
 
 @media (max-width:1100px) {
   :root[data-design="workspace"] { --conversation-gutter:16px; }
@@ -146,5 +145,4 @@
 @media (max-height:700px) {
   :root[data-design="workspace"] .tri-app--workspace:not(.tri-app--call-fullscreen) .tri-page__main--conversation>.tri-call { min-height:208px;flex-basis:38%; }
   :root[data-design="workspace"] .tri-conversation-heading { padding-top:8px; }
-  :root[data-design="workspace"] .tri-composer__hint { display:none; }
 }

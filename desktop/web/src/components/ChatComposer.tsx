@@ -89,7 +89,6 @@ export function ChatComposer({ channelName, bridge, onSent }: {
           </button>
         </div>
       </div>
-      <span class="tri-composer__hint">Enter para enviar <span aria-hidden="true">·</span> Shift + Enter para uma nova linha</span>
     </form>
   );
 }
