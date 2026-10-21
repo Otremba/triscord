@@ -100,7 +100,8 @@
    motion.generated.css. Entering: scrim fades in, the dialog fades in 64ms later. Closing: scrim fades out with the
    same spring; the dialog fades out and scales to 0.9 with the close spring. */
 .tri-modal-backdrop { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.tri-modal-backdrop::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--background-scrim);
+.tri-modal-backdrop::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--background-scrim, rgba(0, 0, 0, 0.72));
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   animation: tri-fade-in var(--tri-spring-modal-in-duration) var(--tri-spring-modal-in) both; }
 .tri-modal-backdrop > * { animation: tri-fade-in var(--tri-spring-modal-in-duration) var(--tri-spring-modal-in) 64ms both; }
 .tri-modal-backdrop.is-closing { pointer-events: none; }

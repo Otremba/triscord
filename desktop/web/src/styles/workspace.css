@@ -316,11 +316,306 @@
 :root[data-design="workspace"] .tri-voice-panel__button { height:34px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-field); }
 :root[data-design="workspace"] .tri-account__button.is-red { background:var(--ui-critical-bg);color:var(--ui-critical);box-shadow:none; }
 
-/* Shared surfaces: no per-screen palette or decorative animation. */
-:root[data-design="workspace"] :is(.tri-menu,.tri-modal,.tri-dmodal,.tri-audio-menu,.tri-account-popover,.tri-participant-profile,.tri-peer-audio,.tri-soundboard,.tri-settings) { color:var(--ui-text);border-color:var(--ui-border);box-shadow:0 12px 32px #0004;backdrop-filter:none; }
-:root[data-design="workspace"] :is(.tri-modal,.tri-dmodal) { border-radius:14px; }
-:root[data-design="workspace"] :is(.tri-menu,.tri-audio-menu) { border-radius:10px;background:var(--ui-panel); }
-:root[data-design="workspace"] .tri-menu__item:not(.is-danger):hover { background:var(--ui-selected);color:var(--ui-primary-text); }
+/* Shared floating surfaces: Ônix palette with clean elevation and crisp borders */
+:root[data-design="workspace"] :is(.tri-menu,.tri-modal,.tri-dmodal,.tri-audio-menu,.tri-account-popover,.tri-participant-profile,.tri-peer-audio,.tri-soundboard,.tri-settings) {
+  color: var(--ui-text);
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-border);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
+  backdrop-filter: none;
+}
+:root[data-design="workspace"] :is(.tri-modal,.tri-dmodal) {
+  border-radius: 14px;
+}
+:root[data-design="workspace"] .tri-dmodal__section {
+  padding: 16px 24px;
+}
+:root[data-design="workspace"] .tri-dmodal__close {
+  border-radius: 8px;
+  color: var(--ui-muted);
+  transition: background-color var(--ui-motion), color var(--ui-motion), transform 0.1s ease;
+}
+:root[data-design="workspace"] .tri-dmodal__close:hover {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+:root[data-design="workspace"] .tri-dmodal__close:active {
+  transform: scale(0.94);
+}
+:root[data-design="workspace"] .tri-button {
+  height: 40px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: background-color var(--ui-motion), border-color var(--ui-motion), color var(--ui-motion), transform 0.1s ease;
+}
+:root[data-design="workspace"] .tri-button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+:root[data-design="workspace"] .tri-button--primary {
+  background: var(--ui-primary);
+  color: var(--ui-primary-text);
+  border-color: var(--ui-accent-border);
+}
+:root[data-design="workspace"] .tri-button--primary:hover:not(:disabled) {
+  background: var(--ui-primary-hover);
+}
+:root[data-design="workspace"] .tri-button--secondary {
+  background: var(--ui-field);
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+}
+:root[data-design="workspace"] .tri-button--secondary:hover:not(:disabled) {
+  background: var(--ui-hover);
+  border-color: var(--ui-border-strong);
+}
+:root[data-design="workspace"] .tri-button--critical {
+  background: #da373c;
+  color: #ffffff;
+}
+:root[data-design="workspace"] .tri-button--critical:hover:not(:disabled) {
+  background: #c03135;
+}
+:root[data-design="workspace"] :is(.tri-text-input, .tri-copy-input) {
+  height: 40px;
+  border-radius: 8px;
+  background: var(--ui-field);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  transition: border-color var(--ui-motion), box-shadow var(--ui-motion);
+}
+:root[data-design="workspace"] :is(.tri-text-input, .tri-copy-input):focus-within {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px var(--ui-selected);
+}
+:root[data-design="workspace"] .tri-text-input__input {
+  color: var(--ui-text);
+  font-size: 14px;
+}
+:root[data-design="workspace"] .tri-text-input__prefix {
+  color: var(--ui-muted);
+}
+:root[data-design="workspace"] .tri-copy-input__button {
+  border-radius: 6px;
+  background: var(--ui-primary);
+  color: var(--ui-primary-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+:root[data-design="workspace"] .tri-copy-input__button:hover:not(:disabled) {
+  background: var(--ui-primary-hover);
+}
+
+/* Context Menus & Audio Dropdowns */
+:root[data-design="workspace"] :is(.tri-menu, .tri-audio-menu, .tri-audio-menu__submenu) {
+  border-radius: 10px;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-border);
+  padding: 6px;
+}
+:root[data-design="workspace"] .tri-menu__item {
+  border-radius: 6px;
+  color: var(--ui-text);
+  font-size: 13.5px;
+  transition: background-color var(--ui-motion), color var(--ui-motion);
+}
+:root[data-design="workspace"] .tri-menu__item:not(.is-danger):hover,
+:root[data-design="workspace"] .tri-menu__item.is-focused:not(.is-danger) {
+  background: var(--ui-selected);
+  color: var(--ui-selected-text);
+}
+:root[data-design="workspace"] .tri-menu__item.is-danger {
+  color: var(--ui-critical);
+}
+:root[data-design="workspace"] .tri-menu__item.is-danger:hover,
+:root[data-design="workspace"] .tri-menu__item.is-danger.is-focused {
+  background: var(--ui-critical-bg);
+  color: #ffffff;
+}
+:root[data-design="workspace"] .tri-menu__separator {
+  margin: 6px 4px;
+  border-bottom: 1px solid var(--ui-border);
+}
+:root[data-design="workspace"] .tri-audio-menu button {
+  border-radius: 6px;
+  transition: background-color var(--ui-motion);
+}
+:root[data-design="workspace"] .tri-audio-menu button:hover {
+  background: var(--ui-selected);
+  color: var(--ui-selected-text);
+}
+:root[data-design="workspace"] .tri-audio-menu__submenu i.is-selected {
+  border-color: var(--ui-accent);
+  background: radial-gradient(circle, #ffffff 4px, var(--ui-accent) 4.5px);
+}
+
+/* Soundboard Popover */
+:root[data-design="workspace"] .tri-soundboard {
+  border-radius: 14px;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-border);
+}
+:root[data-design="workspace"] .tri-soundboard__search {
+  height: 40px;
+  border-radius: 8px;
+  background: var(--ui-field);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+}
+:root[data-design="workspace"] .tri-soundboard__search:focus-within {
+  border-color: var(--ui-accent);
+}
+:root[data-design="workspace"] .tri-soundboard__rail {
+  background: var(--ui-canvas);
+  border-right: 1px solid var(--ui-border);
+}
+:root[data-design="workspace"] .tri-soundboard__tile {
+  border-radius: 8px;
+  background: var(--ui-field);
+}
+:root[data-design="workspace"] .tri-soundboard__play {
+  border-radius: 8px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-field);
+  transition: background-color var(--ui-motion), border-color var(--ui-motion), transform 0.1s ease;
+}
+:root[data-design="workspace"] .tri-soundboard__tile:hover .tri-soundboard__play {
+  background: var(--ui-hover);
+  border-color: var(--ui-border-strong);
+}
+:root[data-design="workspace"] .tri-soundboard__play:active:not(:disabled) {
+  transform: scale(0.96);
+}
+:root[data-design="workspace"] .tri-soundboard__tile.is-playing .tri-soundboard__play {
+  border-color: var(--ui-positive);
+  outline: 1px solid var(--ui-positive);
+}
+
+/* Account & Participant Profile Popover */
+:root[data-design="workspace"] :is(.tri-account-popover, .tri-participant-profile) {
+  border-radius: 14px;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-border);
+}
+:root[data-design="workspace"] .tri-account-popover__status {
+  border-radius: 10px;
+  background: var(--ui-field);
+  color: var(--ui-text);
+}
+:root[data-design="workspace"] .tri-account-popover__card {
+  border-radius: 8px;
+  background: var(--ui-field);
+  border: 1px solid var(--ui-border);
+}
+:root[data-design="workspace"] .tri-account-popover__action {
+  border-radius: 6px;
+  color: var(--ui-text);
+  transition: background-color var(--ui-motion);
+}
+:root[data-design="workspace"] .tri-account-popover__action:hover {
+  background: var(--ui-hover);
+  color: #ffffff;
+}
+
+/* Settings Dialog */
+:root[data-design="workspace"] .tri-settings {
+  border-radius: 14px;
+  background: var(--ui-canvas);
+  border: 1px solid var(--ui-border);
+}
+:root[data-design="workspace"] .tri-settings__nav {
+  background: var(--ui-sidebar);
+  border-right: 1px solid var(--ui-border);
+}
+:root[data-design="workspace"] .tri-settings__item {
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--ui-muted);
+  transition: background-color var(--ui-motion), color var(--ui-motion);
+}
+:root[data-design="workspace"] .tri-settings__item:hover {
+  background: var(--ui-panel);
+  color: var(--ui-text);
+}
+:root[data-design="workspace"] .tri-settings__item.is-selected {
+  background: var(--ui-selected);
+  color: var(--ui-selected-text);
+  font-weight: 600;
+}
+:root[data-design="workspace"] .tri-settings__item.is-danger {
+  color: var(--ui-critical);
+}
+:root[data-design="workspace"] .tri-settings__item.is-danger:hover {
+  background: var(--ui-critical-bg);
+}
+:root[data-design="workspace"] .tri-settings__header {
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-canvas);
+}
+:root[data-design="workspace"] .tri-settings__close {
+  border-radius: 8px;
+  color: var(--ui-muted);
+  transition: background-color var(--ui-motion), color var(--ui-motion), transform 0.1s ease;
+}
+:root[data-design="workspace"] .tri-settings__close:hover {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+:root[data-design="workspace"] .tri-settings__close:active {
+  transform: scale(0.94);
+}
+:root[data-design="workspace"] .tri-select__value {
+  height: 40px;
+  border-radius: 8px;
+  background: var(--ui-field);
+  border: 1px solid var(--ui-border);
+  color: var(--ui-text);
+  font-size: 14px;
+  transition: border-color var(--ui-motion);
+}
+:root[data-design="workspace"] .tri-select__value:hover {
+  border-color: var(--ui-border-strong);
+}
+:root[data-design="workspace"] .tri-select__value.is-open {
+  border-color: var(--ui-accent);
+}
+:root[data-design="workspace"] .tri-select__popout {
+  border-radius: 10px;
+  background: var(--ui-panel);
+  border: 1px solid var(--ui-border);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+:root[data-design="workspace"] .tri-select__option {
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--ui-muted);
+}
+:root[data-design="workspace"] .tri-select__option:hover {
+  background: var(--ui-selected);
+  color: var(--ui-selected-text);
+}
+:root[data-design="workspace"] .tri-switch {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--ui-switch-track, #444849);
+  border: 1px solid var(--ui-border);
+}
+:root[data-design="workspace"] .tri-switch.is-on {
+  background: var(--ui-positive);
+  border-color: var(--ui-positive);
+}
+:root[data-design="workspace"] .tri-switch__knob {
+  width: 18px;
+  height: 18px;
+  top: 2px;
+  left: 2px;
+  background: #ffffff;
+}
+:root[data-design="workspace"] .tri-switch.is-on .tri-switch__knob {
+  transform: translateX(20px);
+}
 :root[data-design="workspace"] .tri-login__brand>span { background:none;color:var(--ui-text);-webkit-text-fill-color:var(--ui-text); }
 :root[data-design="workspace"] :is(.tri-login,.tri-friends) { background:var(--ui-canvas); }
 :root[data-design="workspace"] .tri-bento-card { border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel); }
@@ -435,10 +730,22 @@
 
 :root[data-design="workspace"] .tri-page { background:var(--ui-canvas); }
 :root[data-design="workspace"] .tri-voice-panel__title { color:var(--ui-text); }
+:root[data-design="workspace"] .tri-voice-panel[data-connection-tone="positive"] .tri-voice-panel__title,
+:root[data-design="workspace"] .tri-voice-panel[data-connection-tone="positive"] .tri-voice-panel__signal {
+  color: var(--ui-positive);
+}
+:root[data-design="workspace"] .tri-voice-panel[data-connection-tone="pending"] .tri-voice-panel__title,
+:root[data-design="workspace"] .tri-voice-panel[data-connection-tone="pending"] .tri-voice-panel__signal {
+  color: var(--ui-warning);
+}
+:root[data-design="workspace"] .tri-voice-panel[data-connection-tone="critical"] .tri-voice-panel__title,
+:root[data-design="workspace"] .tri-voice-panel[data-connection-tone="critical"] .tri-voice-panel__signal {
+  color: var(--ui-critical);
+}
 :root[data-design="workspace"] .tri-voice-panel__room { color:var(--ui-muted); }
 :root[data-design="workspace"] .tri-switch.is-on .tri-switch__knob { background:var(--ui-primary-text); }
 
-:root[data-design="workspace"] .tri-call-card { background:var(--ui-field);border:1px solid var(--ui-border); }
+:root[data-design="workspace"] .tri-call-card { background:var(--ui-panel);border:1px solid var(--ui-border); }
 :root[data-design="workspace"] .tri-message { background:transparent; }
 :root[data-design="workspace"] .tri-message:hover { background:var(--ui-message-hover); }
 
