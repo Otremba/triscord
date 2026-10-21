@@ -32,10 +32,10 @@ import './styles/tailwind.generated.css';
 import './styles/workspace.css';
 import './styles/workspace-themes.css';
 
-// Keep the first paint aligned with the logo-gray default; saved account preferences arrive from the core.
+// Keep the first paint aligned with the midnight default; saved account preferences arrive from the core.
 const params = new URLSearchParams(location.search);
 document.documentElement.dataset.design='workspace';
-document.documentElement.dataset.theme = params.get('theme') ?? 'dark';
+document.documentElement.dataset.theme = params.get('theme') ?? 'midnight';
 
 const bridge = createBridge(() => fixtureSession(params.get('fixture') ?? 'default'));
 const store = new SessionStore(() => bridge.send({ name: 'requestSnapshot' }));

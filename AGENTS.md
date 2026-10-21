@@ -80,3 +80,6 @@ Esta memória foi consolidada da conversa do Claude Code `66a8637f-6d60-4f38-b80
 
 - Revisão de chamada e ações (21/10): `ChannelView` sincroniza `localFocus` e despacha `setCallFocus` para expansão de vídeo no palco de destaque; `Model` Rust armazena e publica `callFocus` no snapshot e limpa ao sair/kicked/reset. `SharePicker` omite aba Dispositivos quando sem suporte a câmera ou sem dispositivos. `ParticipantMenu` adiciona "Silenciar para mim" funcional via `peer_muted` e omite sliders de volume individual indisponíveis no Tauri. `FixtureBridge` reflete foco/fullscreen/streamHidden; fixture `stream-focus` adicionado. Passaram testes unitários Node de contrato/IPC/VNodes, 105 testes Rust sem interface e compilação MSVC (`runtimeVerified=false`). Sem push/release/deploy.
 
+- Tema padrão Ônix (21/10): usuário aprovou a interface e escolheu definir o tema padrão para Ônix (`midnight` / canvas `#090B0F` preto profundo estilo AMOLED). Primeiro paint (`main.tsx`), preferências padrão Rust (`settings.rs`) e fixtures (`fixtures.ts`) atualizados para `midnight`. Passaram testes unitários Node de contrato/temas, 105 testes Rust sem interface e compilação MSVC (`runtimeVerified=false`). Binário de desenvolvimento recompilado.
+
+

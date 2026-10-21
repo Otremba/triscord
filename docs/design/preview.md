@@ -92,3 +92,8 @@ A revisão da interface de chamada e das superfícies de vídeo revelou e corrig
 - No menu de contexto do participante (`ParticipantMenu`), foi adicionado o item funcional "Silenciar para mim" (`setPeerAudio` com `muted`), suportado pela tabela `peer_muted` do núcleo Rust. Os controles deslizantes de volume individual ("Volume do usuário" e "Volume da transmissão") e "Silenciar transmissão" continuam omitidos sob a runtime Tauri, evitando erros de operação indisponível antes da implementação de mixagem DSP dedicada.
 - O `FixtureBridge` passou a refletir `setCallFocus`, `setCallFullscreen` e `setStreamHidden`. O fixture `stream-focus` permite testar a visão ampliada estaticamente. Testes de contrato cobrem a emissão desses comandos e as ações filtradas por runtime.
 
+## Tema padrão Ônix (Midnight)
+
+Em 21/10, o usuário aprovou a interface e escolheu definir o tema padrão para **Ônix** (`midnight` / canvas `#090B0F` preto profundo estilo AMOLED). O primeiro paint da interface web (`main.tsx`), as preferências padrão no núcleo Rust (`settings.rs`) e os fixtures de desenvolvimento (`fixtures.ts`) agora usam `midnight` por padrão, mantendo compatibilidade com as demais opções na tela de Aparência (Claro, Cinza, Escuro, Ônix e Algodão-doce).
+
+

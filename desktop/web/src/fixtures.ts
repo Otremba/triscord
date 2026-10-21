@@ -10,7 +10,7 @@ export function fixtureSession(name: string): Session {
     settings: {
       inputDevices: [{ id: '01', name: 'Microfone (USB Audio)' }], outputDevices: [{ id: '02', name: 'Alto-falantes (Realtek)' }],
       cameraDevices: [{ id: '03', name: 'HD Webcam' }], inputDevice: '', outputDevice: '', cameraDevice: '',
-      inputVolume: 100, outputVolume: 100, noiseSuppression: true, noiseSuppressionMode: 'high', noiseSuppressionHighAvailable: true, desktopNotifications: true, taskbarAlert: true, closeToTray: true, startMinimized: false, openAtLogin: false, loginSupported: true, soundboardVolume: 70, theme: 'dark', shareMode: 'game', shareHd: false, shareAudio: false,
+      inputVolume: 100, outputVolume: 100, noiseSuppression: true, noiseSuppressionMode: 'high', noiseSuppressionHighAvailable: true, desktopNotifications: true, taskbarAlert: true, closeToTray: true, startMinimized: false, openAtLogin: false, loginSupported: true, soundboardVolume: 70, theme: 'midnight', shareMode: 'game', shareHd: false, shareAudio: false,
     },
     servers: [
       { id: '', name: 'Triscord', owned: false },
