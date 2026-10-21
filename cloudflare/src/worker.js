@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import sanitize from '../../server/sanitize.js';
+import sanitize from '../../shared/sanitize.cjs';
 import soundCatalog from '../../shared/soundboard_catalog.json';
 import { handleErrorReports } from './error_reports.js';
 import { consumeControlRate, controlRateLimitReason } from './control_rate.js';

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "wrangler deploy --dry-run --outdir out",
-    "test": "npm run build && node tests/auth.test.mjs && node tests/password.test.mjs && node tests/media.test.mjs && node tests/migration-plan.test.mjs",
+    "test": "node --test ../shared/sanitize.test.cjs && npm run build && node tests/auth.test.mjs && node tests/password.test.mjs && node tests/media.test.mjs && node tests/migration-plan.test.mjs",
     "db:plan": "node scripts/migrate.mjs --remote",
     "db:migrate": "node scripts/migrate.mjs --remote --apply",
     "test:remote": "node tests/remote-readiness.test.mjs",

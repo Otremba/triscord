@@ -1,7 +1,5 @@
-// Builds the interface into desktop/web/dist (index.html, app.js, app.css), the folder the native host
-// maps to https://app.triscord/ in WebView2. Icons are regenerated from the C++ list first.
+// Builds the shared interface and the assets embedded by the Tauri host.
 import { build } from 'esbuild';
-import { execFileSync } from 'node:child_process';
 import postcss from 'postcss';
 import tailwindcss from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
@@ -11,12 +9,8 @@ import { fileURLToPath } from 'node:url';
 
 const web = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const tauri = process.argv.includes('--tauri');
-if (!tauri) {
-  execFileSync(process.execPath, [resolve(web, 'tools/icons-from-cpp.mjs')], { stdio: 'inherit' });
-  execFileSync(process.execPath, [resolve(web, 'tools/spring-easing.mjs')], { stdio: 'inherit' });
-}
 
-// Compile Tailwind CSS with Triscord Aurora design system config
+// Compile the shared Tailwind styles.
 const tailwindCssInput = readFileSync(resolve(web, 'src/styles/tailwind.css'), 'utf-8');
 const tailwindResult = await postcss([
   tailwindcss(resolve(web, 'tailwind.config.cjs')),

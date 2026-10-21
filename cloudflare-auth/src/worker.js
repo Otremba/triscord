@@ -1,4 +1,4 @@
-import sanitize from '../../server/sanitize.js';
+import sanitize from '../../shared/sanitize.cjs';
 import { uploadMedia, deleteMedia, serveMedia } from './profile-media.js';
 
 const { sanitizeUsername } = sanitize;
