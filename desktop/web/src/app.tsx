@@ -23,6 +23,7 @@ import { ProfileEditor } from './components/ProfileEditor';
 import { AudioMenuHost } from './components/AudioMenu';
 import { ServerRemovalModal } from './components/ServerRemovalModal';
 import { DeleteMessageModal } from './components/DeleteMessageModal';
+import { QuickSwitcher } from './components/QuickSwitcher';
 import type { ChatMessage } from './protocol';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { soundEngine } from './sound-engine';
@@ -41,6 +42,22 @@ export function App({ store, bridge, workspace = true }: { store: SessionStore; 
   const [serverModal, setServerModal] = useState(false);
   useEffect(() => { const open = () => setServerModal(true); addEventListener('tri-open-server-modal', open); return () => removeEventListener('tri-open-server-modal', open); }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setQuickSwitcherOpen(prev => !prev);
+      }
+    };
+    const open = () => setQuickSwitcherOpen(true);
+    addEventListener('keydown', onKey);
+    addEventListener('tri-open-quick-switcher', open);
+    return () => {
+      removeEventListener('keydown', onKey);
+      removeEventListener('tri-open-quick-switcher', open);
+    };
+  }, []);
   const [cameraPreviewOpen, setCameraPreviewOpen] = useState(false);
   useEffect(() => { const open = () => setCameraPreviewOpen(true); addEventListener('tri-open-camera-preview',open); return () => removeEventListener('tri-open-camera-preview',open); }, []);
   const [profileOpen,setProfileOpen]=useState(false);
@@ -138,6 +155,7 @@ export function App({ store, bridge, workspace = true }: { store: SessionStore; 
       <ParticipantProfileHost session={session} bridge={bridge}/>
       <PeerAudioHost session={session} bridge={bridge}/>
       {serverModal && <ServerModal bridge={bridge} displayName={session.account.displayName} onClose={() => setServerModal(false)} />}
+      {quickSwitcherOpen && <QuickSwitcher session={session} bridge={bridge} onClose={() => setQuickSwitcherOpen(false)} />}
     </div>
   );
 }
