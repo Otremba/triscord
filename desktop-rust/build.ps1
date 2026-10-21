@@ -1,4 +1,4 @@
-param([switch]$CheckOnly)
+param([switch]$CheckOnly, [switch]$Release)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $toolchain = if ($env:TRISCORD_TOOLCHAIN_DIR) { $env:TRISCORD_TOOLCHAIN_DIR } else { Join-Path $repo '.toolchain' }
@@ -48,7 +48,9 @@ try {
     & $cargo test --locked --target x86_64-pc-windows-msvc --manifest-path desktop-rust/src-tauri/Cargo.toml -j 2
     if ($LASTEXITCODE -ne 0) { throw 'Rust unit tests failed' }
     if (-not $CheckOnly) {
-        & $cargo build --locked --target x86_64-pc-windows-msvc --manifest-path desktop-rust/src-tauri/Cargo.toml -j 2
+        $buildArgs = @('build', '--locked', '--target', 'x86_64-pc-windows-msvc', '--manifest-path', 'desktop-rust/src-tauri/Cargo.toml', '-j', '2')
+        if ($Release) { $buildArgs += '--release' }
+        & $cargo @buildArgs
         if ($LASTEXITCODE -ne 0) { throw 'Rust executable build failed' }
     }
     Write-Output 'runtimeVerified=false; no app, installer or E2E was executed'
