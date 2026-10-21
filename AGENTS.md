@@ -13,6 +13,27 @@
 - Não interromper o aplicativo instalado ou chamadas. Não versionar credenciais, SDKs, caches ou binários.
 - Em 20/10 o usuário revogou o logout automático para evitar autorizações repetidas. Manter a sessão OAuth do Wrangler conectada e sua renovação normal para Workers e D1. Pages continua com token DPAPI. Verificar a sessão existente antes de abrir login; não pedir autorização novamente para publicações já autorizadas. Não conceder permissões de produtos adicionais sem necessidade da tarefa.
 
+## Skills do projeto
+
+- Pedido do usuário em 21/10: usar as 22 skills selecionadas pela pesquisa `find-skills`. Estão instaladas para Codex em `.agents/skills/`, além de `find-skills` (23 no total); origens e hashes registrados em `skills-lock.json`. Para restaurar as skills do lock, usar `npx.cmd skills experimental_install` e conferir o inventário com `npx.cmd skills list --agent codex`.
+- Selecionar e combinar as skills pertinentes ao trabalho em andamento, ler seu `SKILL.md` e os recursos necessários antes de aplicar. A instalação do conjunto não exige rodar 22 fluxos em toda tarefa. Instruções explícitas do usuário e deste projeto continuam prevalecendo: preservar Preact/TypeScript, o tema Ônix e a direção visual aprovada; respeitar testes, chamadas e autorizações de publicação. Não introduzir Next.js, outra biblioteca de testes ou outro fluxo de autenticação por copiar exemplos.
+
+| Trabalho | Skills a consultar |
+|---|---|
+| Falhas e regressões | `diagnosing-bugs`; `tdd` quando houver trabalho orientado por testes; `javascript-testing-patterns` para contratos e componentes web |
+| Núcleo Rust, cancelamento e concorrência | `rust-best-practices`, `rust-async-patterns`, `tauri-v2` |
+| LiveKit, áudio e transmissões | `reading-livekit-docs`, combinada com diagnóstico e Rust; conferir a versão instalada do SDK |
+| Componentes, estados e interface | `frontend-ui-engineering`, `frontend-design`, `web-design-guidelines`, `accessibility`, `typescript-advanced-types` |
+| Desempenho | `performance-optimization`; `workers-profiling` apenas com uma hipótese mensurável e um alvo/ambiente confirmados |
+| Workers, WebSockets e salas | `workers-best-practices`, `durable-objects` |
+| Segurança de contas, uploads e fronteiras de confiança | `security-review`; `rust-review` para auditoria Rust/unsafe/FFI |
+| GitHub Actions | `github-actions-hardening`; `gh-fix-ci` ao investigar falhas, adaptando o fluxo de PR à regra de commits diretos na `main` e às ferramentas disponíveis |
+| Publicação Pages/Workers/D1 | `cloudflare-deploy`, usando os scripts, DPAPI e a sessão Wrangler existentes, dentro da autorização da tarefa |
+| VPS, rede e containers LiveKit/Caddy | `docker-patterns`, distinguindo configuração de desenvolvimento e de produção |
+
+- `rust-review`: recursos completos preparados em `.agents/plugins/rust-review`, origem `trailofbits/skills`, revisão `f0dd11d2b1da17a1ff8c403741fbe1f6bca0f871`, correspondente ao `SKILL.md` instalado. Inclui 86 arquivos com scripts, prompts e agentes auxiliares; o planejador foi validado com `uv run --no-project .agents/plugins/rust-review/scripts/build_run_plan.py --help`. Ao executar uma auditoria, resolver `RUST_REVIEW_PLUGIN_ROOT` para essa pasta, seguir as etapas/parâmetros exigidos e registrar limites das ferramentas do Codex; preparar recursos não equivale a concluir uma auditoria. Não inventar disponibilidade de modelos ou ferramentas citados nos exemplos de outros agentes.
+- As skills ficam locais e ignoradas pelo Git; não versionar caches, dependências baixadas, prompts de terceiros ou binários. A configuração de uso e o lock ficam versionados. A escolha de uma skill não concede autorização adicional de E2E, uso de dispositivos, profiling de produção, push, release ou deploy.
+
 ## Estado registrado em 19/10/2026
 
 - Repositório: Otremba/triscord. Checkout principal: `C:/Users/camargo/Documents/GitHub/triscord`.
