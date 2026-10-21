@@ -1,10 +1,10 @@
 /* Saved appearance preferences adapt the same component system. No animated gradient layers. */
 :root[data-design="workspace"][data-theme="dark"] {
-  --ui-canvas:#2c2f33;
-  --ui-sidebar:#31353a;
-  --ui-panel:#383d43;
-  --ui-field:#32363b;
-  --ui-border:#535c68;
+  --ui-canvas:#282b30;
+  --ui-sidebar:#24272b;
+  --ui-panel:#30343a;
+  --ui-field:#34383f;
+  --ui-border:#464e59;
   --ui-text:#f0f2f7;
   --ui-muted:#bdc5d1;
   --ui-subtle:#b3bdcc;
@@ -93,6 +93,6 @@
 }
 
 :root[data-design="workspace"] .tri-theme--cotton-candy { background:#eaddef; }
-:root[data-design="workspace"] .tri-theme--dark { background:#2c2f33; }
+:root[data-design="workspace"] .tri-theme--dark { background:#282b30; }
 :root[data-design="workspace"] .tri-theme--darker { background:#1e2021; }
 :root[data-design="workspace"] .tri-theme--midnight { background:#090b0f; }

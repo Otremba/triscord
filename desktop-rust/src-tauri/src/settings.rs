@@ -37,7 +37,7 @@ impl Default for Preferences {
             automatic_gain_control: true,
             input_device: String::new(),
             output_device: String::new(),
-            theme: "darker".into(),
+            theme: "dark".into(),
             share_hd: false,
             share_mode: "game".into(),
             custom_status: String::new(),

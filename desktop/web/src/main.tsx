@@ -32,12 +32,10 @@ import './styles/tailwind.generated.css';
 import './styles/workspace.css';
 import './styles/workspace-themes.css';
 
-// Theme comes from the core's settings. Until they arrive, Discord's default for an account with no preference:
-// "Escuro" (ThemeStore maps UNSET to NJ8.DARK, whose class is theme-darker; web bundle, REA). Fixtures/tests may pick
-// another one with ?theme= to compare with captures.
+// Keep the first paint aligned with the logo-gray default; saved account preferences arrive from the core.
 const params = new URLSearchParams(location.search);
 document.documentElement.dataset.design='workspace';
-document.documentElement.dataset.theme = params.get('theme') ?? 'darker';
+document.documentElement.dataset.theme = params.get('theme') ?? 'dark';
 
 const bridge = createBridge(() => fixtureSession(params.get('fixture') ?? 'default'));
 const store = new SessionStore(() => bridge.send({ name: 'requestSnapshot' }));
