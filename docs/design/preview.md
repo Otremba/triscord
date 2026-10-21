@@ -48,3 +48,11 @@ TypeScript, unidades Node, 104 unidades Rust e compilação MSVC passaram. runti
 A paleta fixa da primeira aplicação do workspace anulava parte dos temas existentes. `workspace-themes.css` agora adapta Claro, Cinza, Escuro, Ônix e Algodão-doce aos mesmos componentes; Escuro mantém a direção grafite/azul aprovada. Algodão-doce usa superfícies claras suaves e destaque malva, sem camadas animadas ou gradiente de fundo. Os controles continuam gravando as mesmas chaves existentes.
 
 Cores de seleção, hover, mensagens, alertas e botões passam por tokens semânticos, incluindo aliases consumidos pelos componentes antigos. Os testes estáticos leem as duas folhas reais, resolvem aliases e verificam ausência de ciclos nos tokens utilizados, canvas distinto nas cinco preferências e contraste de pelo menos 4,5:1 nos pares de texto especificados (incluindo texto secundário, seleção, ações e erro). Isso não é uma auditoria de todos os elementos renderizados.
+
+## Continuação — foco dos modais e falha de carregamento
+
+`ModalLayer` passa a manter Tab/Shift+Tab no modal superior, focar um controle inicial quando necessário, permitir fallback sem controles e restaurar o elemento de origem quando ele ainda existe. Controles ocultos/desativados são excluídos e grupos de rádio mantêm um único ponto de Tab. A suspensão do vídeo nativo fica vinculada ao ciclo de montagem, sem alternar a cada atualização do callback. Modais recebem `aria-modal=true`; Escape ainda deixa o menu interno do seletor de transmissão fechar primeiro.
+
+A política de escolha do próximo foco é testada com listas de objetos, sem DOM: bordas, interior, foco externo, lista vazia e um único controle. Filtragem dos elementos reais, restauração, múltiplos modais, menus e interação de teclado não foram executados; esses testes unitários não comprovam a integração visual.
+
+O perfil oferece “Tentar carregar novamente” quando a consulta falha. O formulário anuncia carregamento/ocupação e as respostas de tentativas antigas continuam descartadas pelo ciclo do efeito. TypeScript, unidades Node, 104 unidades Rust e compilação MSVC passaram; runtimeVerified=false.

@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
-const bundle=await build({stdin:{contents:`export {WorkspaceNav} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
-const {WorkspaceNav,ShimmerButton,DeviceSelect,deviceChoices}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
+const bundle=await build({stdin:{contents:`export {WorkspaceNav} from './components/WorkspaceNav';export {ShimmerButton} from './components/ui/ShimmerButton';export {DeviceSelect,deviceChoices} from './components/ui/DeviceSelect';export {modalTabTarget} from './focus-policy';`,resolveDir:fileURLToPath(new URL('../src/',import.meta.url)),loader:'tsx'},bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',jsxImportSource:'preact'});
+const {WorkspaceNav,ShimmerButton,DeviceSelect,deviceChoices,modalTabTarget}=await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].contents).toString('base64')}`);
 function nodes(root){if(!root||typeof root!=='object')return [];const children=[root.props?.children].flat(Infinity);return [root,...children.flatMap(nodes)];}
 const sent=[];
 const servers=Array.from({length:8},(_,i)=>({id:`server-${i}`,name:`Espaço ${i}`,owned:i===0}));
@@ -43,3 +43,14 @@ assert.deepEqual(changes,[],'reselecting the same device must not reinitialize m
 devicePicker.props.onChange({currentTarget:{value:''}});
 assert.deepEqual(changes,[''],'selecting the system default must preserve the empty-id contract');
 console.log('Device selector: defaults, removed devices, duplicate ids and explicit changes passed without devices or DOM');
+
+const focusControls=[{name:'first'},{name:'middle'},{name:'last'}];
+assert.equal(modalTabTarget(focusControls,focusControls[0],true),focusControls[2],'Shift+Tab wraps to the last control');
+assert.equal(modalTabTarget(focusControls,focusControls[2],false),focusControls[0],'Tab wraps to the first control');
+assert.equal(modalTabTarget(focusControls,focusControls[1],false),undefined,'interior traversal stays native');
+assert.equal(modalTabTarget(focusControls,focusControls[1],true),undefined);
+assert.equal(modalTabTarget(focusControls,{name:'behind-modal'},false),focusControls[0],'focus outside is brought to the current dialog');
+assert.equal(modalTabTarget(focusControls,null,true),focusControls[2]);
+assert.equal(modalTabTarget([],null,false),null,'empty dialogs need a focusable fallback');
+assert.equal(modalTabTarget([focusControls[0]],focusControls[0],false),focusControls[0]);
+console.log('Modal focus policy: wrap, outside focus, empty and single-control dialogs passed without DOM');

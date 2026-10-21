@@ -30,9 +30,10 @@ export function ProfileEditor({session,bridge,onClose}:{session:Session;bridge:B
   const [draft,setDraft]=useState<ProfileFields>(EMPTY),[saved,setSaved]=useState<ProfileFields>(EMPTY);
   const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
   const [ready,setReady]=useState(false),[discard,setDiscard]=useState(false);
+  const [loadAttempt,setLoadAttempt]=useState(0);
   const dirty=JSON.stringify(draft)!==JSON.stringify(saved);
-  useEffect(()=>{let live=true;bridge.request<OwnProfile>({name:'getOwnProfile'}).then(p=>{if(live){setDraft(fields(p));setSaved(fields(p));setReady(true);}})
-    .catch(e=>{if(live)setError(e.message);}).finally(()=>{if(live)setLoading(false);});return()=>{live=false;};},[bridge]);
+  useEffect(()=>{let live=true;setLoading(true);setReady(false);setError('');bridge.request<OwnProfile>({name:'getOwnProfile'}).then(p=>{if(live){setDraft(fields(p));setSaved(fields(p));setReady(true);}})
+    .catch(e=>{if(live)setError(e.message);}).finally(()=>{if(live)setLoading(false);});return()=>{live=false;};},[bridge,loadAttempt]);
   const change=(key:keyof ProfileFields,value:string)=>{setMessage('');setDraft(current=>({...current,[key]:value||null}));};
   const finish=()=>{if(busy)return;if(dirty)setDiscard(true);else close();};
   const media=async(kind:'avatar'|'banner',file?:File,remove=false)=>{
@@ -47,7 +48,7 @@ export function ProfileEditor({session,bridge,onClose}:{session:Session;bridge:B
     <section class="tri-profile-editor" role="dialog" aria-label="Perfil principal">
       <header><h1>Perfil principal</h1></header>
       <button class="tri-profile-editor__close" aria-label="Fechar perfil" disabled={busy} onClick={finish}><Icon name="Close" size={24}/></button>
-      <form id="tri-profile-form" class="tri-profile-editor__body" onSubmit={async e=>{
+      <form id="tri-profile-form" class="tri-profile-editor__body" aria-busy={loading||busy} onSubmit={async e=>{
           e.preventDefault();setBusy(true);setError('');setMessage('');
           try{const p=await bridge.request<OwnProfile>({name:'saveOwnProfile',fields:draft});setDraft(fields(p));setSaved(fields(p));setMessage('Perfil salvo.');}
           catch(e){setError((e as Error).message);}finally{setBusy(false);}
@@ -91,6 +92,7 @@ export function ProfileEditor({session,bridge,onClose}:{session:Session;bridge:B
         </fieldset>
       </form>
       <footer><span role={error?'alert':'status'}>{loading?'Carregando perfil…':error||message|| (dirty?'Você tem alterações não salvas.':'')}</span>
+        {!loading&&!ready&&<button type="button" class="tri-button tri-button--secondary" disabled={busy} onClick={()=>setLoadAttempt(attempt=>attempt+1)}>Tentar carregar novamente</button>}
         <button class="tri-button tri-button--secondary" disabled={busy||loading||!dirty} onClick={()=>{setDraft(saved);setMessage('');}}>Redefinir</button>
         <ShimmerButton type="submit" form="tri-profile-form" variant="aurora" disabled={busy||!ready||!dirty}>Salvar alterações</ShimmerButton>
       </footer>
