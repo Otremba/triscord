@@ -7,7 +7,9 @@ mod error;
 mod media;
 mod model;
 mod oauth;
+mod presenter;
 mod profiles;
+mod receiver;
 mod screen;
 mod settings;
 mod socket;
@@ -26,6 +28,34 @@ async fn dispatch(
 ) -> error::Result<serde_json::Value> {
     if command.to_string().len() > 65536 {
         return Err(error::Error::invalid());
+    }
+    // Geometry must not contend with a slow login or REST request holding the core lock.
+    let presenter = app.state::<presenter::Presenter>();
+    if command["name"] == "videoSurface" {
+        let id = command["streamId"]
+            .as_str()
+            .filter(|id| id.len() <= 64)
+            .ok_or_else(error::Error::invalid)?;
+        let rect =
+            serde_json::from_value(command["rect"].clone()).map_err(|_| error::Error::invalid())?;
+        presenter.layout(
+            id,
+            rect,
+            command["scale"]
+                .as_f64()
+                .ok_or_else(error::Error::invalid)?,
+        )?;
+        return Ok(serde_json::Value::Null);
+    }
+    if command["name"] == "videoOccluders" {
+        presenter.occluders(
+            serde_json::from_value(command["rects"].clone())
+                .map_err(|_| error::Error::invalid())?,
+        )?;
+        return Ok(serde_json::Value::Null);
+    }
+    if command["name"] == "videoRole" {
+        return Ok(serde_json::Value::Null);
     }
     let mut core = state.try_lock().map_err(|_| error::Error {
         code: "busy",
@@ -48,7 +78,13 @@ fn main() {
         .setup(|app| {
             // Separate identifier/data directory; never read Qt settings or the installed app's session.
             let directory = app.path().app_local_data_dir()?;
-            let core = core::Core::new(directory, app.handle().clone())
+            let window = app
+                .get_webview_window("main")
+                .ok_or_else(|| std::io::Error::other("main window missing"))?;
+            let presenter =
+                presenter::Presenter::new(window.hwnd()?.0 as usize, app.handle().clone());
+            app.manage(presenter.clone());
+            let core = core::Core::new(directory, app.handle().clone(), presenter)
                 .map_err(|e| std::io::Error::other(e.message))?;
             app.manage(Mutex::new(core));
             Ok(())

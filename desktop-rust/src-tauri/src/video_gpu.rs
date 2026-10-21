@@ -17,6 +17,7 @@ pub struct Converter {
     source: (u32, u32),
     enumerator: Option<ID3D11VideoProcessorEnumerator>,
     processor: Option<ID3D11VideoProcessor>,
+    receiving: bool,
 }
 impl Converter {
     pub fn new(device: ID3D11Device, context: ID3D11DeviceContext, config: Config) -> Result<Self> {
@@ -37,7 +38,38 @@ impl Converter {
             source: (0, 0),
             enumerator: None,
             processor: None,
+            receiving: false,
         })
+    }
+    pub fn receiver(
+        device: ID3D11Device,
+        context: ID3D11DeviceContext,
+        width: u32,
+        height: u32,
+    ) -> Result<Self> {
+        if width < 2
+            || height < 2
+            || width > 8192
+            || height > 8192
+            || width % 2 != 0
+            || height % 2 != 0
+        {
+            return Err(Error::from_hresult(E_INVALIDARG));
+        }
+        let mut converter = Self::new(
+            device,
+            context,
+            Config {
+                width: 64,
+                height: 64,
+                fps: 60,
+                bitrate: 8_000_000,
+            },
+        )?;
+        converter.config.width = width;
+        converter.config.height = height;
+        converter.receiving = true;
+        Ok(converter)
     }
     pub fn convert(
         &mut self,
@@ -53,7 +85,12 @@ impl Converter {
             input.GetDesc(&mut desc);
             if desc.Width < width
                 || desc.Height < height
-                || desc.Format != DXGI_FORMAT_B8G8R8A8_UNORM
+                || desc.Format
+                    != if self.receiving {
+                        DXGI_FORMAT_NV12
+                    } else {
+                        DXGI_FORMAT_B8G8R8A8_UNORM
+                    }
                 || desc.SampleDesc.Count != 1
                 || desc.ArraySize != 1
                 || input.GetDevice()?.as_raw() != self.device.as_raw()
@@ -78,9 +115,16 @@ impl Converter {
                     Usage: D3D11_VIDEO_USAGE_OPTIMAL_SPEED,
                 };
                 let enumerator = self.video.CreateVideoProcessorEnumerator(&description)?;
-                let input_support =
-                    enumerator.CheckVideoProcessorFormat(DXGI_FORMAT_B8G8R8A8_UNORM)?;
-                let output_support = enumerator.CheckVideoProcessorFormat(DXGI_FORMAT_NV12)?;
+                let input_support = enumerator.CheckVideoProcessorFormat(if self.receiving {
+                    DXGI_FORMAT_NV12
+                } else {
+                    DXGI_FORMAT_B8G8R8A8_UNORM
+                })?;
+                let output_support = enumerator.CheckVideoProcessorFormat(if self.receiving {
+                    DXGI_FORMAT_B8G8R8A8_UNORM
+                } else {
+                    DXGI_FORMAT_NV12
+                })?;
                 if input_support & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT.0 as u32 == 0
                     || output_support & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT.0 as u32 == 0
                 {
@@ -98,11 +142,15 @@ impl Converter {
                 self.video_context.VideoProcessorSetStreamColorSpace(
                     &processor,
                     0,
-                    &D3D11_VIDEO_PROCESSOR_COLOR_SPACE { _bitfield: 0 },
+                    &D3D11_VIDEO_PROCESSOR_COLOR_SPACE {
+                        _bitfield: if self.receiving { 0x14 } else { 0 },
+                    },
                 );
                 self.video_context.VideoProcessorSetOutputColorSpace(
                     &processor,
-                    &D3D11_VIDEO_PROCESSOR_COLOR_SPACE { _bitfield: 0x14 },
+                    &D3D11_VIDEO_PROCESSOR_COLOR_SPACE {
+                        _bitfield: if self.receiving { 0 } else { 0x14 },
+                    },
                 );
                 self.video_context.VideoProcessorSetOutputBackgroundColor(
                     &processor,
@@ -161,7 +209,11 @@ impl Converter {
                 Height: height,
                 MipLevels: 1,
                 ArraySize: 1,
-                Format: DXGI_FORMAT_B8G8R8A8_UNORM,
+                Format: if self.receiving {
+                    DXGI_FORMAT_NV12
+                } else {
+                    DXGI_FORMAT_B8G8R8A8_UNORM
+                },
                 SampleDesc: DXGI_SAMPLE_DESC {
                     Count: 1,
                     Quality: 0,
@@ -193,7 +245,11 @@ impl Converter {
             );
             description.Width = self.config.width;
             description.Height = self.config.height;
-            description.Format = DXGI_FORMAT_NV12;
+            description.Format = if self.receiving {
+                DXGI_FORMAT_B8G8R8A8_UNORM
+            } else {
+                DXGI_FORMAT_NV12
+            };
             let mut output = None;
             self.device
                 .CreateTexture2D(&description, None, Some(&mut output))?;

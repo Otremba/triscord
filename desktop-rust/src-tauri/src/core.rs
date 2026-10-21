@@ -140,13 +140,17 @@ pub struct Core {
     sources_generation: String,
 }
 impl Core {
-    pub fn new(directory: PathBuf, app: tauri::AppHandle) -> Result<Self> {
+    pub fn new(
+        directory: PathBuf,
+        app: tauri::AppHandle,
+        presenter: crate::presenter::Presenter,
+    ) -> Result<Self> {
         let model = Arc::new(Mutex::new(Model {
             muted: true,
             ..Default::default()
         }));
         let media = Media::new(app.clone(), model.clone());
-        let screen = Screen::new(app, model.clone());
+        let screen = Screen::new(app, model.clone(), presenter);
         let preferences = Store::new(directory.clone())?;
         Ok(Self {
             api: Api::new()?,
@@ -176,7 +180,7 @@ impl Core {
             .unwrap_or_else(|e| e.into_inner())
             .generation;
         let _ = self.media.stop(generation);
-        let _ = self.screen.stop(generation);
+        let _ = self.screen.leave(generation);
         self.socket = None;
     }
     fn clear_account(&mut self) {
@@ -330,9 +334,11 @@ impl Core {
             let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
             model.screen_requested = false;
             model.screen_epoch += 1;
+            model.membership_epoch += 1;
+            model.streams.clear();
             model.generation
         };
-        self.screen.stop(generation)?;
+        self.screen.leave(generation)?;
         self.model
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -815,8 +821,10 @@ impl Core {
                     let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
                     model.screen_requested = false;
                     model.screen_epoch += 1;
+                    model.membership_epoch += 1;
+                    model.streams.clear();
                 }
-                self.screen.stop(generation)?;
+                self.screen.leave(generation)?;
                 self.send("leave-room", json!({}))?;
                 let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
                 model.text_room = None;

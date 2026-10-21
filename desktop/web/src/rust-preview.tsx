@@ -5,6 +5,7 @@ import { useSession, type SessionStore } from './store';
 import { LoginScreen } from './components/LoginScreen';
 import { ProfileEditor } from './components/ProfileEditor';
 import { SharePicker } from './components/SharePicker';
+import { VideoTile } from './components/VideoTile';
 import './styles/rust-preview.css';
 
 export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Bridge }) {
@@ -125,8 +126,9 @@ export function RustPreview({ store, bridge }: { store: SessionStore; bridge: Br
         <header><h2>{room ? `# ${room.name}` : 'Chat'}</h2>{room && <button disabled={busy} onClick={() => void run({ name: 'leaveTextRoom' })}>Sair da sala</button>}</header>
         {room && <div>
           <button disabled={busy || !connected} onClick={() => session.sharing ? void run({ name: 'stopScreenShare' }) : setSharePickerOpen(true)}>{session.sharing ? 'Parar transmissão' : 'Compartilhar tela'}</button>
-          <p class="rust-preview__hint">Publicação de vídeo por GPU em desenvolvimento. Recepção, prévia e áudio da transmissão ainda pendentes nesta etapa.</p>
+          <p class="rust-preview__hint">Vídeo com exibição nativa por GPU em desenvolvimento. Prévia local e áudio da transmissão ainda pendentes.</p>
         </div>}
+        {!!session.streams?.length && <section aria-label="Transmissões" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:'12px'}}>{session.streams.map(stream=><div key={stream.id}><p>{stream.title}</p><VideoTile stream={stream} bridge={bridge}/></div>)}</section>}
         <div class="rust-preview__messages" role="log" aria-label="Mensagens">
           {!room && <p>Abra uma sala para conversar. A voz é ativada separadamente e o vídeo ainda está em desenvolvimento.</p>}
           {session.chat?.map(message => <article key={message.id}><strong>{message.authorName}</strong> <time>{new Date(message.timestamp).toLocaleTimeString()}</time><p>{message.text}</p>

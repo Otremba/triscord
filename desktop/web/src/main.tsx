@@ -35,7 +35,7 @@ document.documentElement.dataset.theme = params.get('theme') ?? 'darker';
 const bridge = createBridge(() => fixtureSession(params.get('fixture') ?? 'default'));
 const store = new SessionStore(() => bridge.send({ name: 'requestSnapshot' }));
 bridge.onMessage(message => store.receive(message));
-if (!(bridge instanceof TauriBridge)) startVideo(bridge);
+startVideo(bridge);
 bridge.send({ name: 'requestSnapshot' }); // the core answers with the current session
 render(bridge instanceof TauriBridge ? <RustPreview store={store} bridge={bridge} /> : <App store={store} bridge={bridge} />, document.getElementById('app')!);
 (window as unknown as { __triscord?: unknown }).__triscord = { bridge, store };

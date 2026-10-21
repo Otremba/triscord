@@ -125,15 +125,19 @@ impl Socket {
                                                 if valid&&screen.admission(generation,payload["roomId"].as_str().unwrap_or_default().to_owned(),&payload["credentials"]).is_ok() {model.lock().unwrap_or_else(|e|e.into_inner()).screen_admitting=true;}
                                             }
                                             if name=="room-join-denied" || name=="kicked" { desired_room=None; notice(&app,"A entrada na sala foi recusada ou encerrada pelo servidor."); }
+                                            if name=="room-joined" && {let m=model.lock().unwrap_or_else(|e|e.into_inner());m.desired_room.as_deref()!=payload["roomId"].as_str()} {continue;}
                                             let changed=model.lock().unwrap_or_else(|e|e.into_inner()).update(generation,&name,payload.clone());
                                             if name=="room-joined" {
+                                                let current={let m=model.lock().unwrap_or_else(|e|e.into_inner());m.desired_room.as_deref()==payload["roomId"].as_str()};
+                                                if !current {continue;}
+                                                if payload["mediaTransport"]=="livekit" {let _=screen.watch(generation,payload["roomId"].as_str().unwrap_or_default().to_owned(),&payload["media"]["screen"]);}
                                                 let (voice_requested,muted,deafened)={let m=model.lock().unwrap_or_else(|e|e.into_inner());(m.voice_requested,m.muted||m.server_muted||!m.voice_requested,m.deafened)};
                                                 if voice_requested {
                                                     if payload["mediaTransport"]!="livekit" || media.connect(generation,payload["roomId"].as_str().unwrap_or_default().to_owned(),&payload["media"]["voice"]).is_err() {notice(&app,"Esta sala não forneceu uma admissão de voz válida. Atualize os clientes ou entre em uma sala nova.");}
                                                 }
                                                 if !send(&mut socket,Message::Text(format!("42{}",json!(["user-state-change",{"isMuted":muted,"isDeafened":deafened}])).into())).await { break; }
                                             }
-                                            if name=="kicked" {let _=media.stop(generation);let _=screen.stop(generation);}
+                                            if name=="kicked" {let _=media.stop(generation);let _=screen.leave(generation);}
                                             if name=="force-muted" {let _=media.configure(generation);}
                                             if name=="request-error" || name=="service-limit" || name=="chat-rate-limited" { notice(&app,"O servidor recusou a operação. Aguarde antes de tentar novamente."); }
                                             if changed { publish(&app,&model); }
@@ -153,7 +157,7 @@ impl Socket {
                     }
                     clear_membership(&app, &model, generation);
                     let _ = media.stop(generation);
-                    let _ = screen.stop(generation);
+                    let _ = screen.leave(generation);
                     if terminal {
                         set_status(&app, &model, generation, "offline");
                         notice(&app,"A sessão foi recusada. Entre novamente ou selecione o servidor para tentar outra vez.");
@@ -244,6 +248,8 @@ fn clear_membership(app: &tauri::AppHandle, model: &Shared, generation: u64) {
             return;
         }
         model.text_room = None;
+        model.membership_epoch += 1;
+        model.streams.clear();
         model.chat.clear();
     }
     publish(app, model);

@@ -31,6 +31,8 @@ pub struct Model {
     pub screen_epoch: u64,
     pub screen_admitting: bool,
     pub user_state_notify: std::sync::Arc<tokio::sync::Notify>,
+    pub membership_epoch: u64,
+    pub streams: Vec<Value>,
 }
 
 impl Model {
@@ -45,6 +47,7 @@ impl Model {
             "runtime": { "name": "tauri", "preview": true, "voice": true, "screen": false, "camera": false, "googleLogin": crate::oauth::configured(), "screenAudio":false },
             "voiceState": if self.voice_state.is_empty() {"idle"} else {&self.voice_state}, "voiceRequested":self.voice_requested,
             "sharing":self.sharing,
+            "streams":self.streams,
             "settings":self.preferences.snapshot(&self.input_devices,&self.output_devices),
             "profile":self.profile,
             "account": { "id": account_id, "displayName": self.profile.as_ref().and_then(|p|p["display_name"].as_str()).filter(|s|!s.is_empty()).unwrap_or(nick), "username": nick, "avatarUrl":self.profile.as_ref().and_then(|p|p["avatarDataUrl"].as_str()).unwrap_or_default(), "status": if account.is_some() { "online" } else { "offline" } },
@@ -59,6 +62,8 @@ impl Model {
         }})
     }
     pub fn reset_connection(&mut self) -> u64 {
+        self.membership_epoch += 1;
+        self.streams.clear();
         self.screen_requested = false;
         self.screen_admitting = false;
         self.sharing = false;
@@ -125,6 +130,11 @@ impl Model {
                 self.server_muted = payload["muted"].as_bool().unwrap_or(true);
             }
             "kicked" => {
+                self.membership_epoch += 1;
+                self.screen_epoch += 1;
+                self.streams.clear();
+                self.screen_requested = false;
+                self.sharing = false;
                 self.text_room = None;
                 self.chat.clear();
                 self.voice_requested = false;
