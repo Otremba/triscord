@@ -48,7 +48,7 @@ export function callChannelOf(session: Session): Channel | undefined {
 export interface Channel {
   id: Id;
   name: string;
-  kind: 'voice';        // triscord rooms are voice channels with a chat
+  kind: 'voice' | 'text';        // triscord rooms are voice channels with a chat, or text channels
   users: VoiceUser[];
   ownerId?: Id;         // participant who owns the room (first in; the hub moves it on) and may moderate it
 }

@@ -109,6 +109,14 @@ export function ServerRail({ servers, selectedId, callServerId, bridge, voice }:
         </button>
         </Tooltip>
       </div>
+      <div class="tri-rail__item">
+        <div class="tri-rail__pill-wrapper" />
+        <Tooltip text="Explorar servidores detectáveis" position="right" spacing={12} guild>
+        <button class="tri-rail__circle" aria-label="Explorar servidores detectáveis" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Exploração de servidores públicos em desenvolvimento.' }))}>
+          <Icon name="Compass" size={20} />
+        </button>
+        </Tooltip>
+      </div>
     </nav>
   );
 }

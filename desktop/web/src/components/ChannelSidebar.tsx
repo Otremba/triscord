@@ -158,7 +158,10 @@ function CategoryList({ category, session, bridge }: { category: Category; sessi
                 <div class="tri-channel__link" role="button" tabIndex={0} onClick={() => bridge.send({ name: 'selectChannel', channelId: channel.id })}
                   onContextMenu={e => openContextMenu(e, channelMenu(bridge, server, channel.id, channel.name, connected, category.name), { label: channel.name })}
                   onKeyDown={e => { if (e.key === 'Enter') bridge.send({ name: 'selectChannel', channelId: channel.id }); }}>
-                  <Icon name="VoiceSpeaker" size={20} className="tri-channel__icon" />
+                  {(() => {
+                    const isText = channel.kind === 'text' || channel.name.startsWith('#') || channel.name.toLowerCase().includes('chat') || channel.name.toLowerCase().includes('geral');
+                    return <Icon name={isText ? 'TextChannel' : 'VoiceSpeaker'} size={20} className="tri-channel__icon" />;
+                  })()}
                   <span class="tri-channel__name">{channel.name}</span>
                   {connected && session.connectedAt && <CallTimer since={session.connectedAt} />}
                   <ChannelActions server={server} channelId={channel.id} connected={connected} />
@@ -176,6 +179,43 @@ function CategoryList({ category, session, bridge }: { category: Category; sessi
 }
 
 export function ChannelSidebar({ session, bridge }: { session: Session; bridge: Bridge }) {
+  const isHome = !session.selectedServerId || session.selectedServerId === '@me';
+  if (isHome) {
+    return (
+      <section class="tri-sidebar-list tri-sidebar-list--home" aria-label="Mensagens Diretas">
+        <header class="tri-dm-header">
+          <button class="tri-dm-search-button" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Busca rápida em desenvolvimento.' }))}>
+            Encontre ou comece uma conversa
+          </button>
+        </header>
+        <div class="tri-dm-nav">
+          <button class="tri-channel__link is-selected">
+            <Icon name="Friends" size={20} className="tri-channel__icon" />
+            <span class="tri-channel__name">Amigos</span>
+          </button>
+          <button class="tri-channel__link" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Página do Nitro em desenvolvimento.' }))}>
+            <Icon name="Nitro" size={20} className="tri-channel__icon" />
+            <span class="tri-channel__name">Nitro</span>
+          </button>
+          <button class="tri-channel__link" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Loja de itens em desenvolvimento.' }))}>
+            <Icon name="Shop" size={20} className="tri-channel__icon" />
+            <span class="tri-channel__name">Loja</span>
+          </button>
+        </div>
+        <div class="tri-dm-list-header">
+          <span class="tri-dm-list-header__title">MENSAGENS DIRETAS</span>
+          <Tooltip text="Criar DM" position="top">
+            <button class="tri-dm-list-header__add" aria-label="Criar DM" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Criação de mensagens diretas em desenvolvimento.' }))}>
+              <Icon name="PlusSmall" size={16} />
+            </button>
+          </Tooltip>
+        </div>
+        <div class="tri-dm-empty">
+          <p>Nenhuma conversa recente</p>
+        </div>
+      </section>
+    );
+  }
   const server = session.servers.find(s => s.id === session.selectedServerId) ?? session.servers[0];
   return (
     <section class="tri-sidebar-list" aria-label="Canais">
