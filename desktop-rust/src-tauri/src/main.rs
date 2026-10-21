@@ -104,6 +104,18 @@ fn main() {
         .setup(|app| {
             // Separate identifier/data directory; never read Qt settings or the installed app's session.
             let directory = app.path().app_local_data_dir()?;
+            // Development validation must never reuse a session from another running build.
+            #[cfg(debug_assertions)]
+            let directory = match std::env::var_os("TRISCORD_TEST_DATA_DIR") {
+                Some(path) => {
+                    let path = std::path::PathBuf::from(path);
+                    if !path.is_absolute() {
+                        return Err(std::io::Error::other("TRISCORD_TEST_DATA_DIR must be absolute").into());
+                    }
+                    path
+                }
+                None => directory,
+            };
             let window = app
                 .get_webview_window("main")
                 .ok_or_else(|| std::io::Error::other("main window missing"))?;

@@ -59,3 +59,9 @@ Estabilização e produção a custo zero: suporte a endpoints de mídia redunda
 Paridade visual e acabamento estético com REA: tokens extraídos com evidências computadas do Discord (`tokens.generated.css`), animação do pill branco do guild rail com curvas bezier oficiais (hover 20px / ativo 40px), transição de squircle suave no hover de ícones de servidores (50% circular para 16px arredondado), anel de fala verde pulsante (`#23a55a`) no avatar ativado pelo LiveKit, badge vermelho "AO VIVO", agrupamento temporal de mensagens em janelas de 5 minutos, parser client-side de Markdown com blocos de código com destaque de sintaxe, botão de cópia de código e revelação de spoilers (`||texto||`), e barra de controles flutuantes translúcida com `backdrop-filter: blur(12px)`.
 
 
+
+## Dados isolados para revisão de desenvolvimento
+
+Em builds debug, `TRISCORD_TEST_DATA_DIR` aceita uma pasta absoluta para preferências e sessão da execução de teste. Caminhos relativos interrompem a inicialização, sem fallback para dados reais. Builds release ignoram essa variável e mantêm o caminho normal do identificador da prévia. A variável deve ser definida apenas no processo que inicia o executável e restaurada no processo pai.
+
+A revisão de 21/10 abriu o executável debug até a tela de entrada com esse isolamento, observou logo/layout nativos e fechou somente o processo de teste. Não houve login nem mídia: `nativeStartupVerified=true`, `nativeMediaVerified=false`. O log do build continua registrando `runtimeVerified=false` porque o build script por si só não inicia o app; não confundir os dois escopos.
