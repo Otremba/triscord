@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Bridge } from '@/bridge';
 import type { Session } from '@/protocol';
-import { X, User, Volume2, Monitor, LogOut, Camera, Upload, Trash2, Sparkles } from 'lucide-react';
+import { X, User, Volume2, Monitor, LogOut, Camera, Upload, Trash2, Sparkles, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Page = 'account' | 'voice' | 'windows';
@@ -9,6 +9,10 @@ type Page = 'account' | 'voice' | 'windows';
 export function SettingsModal({ session, bridge, initialPage = 'voice', onClose }: { session: Session; bridge: Bridge; initialPage?: Page; onClose: () => void }) {
     const [page, setPage] = useState<Page>(initialPage);
     const s = session.settings;
+
+    useEffect(() => {
+        bridge.send({ name: 'requestDevices' });
+    }, [bridge, page]);
 
     // Profile Edit State
     const [displayName, setDisplayName] = useState(session.profile?.display_name || session.account.displayName);
@@ -296,9 +300,20 @@ export function SettingsModal({ session, bridge, initialPage = 'voice', onClose 
 
                     {page === 'voice' && s && (
                         <div className="space-y-6 max-w-xl">
-                            <div>
-                                <h2 className="text-xl font-bold text-ink-100">Voz & Vídeo</h2>
-                                <p className="text-xs text-ink-400 mt-1">Configure seus dispositivos de áudio, microfone e supressão de ruído.</p>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-xl font-bold text-ink-100">Voz & Vídeo</h2>
+                                    <p className="text-xs text-ink-400 mt-1">Configure seus dispositivos de áudio, microfone e supressão de ruído.</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => bridge.send({ name: 'requestDevices' })}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ink-800 hover:bg-ink-700 text-xs font-semibold text-ink-200 hover:text-ink-100 transition-colors"
+                                    title="Atualizar lista de dispositivos de áudio"
+                                >
+                                    <RefreshCw size={13} />
+                                    <span>Detectar Dispositivos</span>
+                                </button>
                             </div>
 
                             {/* Device Selectors */}
@@ -306,26 +321,34 @@ export function SettingsModal({ session, bridge, initialPage = 'voice', onClose 
                                 <div>
                                     <label className="block text-xs font-bold uppercase tracking-wider text-ink-400 mb-2">Dispositivo de Entrada</label>
                                     <select
-                                        value={s.inputDevice}
+                                        value={s.inputDevice || ''}
                                         onChange={e => setSetting('inputDevice', e.target.value)}
                                         className="w-full rounded-md border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 focus:border-brand-500 focus:outline-none"
                                     >
-                                        {s.inputDevices.map(d => (
-                                            <option key={d.id} value={d.id}>{d.name}</option>
-                                        ))}
+                                        {(!s.inputDevices || s.inputDevices.length === 0) ? (
+                                            <option value="">Padrão do Sistema (Comunicações)</option>
+                                        ) : (
+                                            s.inputDevices.map(d => (
+                                                <option key={d.id} value={d.id}>{d.name}</option>
+                                            ))
+                                        )}
                                     </select>
                                 </div>
 
                                 <div>
                                     <label className="block text-xs font-bold uppercase tracking-wider text-ink-400 mb-2">Dispositivo de Saída</label>
                                     <select
-                                        value={s.outputDevice}
+                                        value={s.outputDevice || ''}
                                         onChange={e => setSetting('outputDevice', e.target.value)}
                                         className="w-full rounded-md border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 focus:border-brand-500 focus:outline-none"
                                     >
-                                        {s.outputDevices.map(d => (
-                                            <option key={d.id} value={d.id}>{d.name}</option>
-                                        ))}
+                                        {(!s.outputDevices || s.outputDevices.length === 0) ? (
+                                            <option value="">Padrão do Sistema (Comunicações)</option>
+                                        ) : (
+                                            s.outputDevices.map(d => (
+                                                <option key={d.id} value={d.id}>{d.name}</option>
+                                            ))
+                                        )}
                                     </select>
                                 </div>
                             </div>

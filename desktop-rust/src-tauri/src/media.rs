@@ -64,9 +64,11 @@ pub struct Media {
 impl Media {
     pub fn new(app: tauri::AppHandle, model: Shared) -> Self {
         let (sender, mut receiver) = mpsc::channel(16);
-        // The actor is the sole owner of device lifecycle. No devices are initialized at startup.
         tauri::async_runtime::spawn(async move {
             let mut active: Option<Voice> = None;
+            if let Ok(audio) = PlatformAudio::new() {
+                devices(&app, &model, &audio);
+            }
             loop {
                 let action = tokio::select! {
                     action=receiver.recv()=>match action {Some(action)=>action,None=>break},
@@ -376,14 +378,18 @@ fn wanted(model: &Shared, generation: u64, room: &str) -> bool {
         && model.desired_room.as_deref() == Some(room)
 }
 fn devices(app: &tauri::AppHandle, model: &Shared, audio: &PlatformAudio) {
-    let inputs = audio
-        .recording_devices()
-        .map(|d| serde_json::json!({"id":d.id.as_str(),"name":d.name}))
-        .collect();
-    let outputs = audio
-        .playout_devices()
-        .map(|d| serde_json::json!({"id":d.id.as_str(),"name":d.name}))
-        .collect();
+    let mut inputs: Vec<Value> = vec![serde_json::json!({"id": "", "name": "Padrão do Sistema (Comunicações)"})];
+    for d in audio.recording_devices() {
+        if !d.name.is_empty() {
+            inputs.push(serde_json::json!({"id": d.id.as_str(), "name": d.name}));
+        }
+    }
+    let mut outputs: Vec<Value> = vec![serde_json::json!({"id": "", "name": "Padrão do Sistema (Comunicações)"})];
+    for d in audio.playout_devices() {
+        if !d.name.is_empty() {
+            outputs.push(serde_json::json!({"id": d.id.as_str(), "name": d.name}));
+        }
+    }
     {
         let mut model = model.lock().unwrap_or_else(|e| e.into_inner());
         model.input_devices = inputs;

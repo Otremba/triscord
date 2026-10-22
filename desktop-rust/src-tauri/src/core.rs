@@ -120,6 +120,7 @@ pub enum Command {
         value: Value,
     },
     RequestDevices,
+    OpenSettings,
     SendChatMessage {
         text: String,
     },
@@ -257,8 +258,6 @@ impl Core {
         model.muted = true;
         model.deafened = false;
         model.preferences = Default::default();
-        model.input_devices.clear();
-        model.output_devices.clear();
     }
     fn install_account(&mut self, account: Value) {
         let preferences = self
@@ -267,6 +266,8 @@ impl Core {
         let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
         model.account = Some(account);
         model.preferences = preferences;
+        drop(model);
+        let _ = self.media.devices();
     }
     async fn finish_sign_in(&mut self, app: &tauri::AppHandle, response: Value) -> Result<Value> {
         let account = public_account(&response["account"])?;
@@ -1075,7 +1076,7 @@ impl Core {
                 self.media.configure(generation)?;
                 Ok(Value::Null)
             }
-            Command::RequestDevices => {
+            Command::RequestDevices | Command::OpenSettings => {
                 self.media.devices()?;
                 Ok(Value::Null)
             }
