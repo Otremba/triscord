@@ -7,6 +7,7 @@ import { Icon } from './Icon';
 import { Tooltip } from './Tooltip';
 import { openContextMenu, type MenuEntry } from './ContextMenu';
 import { AudioRipple } from './ui/AudioRipple';
+import { useSpeakingHold } from './ui/useSpeakingHold';
 import { soundEngine } from '../sound-engine';
 
 // Server header dropdown menu options.
@@ -47,12 +48,13 @@ function ServerHeader({ server, bridge }: { server: Server; bridge: Bridge }) {
 
 // Voice channel participant row.
 function VoiceUserRow({ user, session, bridge }: { user: VoiceUser; session: Session; bridge: Bridge }) {
+  const isSpeaking = useSpeakingHold(!!user.speaking, 400);
   const open=(anchor:HTMLElement)=>user.self ? dispatchEvent(new Event('tri-open-profile')) : openParticipantProfile(user.id,anchor);
   return (
-    <li class={`tri-voice-user ${user.speaking ? 'is-speaking' : ''}`} title={user.customStatus || undefined} role="button" tabIndex={0} aria-label={`Ver perfil de ${user.name}`}
+    <li class={`tri-voice-user ${isSpeaking ? 'is-speaking' : ''}`} title={user.customStatus || undefined} role="button" tabIndex={0} aria-label={`Ver perfil de ${user.name}`}
       onClick={e=>open(e.currentTarget)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open(e.currentTarget);}}}
       onContextMenu={e=>openParticipantMenu(e,user,session,bridge)}>
-      <AudioRipple speaking={!!user.speaking}>
+      <AudioRipple speaking={isSpeaking}>
         <span class="tri-avatar tri-avatar--24">{user.avatarUrl ? <img src={user.avatarUrl} alt=""/> : <span class="tri-avatar__letter">{user.name.slice(0, 1).toUpperCase()}</span>}</span>
       </AudioRipple>
       <span class="tri-voice-user__name">{user.name}</span>

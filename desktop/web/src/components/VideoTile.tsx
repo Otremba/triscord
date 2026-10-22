@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Bridge } from '../bridge';
 import type { VideoStream, VoiceUser } from '../protocol';
 import { attachCanvas, overlaysSuspended } from '../video';
+import { useSpeakingHold } from './ui/useSpeakingHold';
 
 // The native image fills the entire card; participant actions live in the context menu.
 // `role`: grid card, the focused stage or a filmstrip thumbnail of the visão ampliada:
@@ -9,6 +10,7 @@ import { attachCanvas, overlaysSuspended } from '../video';
 export function VideoTile({ stream, bridge, label, speaking, onContextMenu, onClick, role = 'grid', style }: { stream: VideoStream; bridge: Bridge;
   label?: string; speaking?: boolean; user?: VoiceUser; onContextMenu?: (event: MouseEvent) => void; onClick?: (event: MouseEvent) => void;
   role?: 'grid' | 'stage' | 'film'; style?: Record<string, string> }) {
+  const isSpeaking = useSpeakingHold(!!speaking, 400);
   const surface = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -35,7 +37,7 @@ export function VideoTile({ stream, bridge, label, speaking, onContextMenu, onCl
   }, [stream.id, stream.path, stream.hidden, stream.loading, bridge]);
   useEffect(() => { bridge.send({ name: 'videoRole', streamId: stream.id, role }); }, [stream.id, role, bridge]);
   const name = label ?? stream.title;
-  return <div class={`tri-video-tile tri-video-tile--${role} ${speaking ? 'is-speaking' : ''}`} aria-label={name} data-hidden={!!stream.hidden} data-stream={stream.id}
+  return <div class={`tri-video-tile tri-video-tile--${role} ${isSpeaking ? 'is-speaking' : ''}`} aria-label={name} data-hidden={!!stream.hidden} data-stream={stream.id}
     onContextMenu={onContextMenu} style={style} onClick={e => { if (!(e.target as HTMLElement).closest('button')) onClick?.(e); }}>
     <div class="tri-video-tile__surface" ref={surface}>
       {stream.hidden ? <button class="tri-video-tile__placeholder" aria-label={stream.kind === 'screen' ? 'Mostrar transmissão' : 'Mostrar vídeo'} onClick={() => {

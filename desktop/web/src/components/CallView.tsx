@@ -14,6 +14,7 @@ import { Tooltip } from './Tooltip';
 import { openSoundboard } from './Soundboard';
 import { openAudioMenu } from './AudioMenu';
 import { AudioRipple } from './ui/AudioRipple';
+import { useSpeakingHold } from './ui/useSpeakingHold';
 import { soundEngine } from '../sound-engine';
 
 // Call view of the connected voice channel (CALLS.md, discord-call-view-client.png):
@@ -24,6 +25,7 @@ import { soundEngine } from '../sound-engine';
 // card was observed in Discord).
 function ParticipantCard({ user, session, bridge, role = 'grid', style, onFocus }: { user: VoiceUser; session: Session; bridge: Bridge;
   role?: 'grid' | 'stage' | 'film'; style?: Record<string, string>; onFocus?: () => void }) {
+  const isSpeaking = useSpeakingHold(!!user.speaking, 400);
   // The core keeps a small PNG for account/sidebar thumbnails. In the call,
   // reuse the validated original GIF already present in our profile so the
   // browser can animate it without sending individual frames over the bridge.
@@ -32,10 +34,10 @@ function ParticipantCard({ user, session, bridge, role = 'grid', style, onFocus 
       ? session.profile.avatarDataUrl : session.account.avatarUrl
     : (user.accountId && session.avatars?.[user.accountId]?.animated) || user.avatarUrl;
   return (
-    <div class={`tri-call-card tri-call-card--${role} ${user.speaking ? 'is-speaking' : ''}`} style={style} aria-label={user.name} role="button" tabIndex={0} onContextMenu={e=>openParticipantMenu(e,user,session,bridge)}
+    <div class={`tri-call-card tri-call-card--${role} ${isSpeaking ? 'is-speaking' : ''}`} style={style} aria-label={user.name} role="button" tabIndex={0} onContextMenu={e=>openParticipantMenu(e,user,session,bridge)}
       onClick={e=>onFocus ? onFocus() : user.self ? dispatchEvent(new Event('tri-open-profile')) : openParticipantProfile(user.id,e.currentTarget)}
       onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.currentTarget.click();}}}>
-      <AudioRipple speaking={!!user.speaking}>
+      <AudioRipple speaking={isSpeaking}>
         <span class="tri-avatar tri-avatar--80">{avatar ? <img src={avatar} alt=""/> : <span class="tri-avatar__letter">{user.name.slice(0, 1).toUpperCase()}</span>}</span>
       </AudioRipple>
       <span class="tri-call-card__pill">

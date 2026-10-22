@@ -68,9 +68,16 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 :root[data-design="workspace"] .tri-call-card.is-speaking {
-  outline: 2px solid var(--ui-positive);
+  outline: 2px solid #23a55a;
   outline-offset: -2px;
-  box-shadow: inset 0 0 14px rgba(143, 198, 169, 0.2);
+  border-color: #23a55a;
+  box-shadow: 0 0 20px rgba(35, 165, 90, 0.3), inset 0 0 14px rgba(35, 165, 90, 0.2);
+}
+:root[data-design="workspace"] .tri-call-card.is-speaking .tri-avatar,
+:root[data-design="workspace"] .tri-call-card.is-speaking .tri-avatar--80 {
+  outline: 3px solid #23a55a;
+  outline-offset: 3px;
+  box-shadow: 0 0 16px rgba(35, 165, 90, 0.55);
 }
 :root[data-design="workspace"] .tri-app--workspace .tri-call.is-idle:not(:hover):not(:focus-within) .tri-call-bottom,
 :root[data-design="workspace"] .tri-app--workspace .tri-page__main.is-idle:not(:hover):not(:focus-within) .tri-channel-header {

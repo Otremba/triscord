@@ -188,8 +188,8 @@
   position: absolute;
   inset: -3px;
   border-radius: 50%;
-  border: 1.5px solid var(--ui-positive);
-  opacity: 0.7;
+  border: 2px solid #23a55a;
+  opacity: 0.8;
   pointer-events: none;
   animation: tri-voice-ripple-wave 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
@@ -200,7 +200,7 @@
   animation-delay: 1.0s;
 }
 @keyframes tri-voice-ripple-wave {
-  0% { transform: scale(0.98); opacity: 0.75; }
+  0% { transform: scale(0.98); opacity: 0.85; }
   100% { transform: scale(1.35); opacity: 0; }
 }
 :root[data-design="workspace"] :is(.tri-logo,.tri-magnetic-item,.tri-bento-card,.tri-shimmer-btn) { filter:none;box-shadow:none;transform:none;animation:none; }
@@ -393,7 +393,12 @@
 :root[data-design="workspace"] .tri-channel__link { min-height:40px;margin:0;border-radius:8px;padding:8px 10px;transition:background-color var(--ui-motion),color var(--ui-motion); }
 :root[data-design="workspace"] .tri-channel.is-selected>.tri-channel__link { background:var(--ui-selected);color:var(--ui-selected-text);box-shadow:none; }
 :root[data-design="workspace"] .tri-channel__name { font-size:14px; }
-:root[data-design="workspace"] .tri-voice-user.is-speaking .tri-avatar { outline:2px solid var(--ui-positive);outline-offset:2px;box-shadow:none;animation:none; }
+:root[data-design="workspace"] .tri-voice-user.is-speaking .tri-avatar {
+  outline: 2px solid #23a55a;
+  outline-offset: 2px;
+  box-shadow: 0 0 10px rgba(35, 165, 90, 0.5);
+  transition: outline .12s ease-out, box-shadow .12s ease-out;
+}
 
 /* Scrollbars refined for clean desktop aesthetics */
 :root[data-design="workspace"] ::-webkit-scrollbar { width: 8px; height: 8px; }
