@@ -6,7 +6,6 @@ import { emit } from '../events';
 import { useSpeakingHold } from '@/hooks/useSpeakingHold';
 
 export function ChannelSidebar({ session, bridge }: { session: Session; bridge: Bridge }) {
-    const server = session.servers.find(s => s.id === session.selectedServerId);
     const isHome = !session.selectedServerId || session.selectedServerId === '@me';
 
     return (
