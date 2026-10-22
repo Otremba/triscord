@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, renderHook, act, fireEvent } from '@testing-library/react';
 import { useSpeakingHold } from '../hooks/useSpeakingHold';
 import { ParticipantCard } from './call/ParticipantCard';
+import { OwnStreamTile } from './call/OwnStreamTile';
 import type { VoiceUser } from '../protocol';
 
 describe('Voice Speaking Indicator & ParticipantCard', () => {
@@ -77,4 +78,43 @@ describe('Voice Speaking Indicator & ParticipantCard', () => {
 
         expect(onKick).toHaveBeenCalledTimes(1);
     });
+
+    it('ParticipantCard displays AO VIVO badge when user is live streaming', () => {
+        const user: VoiceUser = {
+            id: 'u3',
+            name: 'Streamer',
+            self: true,
+            muted: false,
+            deafened: false,
+            speaking: false,
+            live: true,
+        };
+
+        render(<ParticipantCard user={user} isSpeaking={false} />);
+        expect(screen.getByText('AO VIVO')).toBeInTheDocument();
+    });
+
+    it('OwnStreamTile displays stream title, quality info, timer and stop button', () => {
+        const bridge = { send: vi.fn(), request: vi.fn(), on: vi.fn(), off: vi.fn() };
+        const session: any = {
+            sharing: true,
+            sharingName: 'Valorant - Partida Ranqueada',
+            settings: {
+                shareHd: true,
+                shareAudio: true,
+            },
+        };
+
+        render(<OwnStreamTile session={session} bridge={bridge as any} />);
+
+        expect(screen.getByText('Valorant - Partida Ranqueada')).toBeInTheDocument();
+        expect(screen.getByText('1080p 60 FPS')).toBeInTheDocument();
+        expect(screen.getByText('8.0 Mbps')).toBeInTheDocument();
+        expect(screen.getByText(/Você está transmitindo sua tela/i)).toBeInTheDocument();
+
+        const stopBtn = screen.getByRole('button', { name: /Parar Transmissão/i });
+        fireEvent.click(stopBtn);
+        expect(bridge.send).toHaveBeenCalledWith({ name: 'stopScreenShare' });
+    });
 });
+

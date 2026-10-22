@@ -1,4 +1,4 @@
-import { Mic, MicOff, HeadphoneOff, Video, UserX } from 'lucide-react';
+import { Mic, MicOff, HeadphoneOff, Video, UserX, ScreenShare } from 'lucide-react';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { VoiceUser } from '@/protocol';
 import { cn } from '@/lib/utils';
@@ -42,7 +42,13 @@ export function ParticipantCard({
                         <span className="text-xs text-ink-400 font-normal">(você)</span>
                     )}
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0">
+                    {user.live && (
+                        <span className="flex items-center gap-0.5 rounded bg-brand-500/20 px-1 py-0.5 text-[9px] font-bold text-brand-300 uppercase tracking-wider">
+                            <ScreenShare size={10} />
+                            <span>AO VIVO</span>
+                        </span>
+                    )}
                     {isDeafened ? (
                         <HeadphoneOff size={16} className="text-critical" />
                     ) : isMuted ? (
@@ -87,6 +93,12 @@ export function ParticipantCard({
                 <div className="flex items-center gap-1.5 rounded-md bg-ink-950/80 px-2.5 py-1 backdrop-blur-sm max-w-[80%]">
                     <span className="truncate text-xs font-medium text-ink-200">{user.name}</span>
                     {isSelf && <span className="text-[10px] text-ink-400 shrink-0">(você)</span>}
+                    {user.live && (
+                        <span className="flex items-center gap-0.5 rounded bg-brand-500/20 px-1 py-0.5 text-[9px] font-bold text-brand-300 uppercase tracking-wider shrink-0 ml-1">
+                            <ScreenShare size={10} />
+                            <span>AO VIVO</span>
+                        </span>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-1 rounded-md bg-ink-950/80 p-1 backdrop-blur-sm">

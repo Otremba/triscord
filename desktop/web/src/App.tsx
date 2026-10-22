@@ -16,6 +16,7 @@ import { CreateServerModal } from './components/modals/CreateServerModal';
 import { ShareScreenModal } from './components/modals/ShareScreenModal';
 import { ControlsBar } from './components/call/ControlsBar';
 import { ParticipantCard } from './components/call/ParticipantCard';
+import { OwnStreamTile } from './components/call/OwnStreamTile';
 import type { Bridge } from './bridge';
 import type { Session, VoiceUser, Channel } from './protocol';
 import { EVENTS } from './events';
@@ -185,12 +186,36 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
                                 {selectedChannel?.kind === 'voice' && inCall ? (
                                     <div className="flex flex-1 min-h-0 flex-col">
                                         {/* Call Stage */}
-                                        <div className="flex flex-1 min-h-0 overflow-y-auto p-4">
-                                            {videoStreams.length > 0 ? (
-                                                <div className="grid flex-1 grid-cols-1 md:grid-cols-2 gap-4 auto-rows-fr">
-                                                    {videoStreams.map(stream => (
-                                                        <VideoTile key={stream.id} stream={stream} bridge={bridge} />
-                                                    ))}
+                                        <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto p-4">
+                                            {(videoStreams.length > 0 || session.sharing) ? (
+                                                <div className="flex flex-1 min-h-0 flex-col gap-4">
+                                                    {/* Video & Screen Streams Grid */}
+                                                    <div className={`grid gap-4 auto-rows-fr ${
+                                                        (videoStreams.length + (session.sharing ? 1 : 0)) === 1
+                                                            ? 'grid-cols-1 max-w-4xl mx-auto w-full'
+                                                            : 'grid-cols-1 md:grid-cols-2'
+                                                    }`}>
+                                                        {session.sharing && (
+                                                            <OwnStreamTile session={session} bridge={bridge} />
+                                                        )}
+                                                        {videoStreams.map(stream => (
+                                                            <VideoTile key={stream.id} stream={stream} bridge={bridge} />
+                                                        ))}
+                                                    </div>
+
+                                                    {/* Voice Participants Strip */}
+                                                    <div className="flex flex-wrap items-center justify-center gap-3 pt-3 border-t border-ink-800/60 mt-auto">
+                                                        {callParticipants.map((user: VoiceUser) => (
+                                                            <div key={user.id} className="w-48 sm:w-56">
+                                                                <ParticipantCard
+                                                                    user={user}
+                                                                    isSpeaking={user.speaking}
+                                                                    variant="compact"
+                                                                    onKick={!user.self ? () => bridge.send({ name: 'disconnectParticipant', socketId: user.id }) : undefined}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <div className="grid flex-1 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 auto-rows-max">
