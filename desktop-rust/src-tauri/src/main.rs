@@ -110,6 +110,22 @@ async fn dispatch(
 }
 
 fn main() {
+    // Configure WebView2 arguments for unconstrained, ultra-fluid 120+ FPS rendering:
+    // - --disable-frame-rate-limit: removes the 60fps compositor limit so rendering runs at 120Hz/144Hz/240Hz
+    // - --ignore-gpu-blocklist: forces full D3D11 / GPU hardware acceleration
+    // - --enable-gpu-rasterization: GPU rasterization for all layers
+    // - --enable-zero-copy: fast zero-copy video and surface compositing
+    // - --disable-background-timer-throttling & --disable-backgrounding-occluded-windows & --disable-renderer-backgrounding:
+    //   prevent frame drops or throttling when games (e.g. Valorant) or other windows are focused
+    let current_args = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default();
+    let fluid_args = "--disable-frame-rate-limit --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding";
+    let combined = if current_args.is_empty() {
+        fluid_args.to_string()
+    } else {
+        format!("{current_args} {fluid_args}")
+    };
+    std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", combined);
+
     tauri::Builder::default()
         .setup(|app| {
             // Separate identifier/data directory; never read Qt settings or the installed app's session.

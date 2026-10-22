@@ -71,6 +71,11 @@
         user-select: text;
     }
 
+    /* GPU-composited scrolling for fluid 120 FPS performance */
+    .overflow-y-auto {
+        will-change: scroll-position;
+    }
+
     ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
