@@ -267,6 +267,13 @@ export type Command =
   | { name: 'deleteServer'; serverId: string }
   | { name: 'leaveServer'; serverId: string }
   | { name: 'copyInvite'; code: string }         // native clipboard; only codes the core created
+  | { name: 'getOwnProfile' }
+  | { name: 'saveOwnProfile'; fields: Record<string, string | null> }
+  | { name: 'beginProfileMedia'; kind: 'avatar' | 'banner'; size: number }
+  | { name: 'appendProfileMedia'; uploadId: string; offset: number; data: string }
+  | { name: 'finishProfileMedia'; uploadId: string }
+  | { name: 'cancelProfileMedia'; uploadId: string }
+  | { name: 'removeProfileMedia'; kind: 'avatar' | 'banner' }
   | { name: 'openServerDialog' }
   | { name: 'openSettings' }
   | { name: 'sendErrorReport' }                    // the running session's log to the hub ("Enviar log agora")

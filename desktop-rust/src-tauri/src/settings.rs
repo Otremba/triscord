@@ -133,7 +133,7 @@ impl Preferences {
         json!({"inputDevices":inputs,"outputDevices":outputs,"cameraDevices":[],"inputDevice":self.input_device,"outputDevice":self.output_device,"cameraDevice":"",
             "inputVolume":self.input_volume,"outputVolume":self.output_volume,"soundboardVolume":self.soundboard_volume,
             "noiseSuppression":self.noise_suppression,"noiseSuppressionStrength":self.noise_suppression_strength,
-            "noiseSuppressionMode":self.noise_suppression_mode,"noiseSuppressionHighAvailable":false,
+            "noiseSuppressionMode":self.noise_suppression_mode,"noiseSuppressionHighAvailable":true,
             "automaticGainControl":self.automatic_gain_control,"theme":self.theme,"callSounds":self.call_sounds,
             "desktopNotifications":self.desktop_notifications,"taskbarAlert":self.taskbar_alert,
             "closeToTray":self.close_to_tray,"startMinimized":self.start_minimized,"openAtLogin":false,"loginSupported":false,

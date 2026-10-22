@@ -57,6 +57,8 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
                 setChannelModal({ categoryName: detail.categoryName });
             } else if (detail?.kind === 'shareScreen') {
                 setShareModalOpen(true);
+            } else if (detail?.kind === 'createServer') {
+                setServerModalOpen(true);
             }
         };
 

@@ -120,4 +120,30 @@ describe('Modals & Dialogs Components', () => {
         });
         expect(onClose).toHaveBeenCalled();
     });
+
+    it('SettingsModal allows editing profile fields and saving', async () => {
+        const bridge = createMockBridge();
+        const session = getFixture('call');
+        const onClose = vi.fn();
+
+        render(<SettingsModal session={session} bridge={bridge} initialPage="account" onClose={onClose} />);
+
+        expect(screen.getByText('Meu Perfil')).toBeInTheDocument();
+
+        const nameInput = screen.getByDisplayValue(session.account.displayName);
+        fireEvent.change(nameInput, { target: { value: 'Novo Apelido' } });
+
+        const saveBtn = screen.getByRole('button', { name: /salvar alterações/i });
+        fireEvent.click(saveBtn);
+
+        await waitFor(() => {
+            expect(bridge.send).toHaveBeenCalledWith(expect.objectContaining({
+                name: 'saveOwnProfile',
+                fields: expect.objectContaining({
+                    display_name: 'Novo Apelido',
+                }),
+            }));
+        });
+    });
 });
+

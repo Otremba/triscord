@@ -75,4 +75,38 @@ describe('ChatPanel Component', () => {
 
         expect(bridge.send).not.toHaveBeenCalled();
     });
+
+    it('allows deleting own message', () => {
+        const bridge = createMockBridge();
+        render(<ChatPanel channelName="Geral" messages={mockMessages} bridge={bridge} />);
+
+        const deleteButton = screen.getByLabelText(/excluir mensagem/i);
+        expect(deleteButton).toBeInTheDocument();
+
+        fireEvent.click(deleteButton);
+        expect(screen.getByText('Excluir?')).toBeInTheDocument();
+
+        const confirmButton = screen.getByText('Sim');
+        fireEvent.click(confirmButton);
+
+        expect(bridge.send).toHaveBeenCalledWith({
+            name: 'deleteChatMessage',
+            messageId: 'm2',
+        });
+    });
+
+    it('toggles reaction when emoji is clicked', () => {
+        const bridge = createMockBridge();
+        render(<ChatPanel channelName="Geral" messages={mockMessages} bridge={bridge} />);
+
+        const thumbsUp = screen.getAllByTitle('Reagir com 👍')[0];
+        fireEvent.click(thumbsUp);
+
+        expect(bridge.send).toHaveBeenCalledWith({
+            name: 'toggleReaction',
+            messageId: 'm1',
+            emoji: '👍',
+        });
+    });
 });
+

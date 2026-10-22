@@ -3,6 +3,7 @@ import type { Bridge } from '../bridge';
 import type { Server } from '../protocol';
 import { cn } from '../lib/utils';
 import { Tooltip } from './ui/tooltip';
+import { emit, EVENTS } from '../events';
 
 function acronym(name: string): string {
     return name.replace(/'s /g, ' ').replace(/\w+/g, w => w[0]).replace(/\s/g, '').slice(0, 3).toUpperCase();
@@ -66,7 +67,7 @@ export function ServerRail({
                 <button
                     type="button"
                     aria-label="Adicionar servidor"
-                    onClick={() => bridge.send({ name: 'openServerDialog' })}
+                    onClick={() => emit(EVENTS.openModal, { kind: 'createServer' })}
                     className="flex h-12 w-12 items-center justify-center rounded-full bg-ink-700 text-positive transition-all hover:rounded-2xl hover:bg-positive hover:text-ink-950"
                 >
                     <Plus size={22} />
