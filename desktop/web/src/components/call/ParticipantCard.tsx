@@ -8,6 +8,8 @@ interface ParticipantCardProps {
     user: VoiceUser;
     isSpeaking?: boolean;
     variant?: 'stage' | 'compact';
+    isFocused?: boolean;
+    onClick?: () => void;
     onKick?: () => void;
 }
 
@@ -15,6 +17,8 @@ export function ParticipantCard({
     user,
     isSpeaking = false,
     variant = 'stage',
+    isFocused = false,
+    onClick,
     onKick,
 }: ParticipantCardProps) {
     const activeSpeaking = useSpeakingHold(isSpeaking, 400);
@@ -25,7 +29,15 @@ export function ParticipantCard({
 
     if (variant === 'compact') {
         return (
-            <div className={cn('flex items-center gap-3 px-2 py-1.5 text-sm text-ink-300 hover:bg-ink-800 rounded-md transition-colors', isSelf && 'bg-ink-800/60')}>
+            <div
+                onClick={onClick}
+                className={cn(
+                    'flex items-center gap-3 px-2 py-1.5 text-sm text-ink-300 hover:bg-ink-800 rounded-md transition-colors',
+                    isSelf && 'bg-ink-800/60',
+                    onClick && 'cursor-pointer hover:bg-ink-800/90',
+                    isFocused && 'ring-1 ring-brand-400 bg-brand-500/10 text-ink-100'
+                )}
+            >
                 <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-ink-700 text-xs font-semibold text-ink-200">
                     {user.avatarUrl ? (
                         <img src={user.avatarUrl} alt="" className={cn('h-8 w-8 rounded-full object-cover transition-all duration-150', activeSpeaking && 'ring-2 ring-positive ring-offset-1 ring-offset-ink-900')} />
@@ -63,11 +75,14 @@ export function ParticipantCard({
 
     return (
         <div
+            onClick={onClick}
             className={cn(
                 'group relative flex aspect-video w-full flex-col items-center justify-center rounded-2xl border bg-ink-900/90 p-4 transition-all duration-150 select-none shadow-lg',
+                onClick && 'cursor-pointer hover:border-brand-500/50',
+                isFocused && 'ring-2 ring-brand-400 border-brand-500 shadow-[0_0_24px_rgba(88,101,242,0.35)]',
                 activeSpeaking
                     ? 'border-[#23a55a] shadow-[0_0_24px_rgba(35,165,90,0.35),inset_0_0_16px_rgba(35,165,90,0.15)] ring-1 ring-[#23a55a]'
-                    : 'border-ink-800/80 hover:border-ink-700 hover:bg-ink-900'
+                    : !isFocused && 'border-ink-800/80 hover:border-ink-700 hover:bg-ink-900'
             )}
         >
             {/* Center Avatar */}

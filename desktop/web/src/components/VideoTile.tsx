@@ -3,8 +3,20 @@ import type { Bridge } from '../bridge';
 import type { VideoStream } from '../protocol';
 import { overlaysSuspended } from '../video';
 
+import { cn } from '../lib/utils';
+
 // A native window draws the stream over this tile (Path A). The page only reports geometry and occlusion.
-export function VideoTile({ stream, bridge }: { stream: VideoStream; bridge: Bridge }) {
+export function VideoTile({
+    stream,
+    bridge,
+    onClick,
+    isFocused = false,
+}: {
+    stream: VideoStream;
+    bridge: Bridge;
+    onClick?: () => void;
+    isFocused?: boolean;
+}) {
     const surface = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -40,7 +52,15 @@ export function VideoTile({ stream, bridge }: { stream: VideoStream; bridge: Bri
     }, [stream.id, bridge]);
 
     return (
-        <div className="relative aspect-video overflow-hidden rounded-xl bg-ink-950 border border-ink-800 shadow-md group" data-stream={stream.id}>
+        <div
+            onClick={onClick}
+            className={cn(
+                'relative aspect-video overflow-hidden rounded-xl bg-ink-950 border border-ink-800 shadow-md group transition-all duration-150',
+                onClick && 'cursor-pointer hover:border-brand-500/60',
+                isFocused && 'ring-2 ring-brand-400 border-brand-500 shadow-[0_0_24px_rgba(88,101,242,0.35)]'
+            )}
+            data-stream={stream.id}
+        >
             <div ref={surface} className="absolute inset-0" />
             {stream.hidden ? (
                 <button

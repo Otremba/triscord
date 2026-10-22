@@ -4,8 +4,19 @@ import type { Session } from '@/protocol';
 import { Monitor, ScreenShare, ScreenShareOff, Volume2, VolumeX, Sparkles } from 'lucide-react';
 import { soundEngine } from '@/sound-engine';
 import { emit, EVENTS } from '@/events';
+import { cn } from '@/lib/utils';
 
-export function OwnStreamTile({ session, bridge }: { session: Session; bridge: Bridge }) {
+export function OwnStreamTile({
+    session,
+    bridge,
+    onClick,
+    isFocused = false,
+}: {
+    session: Session;
+    bridge: Bridge;
+    onClick?: () => void;
+    isFocused?: boolean;
+}) {
     const s = session.settings;
     const isHd = s?.shareHd ?? true;
     const shareAudio = s?.shareAudio ?? true;
@@ -36,7 +47,14 @@ export function OwnStreamTile({ session, bridge }: { session: Session; bridge: B
     };
 
     return (
-        <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950 border border-brand-500/40 shadow-[0_0_30px_rgba(88,101,242,0.15)] flex flex-col justify-between p-5 select-none group">
+        <div
+            onClick={onClick}
+            className={cn(
+                "relative aspect-video w-full overflow-hidden rounded-2xl bg-gradient-to-b from-ink-950 via-ink-900 to-ink-950 border border-brand-500/40 shadow-[0_0_30px_rgba(88,101,242,0.15)] flex flex-col justify-between p-5 select-none group transition-all duration-150",
+                onClick && "cursor-pointer hover:border-brand-400",
+                isFocused && "ring-2 ring-brand-400 border-brand-400 shadow-[0_0_30px_rgba(88,101,242,0.4)]"
+            )}
+        >
             {/* Ambient Background Graphic */}
             <div className="absolute inset-0 pointer-events-none opacity-20 overflow-hidden flex items-center justify-center">
                 <div className="h-96 w-96 rounded-full bg-brand-500/30 blur-3xl" />
