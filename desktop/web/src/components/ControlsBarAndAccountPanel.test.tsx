@@ -33,9 +33,13 @@ describe('AccountPanel & ControlsBar Components', () => {
         expect(bridge.send).toHaveBeenCalledWith({ name: 'setDeafened', deafened: true });
 
         // Settings
+        const settingsListener = vi.fn();
+        window.addEventListener('tri-open-settings', settingsListener);
         const settingsBtn = screen.getByRole('button', { name: /configurações/i });
         fireEvent.click(settingsBtn);
+        expect(settingsListener).toHaveBeenCalled();
         expect(bridge.send).toHaveBeenCalledWith({ name: 'openSettings' });
+        window.removeEventListener('tri-open-settings', settingsListener);
     });
 
     it('ControlsBar toggles camera, sharing, and leaveVoice with sound effects', () => {

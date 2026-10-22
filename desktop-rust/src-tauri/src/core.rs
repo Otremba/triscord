@@ -1578,5 +1578,12 @@ mod tests {
             "text": "Coding in Rust 🦀"
         })).unwrap();
         assert!(matches!(status, Command::SetCustomStatus { text } if text == "Coding in Rust 🦀"));
+
+        // Select server supports @me home indicator
+        let select_me: Command = serde_json::from_value(json!({
+            "name": "selectServer",
+            "serverId": "@me"
+        })).unwrap();
+        assert!(matches!(select_me, Command::SelectServer { server_id } if server_id == "@me"));
     }
 }
