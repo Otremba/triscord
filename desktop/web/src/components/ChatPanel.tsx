@@ -56,7 +56,7 @@ export function ChatPanel({
                 )}
             </div>
             <div className="shrink-0 border-t border-ink-800 p-3">
-                <div className="flex items-end gap-2 rounded-lg bg-ink-800 px-3 py-2">
+                <div className={`flex gap-2 rounded-lg bg-ink-800 px-3 py-1.5 ${draft.includes('\n') ? 'items-end' : 'items-center'}`}>
                     <textarea
                         value={draft}
                         onChange={e => setDraft(e.target.value)}
@@ -68,14 +68,14 @@ export function ChatPanel({
                         }}
                         placeholder={`Mensagem em #${channelName}`}
                         rows={1}
-                        className="max-h-40 min-h-0 flex-1 resize-none bg-transparent text-sm text-ink-100 placeholder:text-ink-500 focus:outline-none"
+                        className="max-h-40 min-h-0 flex-1 resize-none bg-transparent py-1 text-sm leading-5 text-ink-100 placeholder:text-ink-500 focus:outline-none"
                     />
                     <button
                         type="button"
                         aria-label="Enviar mensagem"
                         onClick={send}
                         disabled={!draft.trim()}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-ink-300 hover:bg-ink-700 hover:text-ink-100 disabled:opacity-40"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-300 hover:bg-ink-700 hover:text-ink-100 disabled:opacity-40"
                     >
                         <Send size={18} />
                     </button>
