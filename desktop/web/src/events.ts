@@ -5,6 +5,7 @@ import type { ChatMessage } from './protocol';
 
 export type OpenModalDetail =
     | { kind: 'createChannel'; categoryName: string }
+    | { kind: 'deleteChannel'; channelId: string; channelName: string }
     | { kind: 'invite'; serverId: string; serverName: string }
     | { kind: 'deleteMessage'; message: ChatMessage }
     | { kind: 'deleteServer' | 'leaveServer'; serverId: string; serverName: string }

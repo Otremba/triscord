@@ -134,6 +134,10 @@ pub enum Command {
         #[serde(default)]
         kind: Option<String>,
     },
+    DeleteChannel {
+        #[serde(rename = "channelId")]
+        channel_id: String,
+    },
     SetCustomStatus {
         text: String,
     },
@@ -1140,6 +1144,35 @@ impl Core {
                 }
                 Ok(Value::Null)
             }
+            Command::DeleteChannel { channel_id } => {
+                api::id(&channel_id)?;
+                let was_connected_voice = {
+                    let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    let in_voice = m.desired_room.as_deref() == Some(&channel_id) && m.voice_requested;
+                    if in_voice {
+                        m.voice_requested = false;
+                        m.desired_room = None;
+                        m.connected_at = 0;
+                    }
+                    if m.text_room.as_deref() == Some(&channel_id) {
+                        m.text_room = None;
+                    }
+                    in_voice
+                };
+                if was_connected_voice {
+                    let generation = self.model.lock().unwrap_or_else(|e| e.into_inner()).generation;
+                    let _ = self.media.stop(generation);
+                    let _ = self.send("leave-room", json!({}));
+                }
+                self.send("delete-room", json!({"roomId": channel_id}))?;
+                {
+                    let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                    m.rooms.retain(|r| r["id"].as_str() != Some(&channel_id));
+                    m.chat.retain(|c| c["roomId"].as_str() != Some(&channel_id));
+                }
+                model::publish(app, &self.model);
+                Ok(Value::Null)
+            }
             Command::SetCustomStatus { text } => {
                 let (account, mut preferences) = {
                     let model = self.model.lock().unwrap_or_else(|e| e.into_inner());
@@ -1457,6 +1490,15 @@ mod tests {
                 stream_muted: Some(true)
             } if socket_id == "sock-peer-1"
         ));
+    }
+    #[test]
+    fn command_delete_channel_deserializes() {
+        let cmd: Command = serde_json::from_value(json!({
+            "name": "deleteChannel",
+            "channelId": "chan-del-123"
+        }))
+        .unwrap();
+        assert!(matches!(cmd, Command::DeleteChannel { channel_id } if channel_id == "chan-del-123"));
     }
     #[test]
     fn command_server_management_deserializes() {

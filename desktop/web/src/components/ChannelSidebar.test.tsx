@@ -84,4 +84,39 @@ describe('ChannelSidebar Component Hierarchy and Behavior', () => {
         fireEvent.click(screen.getByText('chat-geral'));
         expect(bridge.send).toHaveBeenCalledWith({ name: 'openTextRoom', channelId: 't1' });
     });
+
+    it('emits tri-open-modal deleteChannel when delete button is clicked', () => {
+        const bridge = createMockBridge();
+        const session = getFixture('empty');
+        session.selectedServerId = 's1';
+        session.servers = [{ id: 's1', name: 'Test Server', owned: true }];
+        session.categories = [
+            {
+                id: 'cat-1',
+                name: 'Geral',
+                channels: [
+                    { id: 'v1', name: 'Canal Teste', kind: 'voice', users: [] },
+                ],
+            },
+        ];
+
+        let modalDetail: any = null;
+        const listener = (e: Event) => {
+            modalDetail = (e as CustomEvent).detail;
+        };
+        window.addEventListener('tri-open-modal', listener);
+
+        render(<ChannelSidebar session={session} bridge={bridge} />);
+
+        const delBtn = screen.getByRole('button', { name: /excluir canal canal teste/i });
+        fireEvent.click(delBtn);
+
+        expect(modalDetail).toEqual({
+            kind: 'deleteChannel',
+            channelId: 'v1',
+            channelName: 'Canal Teste',
+        });
+
+        window.removeEventListener('tri-open-modal', listener);
+    });
 });

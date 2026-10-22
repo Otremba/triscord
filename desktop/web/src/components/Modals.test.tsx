@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SettingsModal } from './SettingsModal';
 import { CreateChannelModal } from './modals/CreateChannelModal';
+import { DeleteChannelModal } from './modals/DeleteChannelModal';
 import { CreateServerModal } from './modals/CreateServerModal';
 import { ShareScreenModal } from './modals/ShareScreenModal';
 import { QuickSwitcher } from './QuickSwitcher';
@@ -160,6 +161,31 @@ describe('Modals & Dialogs Components', () => {
                 }),
             }));
         });
+    });
+
+    it('DeleteChannelModal confirms deletion and sends deleteChannel command', () => {
+        const bridge = createMockBridge();
+        const onClose = vi.fn();
+
+        render(
+            <DeleteChannelModal
+                channelId="c-to-delete"
+                channelName="canal-teste"
+                bridge={bridge}
+                onClose={onClose}
+            />
+        );
+
+        expect(screen.getByText('canal-teste')).toBeInTheDocument();
+
+        const deleteBtn = screen.getByRole('button', { name: /^excluir canal$/i });
+        fireEvent.click(deleteBtn);
+
+        expect(bridge.send).toHaveBeenCalledWith({
+            name: 'deleteChannel',
+            channelId: 'c-to-delete',
+        });
+        expect(onClose).toHaveBeenCalled();
     });
 });
 

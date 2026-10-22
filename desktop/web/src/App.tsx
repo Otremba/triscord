@@ -12,6 +12,7 @@ import { FriendsView } from './components/FriendsView';
 import { QuickSwitcher } from './components/QuickSwitcher';
 import { SettingsModal } from './components/SettingsModal';
 import { CreateChannelModal } from './components/modals/CreateChannelModal';
+import { DeleteChannelModal } from './components/modals/DeleteChannelModal';
 import { CreateServerModal } from './components/modals/CreateServerModal';
 import { ShareScreenModal } from './components/modals/ShareScreenModal';
 import { ControlsBar } from './components/call/ControlsBar';
@@ -31,6 +32,7 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
     const [settingsPage, setSettingsPage] = useState<'account' | 'voice' | 'windows'>('voice');
     const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
     const [channelModal, setChannelModal] = useState<{ categoryName?: string } | null>(null);
+    const [deleteChannelModal, setDeleteChannelModal] = useState<{ channelId: string; channelName: string } | null>(null);
     const [serverModalOpen, setServerModalOpen] = useState(false);
     const [shareModalOpen, setShareModalOpen] = useState(false);
 
@@ -56,6 +58,8 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
             const detail = (e as CustomEvent).detail;
             if (detail?.kind === 'createChannel') {
                 setChannelModal({ categoryName: detail.categoryName });
+            } else if (detail?.kind === 'deleteChannel') {
+                setDeleteChannelModal({ channelId: detail.channelId, channelName: detail.channelName });
             } else if (detail?.kind === 'shareScreen') {
                 setShareModalOpen(true);
             } else if (detail?.kind === 'createServer') {
@@ -273,6 +277,15 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
                     categoryName={channelModal.categoryName}
                     bridge={bridge}
                     onClose={() => setChannelModal(null)}
+                />
+            )}
+
+            {deleteChannelModal && (
+                <DeleteChannelModal
+                    channelId={deleteChannelModal.channelId}
+                    channelName={deleteChannelModal.channelName}
+                    bridge={bridge}
+                    onClose={() => setDeleteChannelModal(null)}
                 />
             )}
 

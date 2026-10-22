@@ -1,4 +1,4 @@
-import { Hash, Volume2, Plus, Mic, MicOff, HeadphoneOff, Users } from 'lucide-react';
+import { Hash, Volume2, Plus, Mic, MicOff, HeadphoneOff, Users, Trash2 } from 'lucide-react';
 import type { Bridge } from '../bridge';
 import type { Session, VoiceUser } from '../protocol';
 import { cn } from '../lib/utils';
@@ -58,28 +58,49 @@ export function ChannelSidebar({ session, bridge }: { session: Session; bridge: 
                                     const active = channel.id === session.selectedChannelId;
                                     const connected = channel.id === session.connectedChannelId;
                                     return (
-                                        <div key={channel.id}>
-                                            <button
-                                            type="button"
-                                            onClick={() => {
-                                                if (channel.kind === 'voice') {
-                                                    bridge.send({ name: 'joinVoice', channelId: channel.id });
-                                                } else {
-                                                    bridge.send({ name: 'openTextRoom', channelId: channel.id });
-                                                }
-                                            }}
-                                            className={cn(
-                                                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-ink-300 hover:bg-ink-800 hover:text-ink-100 transition-colors',
-                                                active && 'bg-ink-700/80 text-ink-100 font-medium',
-                                                connected && 'text-brand-300 font-medium'
-                                            )}
-                                        >
-                                            {channel.kind === 'voice' ? <Volume2 size={16} className={connected ? 'text-brand-400' : 'text-ink-400'} /> : <Hash size={16} className="text-ink-400" />}
-                                            <span className="truncate">{channel.name}</span>
-                                            {connected && (
-                                                <span className="ml-auto flex h-2 w-2 rounded-full bg-brand-400" />
-                                            )}
-                                        </button>
+                                        <div key={channel.id} className="group relative">
+                                            <div className={cn(
+                                                'flex items-center rounded-md hover:bg-ink-800 transition-colors',
+                                                active && 'bg-ink-700/80'
+                                            )}>
+                                                <button
+                                                    type="button"
+                                                    onContextMenu={e => {
+                                                        e.preventDefault();
+                                                        emit('tri-open-modal', { kind: 'deleteChannel', channelId: channel.id, channelName: channel.name });
+                                                    }}
+                                                    onClick={() => {
+                                                        if (channel.kind === 'voice') {
+                                                            bridge.send({ name: 'joinVoice', channelId: channel.id });
+                                                        } else {
+                                                            bridge.send({ name: 'openTextRoom', channelId: channel.id });
+                                                        }
+                                                    }}
+                                                    className={cn(
+                                                        'flex flex-1 min-w-0 items-center gap-2 px-2 py-1.5 text-sm text-ink-300 hover:text-ink-100 transition-colors text-left',
+                                                        active && 'text-ink-100 font-medium',
+                                                        connected && 'text-brand-300 font-medium'
+                                                    )}
+                                                >
+                                                    {channel.kind === 'voice' ? <Volume2 size={16} className={connected ? 'text-brand-400' : 'text-ink-400'} /> : <Hash size={16} className="text-ink-400" />}
+                                                    <span className="truncate">{channel.name}</span>
+                                                    {connected && (
+                                                        <span className="ml-auto flex h-2 w-2 rounded-full bg-brand-400" />
+                                                    )}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    title={`Excluir canal ${channel.name}`}
+                                                    aria-label={`Excluir canal ${channel.name}`}
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        emit('tri-open-modal', { kind: 'deleteChannel', channelId: channel.id, channelName: channel.name });
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 p-1 mr-1 text-ink-400 hover:text-critical hover:bg-ink-700/60 rounded transition-all"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
                                         {channel.users && channel.users.length > 0 && (
                                             <div className="mt-0.5 space-y-0.5 pl-6">
                                                 {channel.users.map(user => (

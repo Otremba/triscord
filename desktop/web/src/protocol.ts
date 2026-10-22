@@ -241,6 +241,7 @@ export type Command =
   | { name: 'selectChannel'; channelId: Id }
   | { name: 'joinVoice'; channelId: Id }
   | { name: 'createChannel'; channelName: string; kind?: 'text' | 'voice' }
+  | { name: 'deleteChannel'; channelId: Id }
   | { name: 'sendChatMessage'; text: string }        // room we are in; hub limit 2000 characters
   | { name: 'deleteChatMessage'; messageId: Id }     // own messages only
   | { name: 'toggleReaction'; messageId: Id; emoji: string }

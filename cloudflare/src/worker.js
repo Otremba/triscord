@@ -410,6 +410,7 @@ export class TriscordHub extends DurableObject {
     const room = this.rooms.get(client.data.room);
     if (name === 'join-room') return this.join(client, payload);
     if (name === 'leave-room') return this.leave(client);
+    if (name === 'delete-room') return this.deleteRoom(client, payload);
     if (!room || !client.data.user) return;
     if (name === 'media-refresh' && client.data.mediaTransport === 'livekit' && client.data.identity && payload.roomId === room.id &&
         ['voice', 'screen', 'camera'].includes(payload.kind)) {
@@ -618,6 +619,45 @@ export class TriscordHub extends DurableObject {
       this.saveRoom(id);
     }
     this.broadcast('user-left', { socketId: client.data.sid, username: user?.username }, id);
+    this.broadcast('rooms-update', this.directory());
+  }
+  async deleteRoom(client, payload) {
+    const id = payload?.roomId;
+    if (typeof id !== 'string' || !this.rooms.has(id)) return;
+    if (this.rooms.size <= 1) {
+      this.send(client, 'request-error', { message: 'Não é possível excluir o único canal existente.' });
+      return;
+    }
+    const room = this.rooms.get(id);
+    let isAuthorized = false;
+    const userId = client.data.user?.userId || client.data.identity?.accountId;
+    if (client.data.identity) {
+      if (client.data.identity.serverId && this.env.DB) {
+        const s = await this.env.DB.prepare('SELECT owner_account_id FROM servers WHERE id=?1').bind(client.data.identity.serverId).first();
+        if (s && s.owner_account_id === client.data.identity.accountId) {
+          isAuthorized = true;
+        } else {
+          isAuthorized = !['geral', 'jogos'].includes(id) || (room.ownerUserId === userId);
+        }
+      } else {
+        isAuthorized = !['geral', 'jogos'].includes(id) || (room.ownerUserId === userId);
+      }
+    } else if (client.data.user?.authenticated) {
+      isAuthorized = !['geral', 'jogos'].includes(id) || (room.ownerUserId === userId);
+    }
+    if (!isAuthorized) {
+      this.send(client, 'request-error', { message: 'Você não tem permissão para excluir este canal.' });
+      return;
+    }
+    for (const c of this.users(id)) {
+      this.send(c, 'kicked', { roomId: id });
+      this.leave(c);
+    }
+    this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec('DELETE FROM messages WHERE room=?', id);
+      this.ctx.storage.sql.exec('DELETE FROM rooms WHERE id=?', id);
+    });
+    this.rooms.delete(id);
     this.broadcast('rooms-update', this.directory());
   }
   close(client) { this.leave(client); this.clients.delete(client.data.sid); }

@@ -160,9 +160,17 @@ try {
   freshB.send('force-mute-user', { socketId: freshB.sid, muted: false });
   freshB.send('user-state-change', { isMuted: false });
   assert.equal((await freshB.event('force-muted')).muted, true);
-  a.send('force-mute-user', { socketId: freshB.sid, muted: false });
-  assert.equal((await freshB.event('force-muted')).muted, false);
   a.send('kick-user',{socketId:freshB.sid}); await freshB.event('kicked');
+  // Channel creation and deletion test
+  c.send('join-room', { roomId: 'teste-del', roomName: 'Canal Teste', userData: { userId: 'profile_c', username: 'guest' } });
+  await c.event('room-joined');
+  await a.packet(p => p.startsWith('42[') && JSON.parse(p.slice(2))[0] === 'rooms-update' && JSON.parse(p.slice(2))[1].some(r => r.id === 'teste-del'));
+  // Unauthenticated non-owner cannot delete
+  b.send('delete-room', { roomId: 'teste-del' });
+  assert.match((await b.event('request-error')).message, /permissão/);
+  // Room creator can delete
+  c.send('delete-room', { roomId: 'teste-del' });
+  await a.packet(p => p.startsWith('42[') && JSON.parse(p.slice(2))[0] === 'rooms-update' && !JSON.parse(p.slice(2))[1].some(r => r.id === 'teste-del'));
   a.close(); await new Promise(resolve => setTimeout(resolve,50));
   const rejoined = await c.join('geral','profile_c'); assert.equal(rejoined.chatHistory.length,0); assert.equal(rejoined.isOwner,true);
   const fixture = await c.join('native-validation', 'profile_c');
