@@ -21,9 +21,11 @@ export function ParticipantCard({
     onClick,
     onKick,
 }: ParticipantCardProps) {
-    const activeSpeaking = useSpeakingHold(isSpeaking, 400);
-    const isMuted = user.muted || user.serverMuted;
-    const isDeafened = user.deafened;
+    const isMuted = Boolean(user.muted || user.serverMuted);
+    const isDeafened = Boolean(user.deafened);
+    const canSpeak = !isMuted && !isDeafened;
+    const rawSpeaking = canSpeak && Boolean(isSpeaking);
+    const activeSpeaking = canSpeak && useSpeakingHold(rawSpeaking, 400);
     const hasVideo = user.camera ?? false;
     const isSelf = user.self ?? false;
 

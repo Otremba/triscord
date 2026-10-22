@@ -159,17 +159,20 @@ export function CallStage({
                     })}
 
                     {/* Users on Stage */}
-                    {stageItems.users.map(user => (
-                        <ParticipantCard
-                            key={user.id}
-                            user={user}
-                            isSpeaking={user.speaking}
-                            variant="stage"
-                            isFocused={focusedKeys.includes(user.id)}
-                            onClick={() => toggleFocus(user.id)}
-                            onKick={!user.self ? () => bridge.send({ name: 'disconnectParticipant', socketId: user.id }) : undefined}
-                        />
-                    ))}
+                    {stageItems.users.map(user => {
+                        const canSpeak = !user.muted && !user.serverMuted && !user.deafened;
+                        return (
+                            <ParticipantCard
+                                key={user.id}
+                                user={user}
+                                isSpeaking={canSpeak && Boolean(user.speaking)}
+                                variant="stage"
+                                isFocused={focusedKeys.includes(user.id)}
+                                onClick={() => toggleFocus(user.id)}
+                                onKick={!user.self ? () => bridge.send({ name: 'disconnectParticipant', socketId: user.id }) : undefined}
+                            />
+                        );
+                    })}
                 </div>
             </div>
 
@@ -201,18 +204,21 @@ export function CallStage({
                     })}
 
                     {/* Secondary Participants in strip */}
-                    {stripItems.users.map(user => (
-                        <div key={user.id} className="w-48 sm:w-56">
-                            <ParticipantCard
-                                user={user}
-                                isSpeaking={user.speaking}
-                                variant="compact"
-                                isFocused={false}
-                                onClick={() => toggleFocus(user.id)}
-                                onKick={!user.self ? () => bridge.send({ name: 'disconnectParticipant', socketId: user.id }) : undefined}
-                            />
-                        </div>
-                    ))}
+                    {stripItems.users.map(user => {
+                        const canSpeak = !user.muted && !user.serverMuted && !user.deafened;
+                        return (
+                            <div key={user.id} className="w-48 sm:w-56">
+                                <ParticipantCard
+                                    user={user}
+                                    isSpeaking={canSpeak && Boolean(user.speaking)}
+                                    variant="compact"
+                                    isFocused={false}
+                                    onClick={() => toggleFocus(user.id)}
+                                    onKick={!user.self ? () => bridge.send({ name: 'disconnectParticipant', socketId: user.id }) : undefined}
+                                />
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>

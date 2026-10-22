@@ -145,6 +145,21 @@ impl Model {
                     if room["ownerUserId"].as_str() == Some(account) {
                         owner = socket.to_owned();
                     }
+                    let is_muted = if is_self {
+                        self.muted || self.server_muted || self.deafened
+                    } else {
+                        flag(user, "isMuted") || flag(user, "isServerMuted")
+                    };
+                    let is_deafened = if is_self {
+                        self.deafened
+                    } else {
+                        flag(user, "isDeafened")
+                    };
+                    let is_speaking = if is_muted || is_deafened {
+                        false
+                    } else {
+                        self.speaking.contains(socket)
+                    };
                     json!({
                         "id": socket, "name": user["username"], "self": is_self, "profileAvailable": authenticated,
                         "avatarUrl": if is_self { self.profile.as_ref().and_then(|p| p["avatarDataUrl"].as_str()).unwrap_or_default() } else { "" },
@@ -154,8 +169,8 @@ impl Model {
                         "pan": self.peer_pan.get(socket).copied().unwrap_or(0),
                         "streamVolume": self.peer_stream_volume.get(socket).copied().unwrap_or(100),
                         "streamMuted": self.peer_stream_muted.contains(socket),
-                        "muted": flag(user, "isMuted"), "deafened": flag(user, "isDeafened"),
-                        "customStatus": user["status"], "speaking": self.speaking.contains(socket),
+                        "muted": is_muted, "deafened": is_deafened,
+                        "customStatus": user["status"], "speaking": is_speaking,
                         "camera": flag(user, "isCameraOn"), "live": flag(user, "isScreenSharing") || (is_self && self.sharing),
                         "serverMuted": flag(user, "isServerMuted"),
                     })
@@ -292,7 +307,12 @@ impl Model {
         self.generation
     }
     /// The people LiveKit hears speaking, as hub socket ids. Returns whether anything changed.
-    pub fn set_speaking(&mut self, sockets: HashSet<String>) -> bool {
+    pub fn set_speaking(&mut self, mut sockets: HashSet<String>) -> bool {
+        if self.muted || self.server_muted || self.deafened {
+            if !self.self_socket.is_empty() {
+                sockets.remove(&self.self_socket);
+            }
+        }
         if self.speaking == sockets {
             return false;
         }
@@ -610,6 +630,24 @@ mod tests {
         assert_eq!(model.snapshot()["session"]["categories"][0]["channels"][0]["users"][1]["speaking"], true);
         assert!(model.update(0, "user-left", json!({"socketId":"s2"})));
         assert_eq!(model.snapshot()["session"]["categories"][0]["channels"][0]["users"][1]["speaking"], false);
+    }
+    #[test]
+    fn muted_users_never_show_speaking() {
+        let mut model = signed_in();
+        // Self is s1, s2 is Bia. When unmuted, speaking can be true
+        assert!(model.set_speaking(["s1".to_string(), "s2".to_string()].into()));
+        assert_eq!(model.snapshot()["session"]["categories"][0]["channels"][0]["users"][0]["speaking"], true);
+        assert_eq!(model.snapshot()["session"]["categories"][0]["channels"][0]["users"][1]["speaking"], true);
+
+        // When self is muted, self can never be speaking
+        model.muted = true;
+        assert_eq!(model.snapshot()["session"]["categories"][0]["channels"][0]["users"][0]["speaking"], false);
+        assert_eq!(model.snapshot()["session"]["categories"][0]["channels"][0]["users"][0]["muted"], true);
+
+        // When remote user is muted, they can never be speaking
+        assert!(model.update(0, "user-state-updated", json!({"socketId":"s2","state":{"isMuted":true}})));
+        assert_eq!(model.snapshot()["session"]["categories"][0]["channels"][0]["users"][1]["speaking"], false);
+        assert_eq!(model.snapshot()["session"]["categories"][0]["channels"][0]["users"][1]["muted"], true);
     }
     #[test]
     fn own_screen_share_marks_the_own_row_live() {

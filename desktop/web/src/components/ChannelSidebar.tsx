@@ -121,7 +121,10 @@ export function ChannelSidebar({ session, bridge }: { session: Session; bridge: 
 }
 
 function VoiceUserRow({ user }: { user: VoiceUser }) {
-    const isSpeaking = useSpeakingHold(!!user.speaking, 400);
+    const isMuted = Boolean(user.muted || user.serverMuted);
+    const isDeafened = Boolean(user.deafened);
+    const canSpeak = !isMuted && !isDeafened;
+    const isSpeaking = canSpeak && useSpeakingHold(canSpeak && Boolean(user.speaking), 400);
 
     return (
         <div className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-ink-300 hover:bg-ink-800/60 transition-colors">

@@ -1025,6 +1025,10 @@ impl Core {
                 let generation = {
                     let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
                     m.muted = muted;
+                    if muted && !m.self_socket.is_empty() {
+                        let self_socket = m.self_socket.clone();
+                        m.speaking.remove(&self_socket);
+                    }
                     m.generation
                 };
                 self.media.configure(generation)?;
@@ -1038,12 +1042,17 @@ impl Core {
                     .unwrap_or_else(|e| e.into_inner())
                     .user_state_notify
                     .notify_one();
+                model::publish(app, &self.model);
                 Ok(Value::Null)
             }
             Command::SetDeafened { deafened } => {
                 let generation = {
                     let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
                     m.deafened = deafened;
+                    if deafened && !m.self_socket.is_empty() {
+                        let self_socket = m.self_socket.clone();
+                        m.speaking.remove(&self_socket);
+                    }
                     m.generation
                 };
                 self.media.configure(generation)?;
@@ -1057,6 +1066,7 @@ impl Core {
                     .unwrap_or_else(|e| e.into_inner())
                     .user_state_notify
                     .notify_one();
+                model::publish(app, &self.model);
                 Ok(Value::Null)
             }
             Command::SetSetting { key, value } => {

@@ -60,6 +60,24 @@ describe('Voice Speaking Indicator & ParticipantCard', () => {
         // useSpeakingHold holds for 400ms, then drops
     });
 
+    it('ParticipantCard never displays green speaking ring when user is muted or deafened even if isSpeaking is true', () => {
+        const mutedUser: VoiceUser = {
+            id: 'u1',
+            name: 'camargo',
+            self: true,
+            muted: true,
+            deafened: false,
+            speaking: true,
+        };
+
+        const { container } = render(<ParticipantCard user={mutedUser} isSpeaking={true} />);
+
+        // Must NOT have green border or ring
+        const card = container.firstChild as HTMLElement;
+        expect(card.className).not.toContain('border-[#23a55a]');
+        expect(card.className).not.toContain('ring-[#23a55a]');
+    });
+
     it('ParticipantCard triggers onKick when moderation button is clicked', () => {
         const user: VoiceUser = {
             id: 'u2',
