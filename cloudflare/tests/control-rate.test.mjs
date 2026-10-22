@@ -31,4 +31,23 @@ for (const invalid of ['42[', '42["webrtc-offer",null]', '42["webrtc-offer",[]]'
   assert.equal(consumeControlRate(exhausted, invalid, now), false);
   assert.equal(exhausted.rtcRateCount, undefined);
 }
+
+// WebRTC limit exhausted does NOT prevent regular commands if under 40
+const rtcMaxed = { rateTime: now, rateCount: 5, rtcRateCount: 256 };
+assert.equal(consumeControlRate(rtcMaxed, packet('webrtc-offer', {}), now), false);
+assert.equal(consumeControlRate(rtcMaxed, packet('user-state-change'), now), true);
+assert.equal(rtcMaxed.rateCount, 6);
+
+// Non-42 packets (ping '2', pong '3', handshake '0') consume the standard rate limit
+const nonRtc = { rateTime: now, rateCount: 39, rtcRateCount: 0 };
+assert.equal(consumeControlRate(nonRtc, '2probe', now), true);
+assert.equal(consumeControlRate(nonRtc, '2probe', now), false);
+assert.equal(controlRateLimitReason(nonRtc), 'Control rate limit (commands 41/40)');
+
+// Time going backwards or sub-second increments does NOT reset the counter
+const midWindow = { rateTime: 5000, rateCount: 40, rtcRateCount: 256 };
+assert.equal(consumeControlRate(midWindow, packet('user-state-change'), 4999), false);
+assert.equal(consumeControlRate(midWindow, packet('user-state-change'), 5500), false);
+assert.equal(consumeControlRate(midWindow, packet('user-state-change'), 6000), true);
+
 console.log('PASS: call negotiation bursts, independent UI limit, bounded WebRTC limit, hibernation and reset');
