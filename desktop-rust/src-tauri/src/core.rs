@@ -360,6 +360,15 @@ impl Core {
         {
             return Err(Error::invalid());
         }
+        if self
+            .model
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .selected_server
+            == id
+        {
+            return Ok(());
+        }
         let token = self
             .credential
             .as_ref()

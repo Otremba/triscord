@@ -33,9 +33,6 @@ export function ChatPanel({
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex h-12 shrink-0 items-center border-b border-ink-800 px-4">
-                <span className="text-sm font-semibold text-ink-100"># {channelName}</span>
-            </div>
             <div ref={listRef} className="selectable flex-1 overflow-y-auto px-4 py-4">
                 {messages.length === 0 ? (
                     <p className="text-sm text-ink-500">Nenhuma mensagem ainda. Comece a conversa.</p>
