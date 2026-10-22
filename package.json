@@ -6,6 +6,11 @@
   "scripts": {
     "build:web": "npm --prefix desktop/web run build",
     "typecheck": "npm --prefix desktop/web run typecheck",
+    "test:web": "npm --prefix desktop/web test",
+    "test:cloudflare": "npm --prefix cloudflare run test",
+    "test:native": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop-rust/build.ps1 -CheckOnly",
+    "test:all": "npm run test:web && npm run test:cloudflare && npm run test:native",
+    "test": "npm run test:all",
     "build:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop-rust/build.ps1",
     "build:release": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop-rust/build.ps1 -Release"
   },
