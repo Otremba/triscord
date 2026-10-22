@@ -57,6 +57,8 @@ pub struct Model {
     pub peer_stream_volume: HashMap<String, u32>,
     /// Hub socket ids whose stream audio is silenced locally.
     pub peer_stream_muted: HashSet<String>,
+    /// Cache of server channel directories (server_id -> rooms) for 0ms instantaneous display.
+    pub server_rooms: HashMap<String, Vec<Value>>,
 }
 
 fn truncate(value: &str, limit: usize) -> String {
@@ -295,6 +297,10 @@ impl Model {
                     if !self.room_order.iter().any(|known| known == id) {
                         self.room_order.push(id.to_owned());
                     }
+                }
+                if !self.selected_server.is_empty() {
+                    self.server_rooms
+                        .insert(self.selected_server.clone(), self.rooms.clone());
                 }
             }
             "user-state-updated" => {

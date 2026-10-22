@@ -42,23 +42,24 @@ export function ChannelSidebar({ session, bridge }: { session: Session; bridge: 
                 ) : (
                     session.categories.map(category => (
                         <div key={category.id} className="mb-4">
-                            <div className="flex items-center justify-between px-2 py-1 text-xs font-bold uppercase tracking-wider text-ink-400">
+                            <div className="flex items-center justify-between px-2 pt-2.5 pb-2 text-xs font-bold uppercase tracking-wider text-ink-400">
                                 <span className="truncate">{category.name}</span>
                                 <button
                                     type="button"
                                     aria-label={`Criar canal em ${category.name}`}
-                                    className="text-ink-400 hover:text-ink-100"
+                                    className="text-ink-400 hover:text-ink-100 p-0.5 rounded hover:bg-ink-800 transition-colors"
                                     onClick={() => emit('tri-open-modal', { kind: 'createChannel', categoryName: category.name })}
                                 >
                                     <Plus size={14} />
                                 </button>
                             </div>
-                            {category.channels.map(channel => {
-                                const active = channel.id === session.selectedChannelId;
-                                const connected = channel.id === session.connectedChannelId;
-                                return (
-                                    <div key={channel.id} className="mb-0.5">
-                                        <button
+                            <div className="mt-1 space-y-1">
+                                {category.channels.map(channel => {
+                                    const active = channel.id === session.selectedChannelId;
+                                    const connected = channel.id === session.connectedChannelId;
+                                    return (
+                                        <div key={channel.id}>
+                                            <button
                                             type="button"
                                             onClick={() => {
                                                 bridge.send({ name: 'selectChannel', channelId: channel.id });
@@ -90,6 +91,7 @@ export function ChannelSidebar({ session, bridge }: { session: Session; bridge: 
                                     </div>
                                 );
                             })}
+                            </div>
                         </div>
                     ))
                 )}

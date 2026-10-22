@@ -380,8 +380,27 @@ impl Core {
             let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
             model.selected_server = id.clone();
             model.connection = "connecting";
+            if let Some(cached) = model.server_rooms.get(&id) {
+                let order: Vec<String> = cached
+                    .iter()
+                    .filter_map(|r| r["id"].as_str().map(str::to_owned))
+                    .collect();
+                model.rooms = cached.clone();
+                for r_id in order {
+                    if !model.room_order.contains(&r_id) {
+                        model.room_order.push(r_id);
+                    }
+                }
+            } else {
+                model.rooms = vec![
+                    json!({"id": "geral", "name": "Geral", "userCount": 0, "ownerUserId": "", "users": []}),
+                    json!({"id": "jogos", "name": "Jogos", "userCount": 0, "ownerUserId": "", "users": []}),
+                ];
+                model.room_order = vec!["geral".into(), "jogos".into()];
+            }
             model.generation
         };
+        crate::model::publish(app, &self.model);
         self.socket = Some(Socket::start(
             app.clone(),
             self.model.clone(),
