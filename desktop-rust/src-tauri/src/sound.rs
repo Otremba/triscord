@@ -18,6 +18,10 @@ const LEAVE_WAV: &[u8] = include_bytes!("../../../desktop/assets/call-sounds/lea
 const MUTE_WAV: &[u8] = include_bytes!("../../../desktop/assets/call-sounds/mute.wav");
 #[allow(dead_code)]
 const UNMUTE_WAV: &[u8] = include_bytes!("../../../desktop/assets/call-sounds/unmute.wav");
+#[allow(dead_code)]
+const DEAFEN_WAV: &[u8] = include_bytes!("../../../desktop/assets/call-sounds/deafen.wav");
+#[allow(dead_code)]
+const UNDEAFEN_WAV: &[u8] = include_bytes!("../../../desktop/assets/call-sounds/undeafen.wav");
 
 /// Returns the bundled soundboard catalog for Triscord.
 pub fn catalog() -> Vec<Value> {
@@ -149,9 +153,16 @@ pub fn stop_playback() {
     }
 }
 
-pub fn play_cue(_cue: CallSound) {
-    // Sound cues are rendered with full fidelity via Web Audio API in WebView2 using
-    // authentic Discord sound assets and user volume preferences.
+pub fn play_cue(cue: CallSound) {
+    let bytes = match cue {
+        CallSound::Join => JOIN_WAV,
+        CallSound::Leave => LEAVE_WAV,
+        CallSound::Mute => MUTE_WAV,
+        CallSound::Unmute => UNMUTE_WAV,
+        CallSound::Deafen => DEAFEN_WAV,
+        CallSound::Undeafen => UNDEAFEN_WAV,
+    };
+    play_wav_bytes(bytes);
 }
 
 pub fn play_sound(sound_id: &str) {

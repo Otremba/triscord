@@ -287,6 +287,7 @@ export type Command =
   | { name: 'startMicTest'; inputDevice?: string; outputDevice?: string }
   | { name: 'stopMicTest' }
   | { name: 'applyUpdate' }
+  | { name: 'playCue'; cue: string }
   | { name: 'window'; action: 'minimize' | 'maximize' | 'close' | 'move' | `resize-${'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'}` }
   | { name: 'videoAck'; index: number; seq: number }
   // Page layers floating over the native video windows (an open menu): they are cut out of the windows' masks.

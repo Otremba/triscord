@@ -155,6 +155,15 @@ class SoundEngine {
 
   public play(cue: SoundCue): void {
     if (!this.enabled || this.volume <= 0) return;
+
+    // Guaranteed native Windows hardware playback via PlaySoundW in Tauri core
+    if (typeof window !== 'undefined') {
+      const tauri = (window as unknown as { __TAURI__?: { core: { invoke: (cmd: string, args: unknown) => Promise<unknown> } } }).__TAURI__;
+      if (tauri) {
+        tauri.core.invoke('dispatch', { command: { name: 'playCue', cue } }).catch(() => {});
+      }
+    }
+
     const ctx = this.getContext();
     if (!ctx) return;
 
@@ -169,18 +178,52 @@ class SoundEngine {
         if (buf && this.enabled && this.volume > 0) {
           const freshCtx = this.getContext();
           if (freshCtx) this.playBuffer(freshCtx, buf);
+        } else {
+          this.synthesizeCue(ctx, cue);
         }
       });
       return;
     }
 
+    this.synthesizeCue(ctx, cue);
+  }
+
+  private synthesizeCue(ctx: AudioContext, cue: SoundCue): void {
     try {
       const now = ctx.currentTime;
       const masterGain = ctx.createGain();
-      masterGain.gain.setValueAtTime(this.volume * 0.25, now);
+      masterGain.gain.setValueAtTime(this.volume * 0.4, now);
       masterGain.connect(ctx.destination);
 
       switch (cue) {
+        case 'join':
+        case 'userJoin':
+          this.synthesizeChirp(ctx, masterGain, now, 380, 520, 0.12);
+          break;
+        case 'leave':
+        case 'userLeave':
+          this.synthesizeChirp(ctx, masterGain, now, 520, 340, 0.14);
+          break;
+        case 'mute':
+          this.synthesizeChirp(ctx, masterGain, now, 480, 360, 0.08);
+          break;
+        case 'unmute':
+          this.synthesizeChirp(ctx, masterGain, now, 360, 480, 0.08);
+          break;
+        case 'deafen':
+          this.synthesizeChirp(ctx, masterGain, now, 440, 330, 0.10);
+          break;
+        case 'undeafen':
+          this.synthesizeChirp(ctx, masterGain, now, 330, 440, 0.10);
+          break;
+        case 'cameraOn':
+        case 'streamStart':
+          this.synthesizeChirp(ctx, masterGain, now, 400, 600, 0.10);
+          break;
+        case 'cameraOff':
+        case 'streamStop':
+          this.synthesizeChirp(ctx, masterGain, now, 600, 400, 0.10);
+          break;
         case 'click':
           this.synthesizeHaptic(ctx, masterGain, now, 900, 0.015);
           break;

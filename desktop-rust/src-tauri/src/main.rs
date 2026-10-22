@@ -108,6 +108,21 @@ async fn dispatch(
             updater::apply_cached_update()?;
             return Ok(serde_json::Value::Null);
         }
+        Some("playCue") => {
+            let cue = match command["cue"].as_str() {
+                Some("join" | "userJoin") => Some(sound::CallSound::Join),
+                Some("leave" | "userLeave") => Some(sound::CallSound::Leave),
+                Some("mute") => Some(sound::CallSound::Mute),
+                Some("unmute") => Some(sound::CallSound::Unmute),
+                Some("deafen") => Some(sound::CallSound::Deafen),
+                Some("undeafen") => Some(sound::CallSound::Undeafen),
+                _ => None,
+            };
+            if let Some(c) = cue {
+                sound::play_cue(c);
+            }
+            return Ok(serde_json::Value::Null);
+        }
         Some("window") => return window::action(&app, command["action"].as_str().unwrap_or_default()),
         _ => {}
     }
