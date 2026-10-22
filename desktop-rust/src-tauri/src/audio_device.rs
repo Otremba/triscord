@@ -60,4 +60,11 @@ mod tests {
         )))
         .is_err());
     }
+
+    #[test]
+    fn wasapi_types_exist() {
+        let _ = std::mem::size_of::<Option<IAudioClient>>();
+        let _ = std::mem::size_of::<Option<IAudioCaptureClient>>();
+        let _ = std::mem::size_of::<Option<IAudioRenderClient>>();
+    }
 }

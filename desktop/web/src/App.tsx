@@ -20,7 +20,7 @@ import { MemberList } from './components/MemberList';
 import type { Bridge } from './bridge';
 import type { Session, Channel } from './protocol';
 import { EVENTS } from './events';
-import { MessageSquare, Volume2, Hash, PanelLeftClose, PanelLeftOpen, Users } from 'lucide-react';
+import { MessageSquare, Volume2, Hash, PanelLeftClose, PanelLeftOpen, Users, RefreshCw, Sparkles } from 'lucide-react';
 import { Tooltip } from './components/ui/tooltip';
 import { cn } from './lib/utils';
 
@@ -37,6 +37,20 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
     const [deleteChannelModal, setDeleteChannelModal] = useState<{ channelId: string; channelName: string } | null>(null);
     const [serverModalOpen, setServerModalOpen] = useState(false);
     const [shareModalOpen, setShareModalOpen] = useState(false);
+    const [updateStatus, setUpdateStatus] = useState<{ available: boolean; version: string; ready: boolean; downloading: boolean } | null>(null);
+
+    useEffect(() => {
+        const tauri = (window as unknown as { __TAURI__?: { event: { listen: (name: string, cb: (e: { payload: any }) => void) => Promise<() => void> } } }).__TAURI__;
+        let unlisten: (() => void) | undefined;
+        if (tauri) {
+            tauri.event.listen('update-status', (event: { payload: any }) => {
+                setUpdateStatus(event.payload);
+            }).then(u => { unlisten = u; });
+        }
+        return () => {
+            if (unlisten) unlisten();
+        };
+    }, []);
 
     // Event listeners
     useEffect(() => {
@@ -147,6 +161,41 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
     return (
         <div className="flex h-screen w-screen flex-col bg-ink-950 text-ink-100 overflow-hidden select-none font-sans">
             <TitleBar server={selectedServer} bridge={bridge} />
+
+            {/* Auto Update Notification Banner */}
+            {updateStatus?.ready && (
+                <div className="bg-gradient-to-r from-brand-600 to-indigo-600 px-4 py-2 flex items-center justify-between text-white shadow-lg z-40 shrink-0">
+                    <div className="flex items-center gap-2.5 text-sm font-medium">
+                        <Sparkles size={16} className="text-amber-300 animate-pulse" />
+                        <span>Nova versão do Triscord pronta para uso (<strong>v{updateStatus.version}</strong>)!</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => bridge.send({ name: 'applyUpdate' })}
+                            className="bg-white text-brand-700 hover:bg-ink-100 px-3 py-1 rounded text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
+                        >
+                            <RefreshCw size={12} />
+                            Reiniciar e Atualizar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setUpdateStatus(null)}
+                            className="text-white/70 hover:text-white px-2 py-0.5 rounded transition-colors text-xs cursor-pointer"
+                        >
+                            Depois
+                        </button>
+                    </div>
+                </div>
+            )}
+            {updateStatus?.downloading && (
+                <div className="bg-ink-900 border-b border-ink-800 px-4 py-1.5 flex items-center justify-between text-ink-300 text-xs shrink-0 z-40">
+                    <div className="flex items-center gap-2">
+                        <RefreshCw size={12} className="animate-spin text-brand-400" />
+                        <span>Baixando atualização do Triscord (<strong>v{updateStatus.version}</strong>)...</span>
+                    </div>
+                </div>
+            )}
 
             <div className="flex flex-1 min-h-0 min-w-0">
                 {/* Left: Server Rail */}

@@ -284,6 +284,9 @@ export type Command =
   | { name: 'setSetting'; key: 'callSounds' | 'noiseSuppression' | 'automaticGainControl' | 'desktopNotifications' | 'taskbarAlert' | 'closeToTray' | 'startMinimized' | 'openAtLogin' | 'shareHd' | 'shareAudio' | 'errorReports'; value: boolean }
   | { name: 'setSetting'; key: 'shareMode'; value: 'game' | 'screen' }
   | { name: 'setSetting'; key: 'noiseSuppressionMode'; value: 'standard' | 'high' }
+  | { name: 'startMicTest'; inputDevice?: string; outputDevice?: string }
+  | { name: 'stopMicTest' }
+  | { name: 'applyUpdate' }
   | { name: 'window'; action: 'minimize' | 'maximize' | 'close' | 'move' | `resize-${'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'}` }
   | { name: 'videoAck'; index: number; seq: number }
   // Page layers floating over the native video windows (an open menu): they are cut out of the windows' masks.

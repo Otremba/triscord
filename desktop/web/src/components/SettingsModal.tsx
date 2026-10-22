@@ -22,6 +22,35 @@ export function SettingsModal({ session, bridge, initialPage = 'voice', onClose 
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'uploading'>('idle');
     const [uploadError, setUploadError] = useState<string | null>(null);
 
+    // Mic Test State
+    const [isTestingMic, setIsTestingMic] = useState(false);
+    const [micLevel, setMicLevel] = useState(0);
+
+    useEffect(() => {
+        const tauri = (window as unknown as { __TAURI__?: { event: { listen: (name: string, cb: (e: { payload: { level: number } }) => void) => Promise<() => void> } } }).__TAURI__;
+        let unlisten: (() => void) | undefined;
+        if (tauri) {
+            tauri.event.listen('mic-test-level', (event: { payload: { level: number } }) => {
+                setMicLevel(event.payload.level);
+            }).then(u => { unlisten = u; });
+        }
+        return () => {
+            if (unlisten) unlisten();
+            bridge.send({ name: 'stopMicTest' });
+        };
+    }, [bridge]);
+
+    const toggleMicTest = () => {
+        if (isTestingMic) {
+            bridge.send({ name: 'stopMicTest' });
+            setIsTestingMic(false);
+            setMicLevel(0);
+        } else {
+            bridge.send({ name: 'startMicTest', inputDevice: s?.inputDevice, outputDevice: s?.outputDevice });
+            setIsTestingMic(true);
+        }
+    };
+
     const setSetting = (key: any, value: any) => {
         bridge.send({ name: 'setSetting', key, value });
     };
@@ -383,6 +412,45 @@ export function SettingsModal({ session, bridge, initialPage = 'voice', onClose 
                                         onChange={e => setSetting('outputVolume', +e.target.value)}
                                         className="w-full accent-brand-500"
                                     />
+                                </div>
+                            </div>
+
+                            {/* Teste de Microfone */}
+                            <div className="rounded-lg bg-ink-950/70 border border-ink-800 p-4 space-y-3">
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-ink-300 mb-1">Teste de Microfone</label>
+                                    <span className="text-xs text-ink-400 block">Está tendo problemas de áudio? Faça um teste para escutar sua voz e conferir se o microfone está funcionando perfeitamente.</span>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={toggleMicTest}
+                                        className={cn(
+                                            "px-4 py-2 rounded-md text-sm font-semibold transition-all duration-150 flex items-center gap-2 shrink-0 select-none shadow-sm cursor-pointer",
+                                            isTestingMic 
+                                                ? "bg-red-600 hover:bg-red-500 text-white shadow-red-900/30" 
+                                                : "bg-brand-500 hover:bg-brand-600 text-white shadow-brand-900/30"
+                                        )}
+                                    >
+                                        <Volume2 className={cn("w-4 h-4", isTestingMic && "animate-pulse")} />
+                                        {isTestingMic ? "Parar Teste" : "Testar Microfone"}
+                                    </button>
+                                    <div className="flex-1 space-y-1">
+                                        <div className="h-3.5 bg-ink-900 rounded-full overflow-hidden border border-ink-800 p-0.5 relative flex items-center">
+                                            <div
+                                                className={cn(
+                                                    "h-full rounded-full transition-all duration-75",
+                                                    micLevel > 75 ? "bg-amber-400" : "bg-emerald-500"
+                                                )}
+                                                style={{ width: `${isTestingMic ? Math.min(100, Math.max(0, micLevel)) : 0}%` }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between text-[10px] text-ink-500 font-mono px-0.5">
+                                            <span>SILÊNCIO</span>
+                                            <span>BOM</span>
+                                            <span>ALTO</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 

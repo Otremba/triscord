@@ -21,6 +21,7 @@ mod video_gpu;
 mod audio_loopback;
 mod sound;
 mod updater;
+mod mic_test;
 mod window;
 
 use tauri::Manager;
@@ -93,6 +94,20 @@ async fn dispatch(
         Some("videoIdle" | "videoStats" | "videoAck") => {
             return Ok(serde_json::Value::Null)
         }
+        Some("startMicTest") => {
+            let input = command["inputDevice"].as_str().unwrap_or_default().to_string();
+            let output = command["outputDevice"].as_str().unwrap_or_default().to_string();
+            mic_test::start(app.clone(), input, output);
+            return Ok(serde_json::Value::Null);
+        }
+        Some("stopMicTest") => {
+            mic_test::stop();
+            return Ok(serde_json::Value::Null);
+        }
+        Some("applyUpdate") => {
+            updater::apply_cached_update()?;
+            return Ok(serde_json::Value::Null);
+        }
         Some("window") => return window::action(&app, command["action"].as_str().unwrap_or_default()),
         _ => {}
     }
@@ -151,6 +166,33 @@ fn main() {
             let core = core::Core::new(directory, app.handle().clone(), presenter)
                 .map_err(|e| std::io::Error::other(e.message))?;
             app.manage(Mutex::new(core));
+
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                if let Some(info) = updater::check_for_updates(env!("CARGO_PKG_VERSION")).await {
+                    let updates_dir = app_handle
+                        .path()
+                        .app_local_data_dir()
+                        .map(|d| d.join("updates"))
+                        .unwrap_or_else(|_| std::path::PathBuf::from("updates"));
+                    let _ = tauri::Emitter::emit(&app_handle, "update-status", serde_json::json!({
+                        "available": true,
+                        "version": info.version,
+                        "ready": false,
+                        "downloading": true
+                    }));
+                    if updater::download_and_verify(&info, &updates_dir).await.is_some() {
+                        let _ = tauri::Emitter::emit(&app_handle, "update-status", serde_json::json!({
+                            "available": true,
+                            "version": info.version,
+                            "ready": true,
+                            "downloading": false
+                        }));
+                    }
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![dispatch])

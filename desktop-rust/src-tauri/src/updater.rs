@@ -109,7 +109,84 @@ pub async fn check_for_updates(current_version: &str) -> Option<UpdateInfo> {
     parse_latest_release(releases.as_array()?, current_version)
 }
 
-#[cfg(test)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct UpdateStatus {
+    pub available: bool,
+    pub version: String,
+    pub ready: bool,
+    pub downloading: bool,
+    pub error: Option<String>,
+}
+
+static CACHED_INSTALLER: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync::Mutex::new(None);
+
+/// Downloads and verifies the installer against its remote sha256 checksum file.
+pub async fn download_and_verify(
+    info: &UpdateInfo,
+    updates_dir: &std::path::Path,
+) -> Option<std::path::PathBuf> {
+    let client = reqwest::Client::builder()
+        .user_agent("Triscord-Desktop")
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .ok()?;
+
+    let checksum_res = client.get(&info.checksum_url).send().await.ok()?;
+    let checksum_text = checksum_res.text().await.ok()?;
+
+    let installer_res = client.get(&info.installer_url).send().await.ok()?;
+    let bytes = installer_res.bytes().await.ok()?;
+
+    if !verify_sha256(&bytes, &checksum_text) {
+        eprintln!("[updater] Checksum verification failed for {}", info.version);
+        return None;
+    }
+
+    std::fs::create_dir_all(updates_dir).ok()?;
+    let installer_path = updates_dir.join(format!("Triscord-Setup-{}.exe", info.version));
+    std::fs::write(&installer_path, &bytes).ok()?;
+
+    if let Ok(mut cache) = CACHED_INSTALLER.lock() {
+        *cache = Some(installer_path.clone());
+    }
+
+    Some(installer_path)
+}
+
+/// Applies the cached update by launching the installer in silent update mode and terminating the current process.
+pub fn apply_cached_update() -> Result<(), crate::error::Error> {
+    let path = CACHED_INSTALLER
+        .lock()
+        .map_err(|_| crate::error::Error::invalid())?
+        .clone()
+        .ok_or_else(crate::error::Error::invalid)?;
+
+    if !path.exists() {
+        return Err(crate::error::Error::invalid());
+    }
+
+    #[cfg(windows)]
+    {
+        std::process::Command::new(&path)
+            .arg("/S")
+            .arg("/UPDATE")
+            .spawn()
+            .map_err(|_| crate::error::Error::invalid())?;
+        std::process::exit(0);
+    }
+
+    #[cfg(not(windows))]
+    Ok(())
+}
+
+/// Sets a cached installer path directly (useful for tests).
+#[allow(dead_code)]
+pub fn set_cached_installer(path: std::path::PathBuf) {
+    if let Ok(mut cache) = CACHED_INSTALLER.lock() {
+        *cache = Some(path);
+    }
+}
+
 mod tests {
     use super::*;
     use serde_json::json;
@@ -184,5 +261,25 @@ mod tests {
         assert!(verify_sha256(data, &hex));
         assert!(verify_sha256(data, &format!("{}  setup.exe", hex)));
         assert!(!verify_sha256(b"corrupted data", &hex));
+    }
+
+    #[test]
+    fn update_status_serializes_and_deserializes() {
+        let status = UpdateStatus {
+            available: true,
+            version: "0.9.67".into(),
+            ready: true,
+            downloading: false,
+            error: None,
+        };
+        let serialized = serde_json::to_string(&status).unwrap();
+        let roundtrip: UpdateStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, roundtrip);
+    }
+
+    #[test]
+    fn apply_cached_update_rejects_missing_file() {
+        set_cached_installer(std::path::PathBuf::from("non-existent-setup-1234.exe"));
+        assert!(apply_cached_update().is_err());
     }
 }
