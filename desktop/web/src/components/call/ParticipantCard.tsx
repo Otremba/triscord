@@ -105,6 +105,7 @@ export function ParticipantCard({
                     <Tooltip label="Remover da chamada" side="left">
                         <button
                             type="button"
+                            aria-label="Remover da chamada"
                             onClick={onKick}
                             className="flex h-7 w-7 items-center justify-center rounded-full bg-ink-950/80 text-critical hover:bg-critical hover:text-white transition-colors"
                         >

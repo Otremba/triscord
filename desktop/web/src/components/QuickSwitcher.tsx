@@ -3,7 +3,7 @@ import { Bridge } from '../bridge';
 import type { Session } from '../protocol';
 import { emit } from '../events';
 
-export function QuickSwitcher({ bridge, session }: { bridge: Bridge; session: Session | null }) {
+export function QuickSwitcher({ bridge, session, onClose }: { bridge: Bridge; session: Session | null; onClose?: () => void }) {
     const [query, setQuery] = useState('');
     const [filteredServers, setFilteredServers] = useState<Array<{ id: string; name: string }>>([]);
     const [filteredChannels, setFilteredChannels] = useState<Array<{ id: string; name: string; serverId: string; serverName: string }>>([]);
@@ -35,12 +35,13 @@ export function QuickSwitcher({ bridge, session }: { bridge: Bridge; session: Se
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 emit('tri-open-quick-switcher', {}); // Toggle off
+                onClose?.();
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [session, bridge]);
+    }, [session, bridge, onClose]);
 
     useEffect(() => {
         if (!session || !query) {
