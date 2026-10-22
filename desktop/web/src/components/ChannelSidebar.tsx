@@ -70,38 +70,39 @@ export function ChannelSidebar({ session, bridge }: { session: Session; bridge: 
                                 const active = channel.id === session.selectedChannelId;
                                 const connected = channel.id === session.connectedChannelId;
                                 return (
-                                    <button
-                                        key={channel.id}
-                                        type="button"
-                                        onClick={() => {
-                                            bridge.send({ name: 'selectChannel', channelId: channel.id });
-                                            if (channel.kind === 'voice') {
-                                                bridge.send({ name: 'joinVoice', channelId: channel.id });
-                                            } else {
-                                                bridge.send({ name: 'openTextRoom', channelId: channel.id });
-                                            }
-                                        }}
-                                        className={cn(
-                                            'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-ink-300 hover:bg-ink-800 hover:text-ink-100 transition-colors',
-                                            active && 'bg-ink-700/80 text-ink-100 font-medium',
-                                            connected && 'text-positive'
+                                    <div key={channel.id} className="mb-0.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                bridge.send({ name: 'selectChannel', channelId: channel.id });
+                                                if (channel.kind === 'voice') {
+                                                    bridge.send({ name: 'joinVoice', channelId: channel.id });
+                                                } else {
+                                                    bridge.send({ name: 'openTextRoom', channelId: channel.id });
+                                                }
+                                            }}
+                                            className={cn(
+                                                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-ink-300 hover:bg-ink-800 hover:text-ink-100 transition-colors',
+                                                active && 'bg-ink-700/80 text-ink-100 font-medium',
+                                                connected && 'text-brand-300 font-medium'
+                                            )}
+                                        >
+                                            {channel.kind === 'voice' ? <Volume2 size={16} className={connected ? 'text-brand-400' : 'text-ink-400'} /> : <Hash size={16} className="text-ink-400" />}
+                                            <span className="truncate">{channel.name}</span>
+                                            {connected && (
+                                                <span className="ml-auto flex h-2 w-2 rounded-full bg-brand-400" />
+                                            )}
+                                        </button>
+                                        {channel.users && channel.users.length > 0 && (
+                                            <div className="mt-0.5 space-y-0.5 pl-6">
+                                                {channel.users.map(user => (
+                                                    <VoiceUserRow key={user.id} user={user} />
+                                                ))}
+                                            </div>
                                         )}
-                                    >
-                                        {channel.kind === 'voice' ? <Volume2 size={16} className={connected ? 'text-positive' : 'text-ink-400'} /> : <Hash size={16} className="text-ink-400" />}
-                                        <span className="truncate">{channel.name}</span>
-                                        {connected && (
-                                            <span className="ml-auto flex h-2 w-2 rounded-full bg-positive animate-pulse" />
-                                        )}
-                                    </button>
+                                    </div>
                                 );
                             })}
-                            {category.channels.some(c => c.users?.length) && (
-                                <div className="mt-1 space-y-0.5 pl-2">
-                                    {category.channels.flatMap(c => c.users).map(user => (
-                                        <VoiceUserRow key={user.id} user={user} />
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     ))
                 )}

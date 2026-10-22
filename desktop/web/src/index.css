@@ -5,18 +5,18 @@
    Depth comes from subtle 1px borders and minimal shadows, never glow. */
 
 @theme {
-    /* Brand accent — a cool, desaturated teal-cyan that reads as "signal", not the generic indigo. */
-    --color-brand-50: #eefbf7;
-    --color-brand-100: #d6f5ec;
-    --color-brand-200: #b0eadb;
-    --color-brand-300: #7cd8c4;
-    --color-brand-400: #4abfa9;
-    --color-brand-500: #2aa48f;
-    --color-brand-600: #1f8474;
-    --color-brand-700: #1c6a5e;
-    --color-brand-800: #1a544c;
-    --color-brand-900: #184640;
-    --color-brand-950: #082824;
+    /* Brand accent — authentic Discord Blurple. */
+    --color-brand-50: #f0f3ff;
+    --color-brand-100: #e0e7ff;
+    --color-brand-200: #c7d2fe;
+    --color-brand-300: #a5b4fc;
+    --color-brand-400: #818cf8;
+    --color-brand-500: #5865f2;
+    --color-brand-600: #4752c4;
+    --color-brand-700: #3c45a5;
+    --color-brand-800: #323989;
+    --color-brand-900: #2b306f;
+    --color-brand-950: #1a1c43;
 
     /* Neutral surfaces — layered steps of a cool near-black. */
     --color-ink-950: #0a0b0d;

@@ -4,7 +4,7 @@ import type { Server } from '../protocol';
 import { cn } from '../lib/utils';
 
 // Frameless window title bar: draggable region with native window controls.
-export function TitleBar({ server, bridge }: { server?: Server; bridge: Bridge }) {
+export function TitleBar({ bridge }: { server?: Server; bridge: Bridge }) {
     return (
         <header
             className="flex h-8 shrink-0 items-center justify-between border-b border-ink-800 bg-ink-900"
@@ -17,9 +17,7 @@ export function TitleBar({ server, bridge }: { server?: Server; bridge: Bridge }
                 if (!(e.target as HTMLElement).closest('button')) bridge.send({ name: 'window', action: 'maximize' });
             }}
         >
-            <div className="flex items-center gap-2 px-3">
-                <span className="text-xs font-medium text-ink-300">{server?.name ?? 'Triscord'}</span>
-            </div>
+            <div className="flex-1 h-full" />
             <div className="flex h-full items-stretch">
                 <WindowButton label="Minimizar" onClick={() => bridge.send({ name: 'window', action: 'minimize' })}>
                     <Minus size={14} />

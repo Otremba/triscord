@@ -40,7 +40,7 @@ export function ServerRail({
                     onClick={() => bridge.send({ name: 'selectServer', serverId: '@me' })}
                     className={cn(
                         'flex h-12 w-12 items-center justify-center rounded-full transition-all',
-                        selectedId === '@me' ? 'bg-brand-500 text-ink-950' : 'bg-ink-700 text-ink-300 hover:bg-brand-500 hover:text-ink-950',
+                        selectedId === '@me' ? 'rounded-2xl bg-brand-500 text-white shadow-md' : 'bg-ink-700 text-ink-200 hover:rounded-2xl hover:bg-brand-500 hover:text-white',
                     )}
                 >
                     <Home size={22} />
@@ -55,7 +55,7 @@ export function ServerRail({
                         onClick={() => bridge.send({ name: 'selectServer', serverId: server.id })}
                         className={cn(
                             'flex h-12 w-12 items-center justify-center rounded-full transition-all',
-                            selectedId === server.id ? 'rounded-2xl bg-brand-500' : 'hover:rounded-2xl',
+                            selectedId === server.id ? 'rounded-2xl ring-2 ring-brand-400' : 'hover:rounded-2xl',
                         )}
                     >
                         <ServerIcon server={server} size={48} />

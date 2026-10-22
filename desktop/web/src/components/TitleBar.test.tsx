@@ -4,13 +4,12 @@ import { TitleBar } from './TitleBar';
 import { createMockBridge } from '../test/test-utils';
 
 describe('TitleBar Component', () => {
-    it('renders server name or default Triscord', () => {
+    it('renders clean frameless titlebar with window controls', () => {
         const bridge = createMockBridge();
-        const { rerender } = render(<TitleBar bridge={bridge} />);
-        expect(screen.getByText('Triscord')).toBeInTheDocument();
-
-        rerender(<TitleBar server={{ id: 's1', name: 'Sala dos Amigos', owned: true }} bridge={bridge} />);
-        expect(screen.getByText('Sala dos Amigos')).toBeInTheDocument();
+        render(<TitleBar bridge={bridge} />);
+        expect(screen.getByRole('button', { name: /minimizar/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /maximizar/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /fechar/i })).toBeInTheDocument();
     });
 
     it('triggers minimize, maximize and close actions', () => {

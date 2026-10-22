@@ -18,7 +18,7 @@ import { ParticipantCard } from './components/call/ParticipantCard';
 import type { Bridge } from './bridge';
 import type { Session, VoiceUser, Channel } from './protocol';
 import { EVENTS } from './events';
-import { MessageSquare, Volume2, Hash, PhoneCall } from 'lucide-react';
+import { MessageSquare, Volume2, Hash } from 'lucide-react';
 import { Tooltip } from './components/ui/tooltip';
 
 export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) {
@@ -151,17 +151,6 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                    {selectedChannel?.kind === 'voice' && !inCall && (
-                                        <button
-                                            type="button"
-                                            onClick={() => bridge.send({ name: 'joinVoice', channelId: selectedChannel.id })}
-                                            className="flex items-center gap-2 rounded-md bg-positive px-3 py-1.5 text-xs font-semibold text-ink-950 hover:bg-positive/90 transition-colors"
-                                        >
-                                            <PhoneCall size={14} />
-                                            <span>Conectar na voz</span>
-                                        </button>
-                                    )}
-
                                     {selectedChannel?.kind === 'voice' && inCall && (
                                         <Tooltip label={showChat ? 'Ocultar chat' : 'Mostrar chat'}>
                                             <button

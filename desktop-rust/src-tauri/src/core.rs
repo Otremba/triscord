@@ -336,6 +336,19 @@ impl Core {
         Ok(())
     }
     fn select(&mut self, app: &tauri::AppHandle, id: String) -> Result<()> {
+        if id == "@me" {
+            self.reset();
+            {
+                let mut model = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                model.selected_server = "@me".into();
+                model.connection = "connected";
+                model.rooms.clear();
+                model.text_room = None;
+                model.desired_room = None;
+            }
+            crate::model::publish(app, &self.model);
+            return Ok(());
+        }
         api::id(&id)?;
         if !self
             .model

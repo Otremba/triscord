@@ -4,6 +4,7 @@ import type { Session } from '../protocol';
 import { cn } from '../lib/utils';
 import { Tooltip } from './ui/tooltip';
 import { soundEngine } from '../sound-engine';
+import { emit, EVENTS } from '../events';
 
 export function AccountPanel({ session, bridge }: { session: Session; bridge: Bridge }) {
     const { account, muted, deafened } = session;
@@ -12,7 +13,10 @@ export function AccountPanel({ session, bridge }: { session: Session; bridge: Br
             <button
                 type="button"
                 className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-ink-800"
-                onClick={() => bridge.send({ name: 'openSettings' })}
+                onClick={() => {
+                    emit(EVENTS.openSettings);
+                    bridge.send({ name: 'openSettings' });
+                }}
             >
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink-700 text-sm font-semibold text-ink-200">
                     {account.avatarUrl ? <img src={account.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" /> : account.displayName.slice(0, 1).toUpperCase()}
@@ -54,7 +58,10 @@ export function AccountPanel({ session, bridge }: { session: Session; bridge: Br
                 <button
                     type="button"
                     aria-label="Configurações"
-                    onClick={() => bridge.send({ name: 'openSettings' })}
+                    onClick={() => {
+                        emit(EVENTS.openSettings);
+                        bridge.send({ name: 'openSettings' });
+                    }}
                     className="flex h-8 w-8 items-center justify-center rounded-md text-ink-300 hover:bg-ink-700"
                 >
                     <Settings size={18} />

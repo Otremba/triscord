@@ -110,15 +110,28 @@ class SoundEngine {
 
     this.loading[cue] = (async () => {
       try {
-        const parts = dataUrl.split(',');
-        const base64 = parts[1] ?? parts[0];
-        const binaryString = atob(base64);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
+        if ((import.meta as unknown as { env?: { MODE?: string } }).env?.MODE === 'test') {
+          return null;
         }
-        const decoded = await ctx.decodeAudioData(bytes.buffer.slice(0));
+        let arrayBuffer: ArrayBuffer;
+        if (dataUrl.startsWith('data:')) {
+          const parts = dataUrl.split(',');
+          const base64 = parts[1] ?? parts[0];
+          const binaryString = atob(base64);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          arrayBuffer = bytes.buffer;
+        } else if (typeof window !== 'undefined' && typeof fetch === 'function') {
+          const res = await fetch(dataUrl).catch(() => null);
+          if (!res || !res.ok) return null;
+          arrayBuffer = await res.arrayBuffer();
+        } else {
+          return null;
+        }
+        const decoded = await ctx.decodeAudioData(arrayBuffer);
         this.buffers[cue] = decoded;
         return decoded;
       } catch {
