@@ -115,6 +115,8 @@ describe('Modals & Dialogs Components', () => {
             name: 'startScreenShare',
             generation: 'gen-uuid-1234',
             index: 0,
+            resolution: '1080p',
+            fps: 60,
         });
         expect(onClose).toHaveBeenCalled();
     });

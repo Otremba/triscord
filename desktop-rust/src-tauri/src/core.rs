@@ -26,6 +26,10 @@ pub enum Command {
     StartScreenShare {
         generation: String,
         index: usize,
+        #[serde(default)]
+        resolution: Option<String>,
+        #[serde(default)]
+        fps: Option<u32>,
     },
     StopScreenShare,
     GetOwnProfile,
@@ -456,7 +460,12 @@ impl Core {
                     json!({"generation":self.sources_generation,"sources":self.sources.iter().enumerate().map(|(index,source)|json!({"index":index,"kind":source.kind,"name":source.name})).collect::<Vec<_>>()}),
                 )
             }
-            Command::StartScreenShare { generation, index } => {
+            Command::StartScreenShare {
+                generation,
+                index,
+                resolution,
+                fps,
+            } => {
                 if generation != self.sources_generation {
                     return Err(Error::invalid());
                 }
@@ -493,11 +502,26 @@ impl Core {
                     .unwrap_or_else(|e| e.into_inner())
                     .preferences
                     .clone();
-                self.screen.start(
-                    generation,
-                    epoch,
-                    source,
-                    crate::video_codec::Config {
+                let config = match resolution.as_deref() {
+                    Some("1440p") => crate::video_codec::Config {
+                        width: 2560,
+                        height: 1440,
+                        fps: fps.unwrap_or(60).clamp(15, 60),
+                        bitrate: if fps.unwrap_or(60) >= 60 { 14_000_000 } else { 8_000_000 },
+                    },
+                    Some("1080p") => crate::video_codec::Config {
+                        width: 1920,
+                        height: 1080,
+                        fps: fps.unwrap_or(60).clamp(15, 60),
+                        bitrate: if fps.unwrap_or(60) >= 60 { 8_000_000 } else { 4_500_000 },
+                    },
+                    Some("720p") => crate::video_codec::Config {
+                        width: 1280,
+                        height: 720,
+                        fps: fps.unwrap_or(30).clamp(15, 60),
+                        bitrate: if fps.unwrap_or(30) >= 60 { 4_000_000 } else { 2_500_000 },
+                    },
+                    _ => crate::video_codec::Config {
                         width: if preferences.share_hd { 1920 } else { 1280 },
                         height: if preferences.share_hd { 1080 } else { 720 },
                         fps: if preferences.share_mode == "screen" {
@@ -508,12 +532,13 @@ impl Core {
                             30
                         },
                         bitrate: if preferences.share_hd {
-                            8000000
+                            8_000_000
                         } else {
-                            2500000
+                            2_500_000
                         },
                     },
-                )?;
+                };
+                self.screen.start(generation, epoch, source, config)?;
                 self.send("media-refresh", json!({"kind":"screen","roomId":room}))?;
                 if let Some(socket) = &self.socket {
                     let sender = socket.sender();
@@ -1464,7 +1489,16 @@ mod tests {
             "index": 0
         }))
         .unwrap();
-        assert!(matches!(start, Command::StartScreenShare { generation, index: 0 } if generation == "gen-1"));
+        assert!(matches!(start, Command::StartScreenShare { generation, index: 0, .. } if generation == "gen-1"));
+        let start_1440p: Command = serde_json::from_value(json!({
+            "name": "startScreenShare",
+            "generation": "gen-2",
+            "index": 1,
+            "resolution": "1440p",
+            "fps": 60
+        }))
+        .unwrap();
+        assert!(matches!(start_1440p, Command::StartScreenShare { generation, index: 1, resolution: Some(res), fps: Some(60) } if generation == "gen-2" && res == "1440p"));
         let stop: Command = serde_json::from_value(json!({"name": "stopScreenShare"})).unwrap();
         assert!(matches!(stop, Command::StopScreenShare));
     }

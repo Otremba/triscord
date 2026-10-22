@@ -256,7 +256,7 @@ export type Command =
   | { name: 'setCallPopoutOnTop'; on: boolean }
   | { name: 'setStreamHidden'; streamId: string; hidden: boolean }
   | { name: 'listShareSources' }                      // value: { generation, sources: ShareSource[] }
-  | { name: 'startScreenShare'; generation: string; index: number }
+  | { name: 'startScreenShare'; generation: string; index: number; resolution?: '720p' | '1080p' | '1440p'; fps?: 30 | 60 }
   | { name: 'startDeviceShare'; deviceId: string }
   | { name: 'stopScreenShare' }
   | { name: 'setMuted'; muted: boolean }

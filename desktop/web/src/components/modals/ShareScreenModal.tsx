@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Bridge } from '@/bridge';
 import type { ShareSource } from '@/protocol';
-import { X, Monitor, AppWindow, ScreenShare, Loader2 } from 'lucide-react';
+import { X, Monitor, AppWindow, ScreenShare, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function ShareScreenModal({ bridge, onClose }: { bridge: Bridge; onClose: () => void }) {
@@ -11,6 +11,8 @@ export function ShareScreenModal({ bridge, onClose }: { bridge: Bridge; onClose:
     const [sources, setSources] = useState<ShareSource[]>([]);
     const [tab, setTab] = useState<'screen' | 'window'>('screen');
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+    const [resolution, setResolution] = useState<'720p' | '1080p' | '1440p'>('1080p');
+    const [fps, setFps] = useState<30 | 60>(60);
 
     useEffect(() => {
         let mounted = true;
@@ -39,7 +41,13 @@ export function ShareScreenModal({ bridge, onClose }: { bridge: Bridge; onClose:
 
     const handleShare = () => {
         if (selectedIndex === null || !generation) return;
-        bridge.send({ name: 'startScreenShare', generation, index: selectedIndex });
+        bridge.send({
+            name: 'startScreenShare',
+            generation,
+            index: selectedIndex,
+            resolution,
+            fps,
+        });
         onClose();
     };
 
@@ -106,7 +114,7 @@ export function ShareScreenModal({ bridge, onClose }: { bridge: Bridge; onClose:
                         </div>
 
                         {/* Sources list/grid */}
-                        <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
+                        <div className="grid grid-cols-2 gap-3 max-h-52 overflow-y-auto pr-1">
                             {filteredSources.length === 0 ? (
                                 <div className="col-span-2 py-8 text-center text-sm text-ink-500">
                                     Nenhuma {tab === 'screen' ? 'tela' : 'janela'} encontrada.
@@ -119,16 +127,16 @@ export function ShareScreenModal({ bridge, onClose }: { bridge: Bridge; onClose:
                                             key={source.index}
                                             type="button"
                                             onClick={() => setSelectedIndex(source.index)}
-                                            className={`flex flex-col items-center justify-center gap-2.5 rounded-lg border p-4 text-center transition-all ${
+                                            className={`flex flex-col items-center justify-center gap-2 rounded-lg border p-3.5 text-center transition-all ${
                                                 isSelected
                                                     ? 'border-brand-500 bg-brand-500/15 text-brand-300 ring-1 ring-brand-500'
                                                     : 'border-ink-750 bg-ink-950 text-ink-300 hover:bg-ink-800 hover:text-ink-100'
                                             }`}
                                         >
                                             {source.kind === 'screen' ? (
-                                                <Monitor size={36} className={isSelected ? 'text-brand-400' : 'text-ink-400'} />
+                                                <Monitor size={32} className={isSelected ? 'text-brand-400' : 'text-ink-400'} />
                                             ) : (
-                                                <AppWindow size={36} className={isSelected ? 'text-brand-400' : 'text-ink-400'} />
+                                                <AppWindow size={32} className={isSelected ? 'text-brand-400' : 'text-ink-400'} />
                                             )}
                                             <span className="text-xs font-medium truncate w-full max-w-[180px]">
                                                 {source.name}
@@ -139,19 +147,72 @@ export function ShareScreenModal({ bridge, onClose }: { bridge: Bridge; onClose:
                             )}
                         </div>
 
+                        {/* Quality Options: Resolution & FPS */}
+                        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-ink-800">
+                            <div>
+                                <label className="block text-[11px] font-bold text-ink-400 mb-1.5 uppercase tracking-wider">
+                                    Resolução
+                                </label>
+                                <div className="grid grid-cols-3 gap-1 bg-ink-950 p-1 rounded-lg border border-ink-800">
+                                    {(['720p', '1080p', '1440p'] as const).map(res => (
+                                        <button
+                                            key={res}
+                                            type="button"
+                                            onClick={() => setResolution(res)}
+                                            className={`py-1 text-xs font-semibold rounded transition-colors flex items-center justify-center gap-1 ${
+                                                resolution === res
+                                                    ? 'bg-brand-500 text-white shadow-sm'
+                                                    : 'text-ink-400 hover:text-ink-200'
+                                            }`}
+                                        >
+                                            {res === '1440p' && <Sparkles size={11} className={resolution === res ? 'text-yellow-300' : 'text-brand-400'} />}
+                                            <span>{res}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-bold text-ink-400 mb-1.5 uppercase tracking-wider">
+                                    Taxa de Quadros
+                                </label>
+                                <div className="grid grid-cols-2 gap-1 bg-ink-950 p-1 rounded-lg border border-ink-800">
+                                    {([30, 60] as const).map(f => (
+                                        <button
+                                            key={f}
+                                            type="button"
+                                            onClick={() => setFps(f)}
+                                            className={`py-1 text-xs font-semibold rounded transition-colors ${
+                                                fps === f
+                                                    ? 'bg-brand-500 text-white shadow-sm'
+                                                    : 'text-ink-400 hover:text-ink-200'
+                                            }`}
+                                        >
+                                            {f} FPS
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Footer buttons */}
-                        <div className="flex items-center justify-end gap-3 pt-4 border-t border-ink-800">
-                            <Button type="button" variant="ghost" onClick={onClose}>
-                                Cancelar
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="default"
-                                disabled={selectedIndex === null}
-                                onClick={handleShare}
-                            >
-                                Compartilhar
-                            </Button>
+                        <div className="flex items-center justify-between pt-3 border-t border-ink-800">
+                            <span className="text-xs text-ink-400">
+                                {resolution} @ {fps} FPS • GPU Hardware Encoder
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <Button type="button" variant="ghost" onClick={onClose}>
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="default"
+                                    disabled={selectedIndex === null}
+                                    onClick={handleShare}
+                                >
+                                    Compartilhar
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 )}
