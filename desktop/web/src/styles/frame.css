@@ -1,6 +1,24 @@
 /* App frame layout */
-.tri-app { display: grid; grid-template-rows: var(--custom-app-top-bar-height) 1fr; height: 100vh; }
-.tri-content { display: flex; min-height: 0; min-width: 0; overflow: hidden; }
+.tri-app {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+.tri-content {
+  display: flex;
+  flex: 1 1 0%;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
 .tri-sidebar { position: relative; display: flex; flex: 0 0 auto; width: var(--tri-sidebar-width); min-height: 0; }
 .tri-sidebar-list {
   display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden;
@@ -67,13 +85,18 @@
 .tri-dm-empty {
   padding: 16px; text-align: center; color: var(--text-muted, #949ba4); font-size: 13px;
 }
-.tri-page { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; background: var(--background-base-lower); }
+.tri-page { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; min-width: 0; height: 100%; background: var(--background-base-lower); }
 :root[data-theme="midnight"] .tri-page { border-inline-start: 1px solid var(--border-subtle); }
 
 /* Title bar */
 .tri-titlebar {
+  flex: 0 0 var(--custom-app-top-bar-height);
+  height: var(--custom-app-top-bar-height);
+  min-height: var(--custom-app-top-bar-height);
+  width: 100%;
+  box-sizing: border-box;
   position: relative; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-8);
-  min-height: var(--custom-app-top-bar-height); background: var(--background-base-lowest); -webkit-app-region: drag;
+  background: var(--background-base-lowest); -webkit-app-region: drag;
 }
 .tri-titlebar__title { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: var(--space-8); pointer-events: none; }
 .tri-titlebar__title .tri-server-acronym, .tri-titlebar__title .tri-server-icon { border-radius: var(--radius-xs); font-size: 7px; }
@@ -272,11 +295,12 @@
 }
 
 /* Call popout window: 24px bar with the window buttons only (observed 17/10), 4px resize edges on the frameless window. */
-.tri-app--popout { grid-template-rows: 24px 1fr; }
+.tri-app--popout .tri-titlebar { flex: 0 0 24px; height: 24px; min-height: 24px; }
 .tri-titlebar--bare { justify-content: flex-end; }
 .tri-titlebar--popout { height: 24px; min-height: 24px; }
 .tri-titlebar--popout .tri-winbutton { width: 24px; height: 24px; }
-.tri-resize-edge { position: fixed; z-index: 1000; }
+.tri-resize-edges { position: fixed; inset: 0; pointer-events: none; z-index: 1000; }
+.tri-resize-edge { position: absolute; pointer-events: auto; }
 .tri-resize-edge--n, .tri-resize-edge--s { left: 6px; right: 6px; height: 4px; cursor: ns-resize; }
 .tri-resize-edge--n { top: 0; } .tri-resize-edge--s { bottom: 0; }
 .tri-resize-edge--e, .tri-resize-edge--w { top: 6px; bottom: 6px; width: 4px; cursor: ew-resize; }

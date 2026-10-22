@@ -66,6 +66,13 @@ export function PopoutBar({ bridge, className = 'tri-titlebar--popout' }: { brid
 const EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const;
 // 4px edges and 6px corners of the frameless windows (main and popout): mousedown starts the system resize.
 export function ResizeEdges({ bridge }: { bridge: Bridge }) {
-  return <>{EDGES.map(edge => <div key={edge} class={`tri-resize-edge tri-resize-edge--${edge}`} aria-hidden="true"
-    onMouseDown={e => { if (e.button === 0) { e.preventDefault(); bridge.send({ name: 'window', action: `resize-${edge}` }); } }} />)}</>;
+  return (
+    <div class="tri-resize-edges" aria-hidden="true">
+      {EDGES.map(edge => (
+        <div key={edge} class={`tri-resize-edge tri-resize-edge--${edge}`}
+          onMouseDown={e => { if (e.button === 0) { e.preventDefault(); bridge.send({ name: 'window', action: `resize-${edge}` }); } }} />
+      ))}
+    </div>
+  );
 }
+

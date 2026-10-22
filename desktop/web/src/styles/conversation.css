@@ -1,6 +1,6 @@
 /* Conversation layout owns its spacing; palettes remain in workspace-themes.css. */
 :root[data-design="workspace"] { --conversation-width:1040px;--conversation-gutter:24px; }
-:root[data-design="workspace"] .tri-page__main { display:flex;flex-direction:column;flex:1 1 auto;min-width:0;background:var(--ui-canvas);overflow:hidden; }
+:root[data-design="workspace"] .tri-page__main { display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0;height:100%;background:var(--ui-canvas);overflow:hidden; }
 :root[data-design="workspace"] .tri-channel-header { display:flex;align-items:center;position:relative;height:64px;flex:none;gap:16px;padding:0 var(--conversation-gutter);border-bottom:1px solid var(--ui-border);background:var(--ui-canvas); }
 :root[data-design="workspace"] .tri-channel-header__symbol { display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:8px;background:var(--ui-panel);color:var(--ui-accent); }
 :root[data-design="workspace"] .tri-channel-header__identity { display:flex;flex-direction:column;gap:4px;min-width:0; }

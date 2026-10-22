@@ -1,7 +1,6 @@
-/* Fullscreen is a native window state. Keep the same mounted call/chat components. */
-.tri-app--call-fullscreen { grid-template-rows:1fr; }
+.tri-app--call-fullscreen { height: 100vh; width: 100vw; }
 .tri-app--call-fullscreen>.tri-titlebar, .tri-app--call-fullscreen .tri-sidebar,
-.tri-app--call-fullscreen .tri-chat-panel, .tri-app--call-fullscreen .tri-channel-header__toolbar { display:none; }
+.tri-app--call-fullscreen .tri-chat-panel, .tri-app--call-fullscreen .tri-channel-header__toolbar { display:none !important; }
 .tri-app--call-fullscreen .tri-page { border:0; }
 .tri-call-bottom:focus-within, .tri-page__main.is-idle .tri-channel-header:focus-within { opacity:1!important; }
 .tri-call.is-idle .tri-call-bottom:focus-within>* { pointer-events:auto; }
