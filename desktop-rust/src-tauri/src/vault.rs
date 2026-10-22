@@ -228,4 +228,30 @@ mod tests {
         assert_eq!(decoded.session, cred.session);
         assert_eq!(decoded.expires_at, cred.expires_at);
     }
+    #[test]
+    fn vault_survives_rapid_sequential_updates_and_leaves_no_temp_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("rapid.bin");
+        for i in 0..20 {
+            let payload = format!("version-{}", i);
+            atomic_write(&file, payload.as_bytes()).unwrap();
+        }
+        assert_eq!(std::fs::read(&file).unwrap(), b"version-19");
+        let entries = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|r| r.unwrap().file_name().to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(entries, vec!["rapid.bin"]);
+    }
+    #[test]
+    fn credential_serialization_handles_special_characters_in_tokens() {
+        let special_cred = Credential {
+            session: "eyJh!@#$%^&*()_+-=[]{}|;':\",./<>?`~\\ \n\t\r 🚀🔐".into(),
+            expires_at: 0,
+        };
+        let encoded = serde_json::to_string(&special_cred).unwrap();
+        let decoded: Credential = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded.session, special_cred.session);
+        assert_eq!(decoded.expires_at, 0);
+    }
 }

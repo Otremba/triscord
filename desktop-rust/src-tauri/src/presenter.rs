@@ -542,4 +542,47 @@ mod tests {
             (15, 30, 452, 302)
         );
     }
+    #[test]
+    fn geometry_edge_cases_scale_limits_and_odd_rounding() {
+        // Minimum valid scale 0.5 and maximum 4.0
+        let r = Rect { x: 100, y: 100, width: 200, height: 200 };
+        assert!(r.physical(0.5).is_some());
+        assert!(r.physical(4.0).is_some());
+        assert!(r.physical(0.49).is_none());
+        assert!(r.physical(4.01).is_none());
+        assert!(r.physical(-1.0).is_none());
+        assert!(r.physical(0.0).is_none());
+
+        // Negative dimensions rejected
+        assert!(Rect { width: -10, ..Default::default() }.physical(1.0).is_none());
+        assert!(Rect { height: -1, ..Default::default() }.physical(1.0).is_none());
+
+        // Coordinate clamping: x.unsigned_abs() > 32768 rejected
+        assert!(Rect { x: 32769, ..Default::default() }.physical(1.0).is_none());
+        assert!(Rect { x: -32769, ..Default::default() }.physical(1.0).is_none());
+        assert!(Rect { x: 32768, ..Default::default() }.physical(1.0).is_some());
+
+        // Odd dimensions always round to even
+        let odd = Rect { x: 0, y: 0, width: 33, height: 55 }.physical(1.0).unwrap();
+        assert_eq!(odd.width % 2, 0);
+        assert_eq!(odd.height % 2, 0);
+        assert_eq!(odd.width, 32);
+        assert_eq!(odd.height, 54);
+    }
+    #[test]
+    fn nv12_degenerate_and_boundary_dimensions() {
+        // Dimensions < 2 rejected
+        assert!(nv12(0, 0, (0, 0, 0), (&[], &[], &[])).is_none());
+        assert!(nv12(1, 2, (2, 1, 1), (&[0; 4], &[0], &[0])).is_none());
+        assert!(nv12(2, 1, (2, 1, 1), (&[0; 4], &[0], &[0])).is_none());
+
+        // Non-even dimensions rejected
+        assert!(nv12(3, 4, (4, 2, 2), (&[0; 16], &[0; 4], &[0; 4])).is_none());
+
+        // Oversized dimensions > 4096 rejected
+        assert!(nv12(4098, 2, (4098, 2049, 2049), (&[], &[], &[])).is_none());
+
+        // Insufficient stride rejected
+        assert!(nv12(100, 100, (90, 50, 50), (&[0; 10000], &[0; 2500], &[0; 2500])).is_none());
+    }
 }

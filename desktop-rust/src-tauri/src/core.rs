@@ -1475,4 +1475,95 @@ mod tests {
         let long_id = json!({"id": "x".repeat(129), "nick": "Dave"});
         assert!(public_account(&long_id).is_err());
     }
+    #[test]
+    fn command_fuzzing_rejects_unknown_fields_and_malformed_structures() {
+        // Unknown command falls back to Unsupported
+        let unknown: Command = serde_json::from_value(json!({"name": "nonExistentOp"})).unwrap();
+        assert!(matches!(unknown, Command::Unsupported));
+
+        // Unknown extra fields on known commands are denied by serde deny_unknown_fields
+        assert!(serde_json::from_value::<Command>(json!({
+            "name": "joinVoice",
+            "channelId": "voice-1",
+            "extraInjectedField": "malicious"
+        })).is_err());
+
+        // Wrong types for known fields return Err, never panic
+        assert!(serde_json::from_value::<Command>(json!({
+            "name": "joinVoice",
+            "channelId": 12345
+        })).is_err());
+        assert!(serde_json::from_value::<Command>(json!({
+            "name": "setMuted",
+            "muted": "not-a-boolean"
+        })).is_err());
+        assert!(serde_json::from_value::<Command>(json!({
+            "name": "setPeerAudio",
+            "socketId": "s1",
+            "volume": -50
+        })).is_err());
+
+        // Malformed JSON structures (e.g. primitives or arrays instead of object)
+        assert!(serde_json::from_value::<Command>(json!(null)).is_err());
+        assert!(serde_json::from_value::<Command>(json!([])).is_err());
+        assert!(serde_json::from_value::<Command>(json!("joinVoice")).is_err());
+        assert!(serde_json::from_value::<Command>(json!(42)).is_err());
+    }
+    #[test]
+    fn command_fuzzing_handles_extreme_strings_and_special_unicode() {
+        // 50,000-character chat text deserializes safely without panic
+        let huge_text = "A".repeat(50000);
+        let cmd: Command = serde_json::from_value(json!({
+            "name": "sendChatMessage",
+            "text": huge_text
+        })).unwrap();
+        if let Command::SendChatMessage { text } = cmd {
+            assert_eq!(text.len(), 50000);
+        } else {
+            panic!("Expected SendChatMessage");
+        }
+
+        // Extreme unicode: RTL, emojis, zero-width joiners, surrogate pairs
+        let complex_unicode = "مرحبا بالعالم! 👨‍👩‍👧‍👦 \u{200B}\u{200E}\u{FEFF} 🎮🔥💻";
+        let cmd: Command = serde_json::from_value(json!({
+            "name": "sendChatMessage",
+            "text": complex_unicode
+        })).unwrap();
+        if let Command::SendChatMessage { text } = cmd {
+            assert_eq!(text, complex_unicode);
+        } else {
+            panic!("Expected SendChatMessage");
+        }
+    }
+    #[test]
+    fn command_fuzzing_channel_and_moderation_variants() {
+        // Toggle reaction
+        let react: Command = serde_json::from_value(json!({
+            "name": "toggleReaction",
+            "messageId": "msg-123",
+            "emoji": "🔥"
+        })).unwrap();
+        assert!(matches!(react, Command::ToggleReaction { message_id, emoji } if message_id == "msg-123" && emoji == "🔥"));
+
+        // Set call fullscreen and stream hidden
+        let fs: Command = serde_json::from_value(json!({
+            "name": "setCallFullscreen",
+            "on": true
+        })).unwrap();
+        assert!(matches!(fs, Command::SetCallFullscreen { on: true }));
+
+        let hide: Command = serde_json::from_value(json!({
+            "name": "setStreamHidden",
+            "streamId": "str-99",
+            "hidden": true
+        })).unwrap();
+        assert!(matches!(hide, Command::SetStreamHidden { stream_id, hidden: true } if stream_id == "str-99"));
+
+        // Custom status
+        let status: Command = serde_json::from_value(json!({
+            "name": "setCustomStatus",
+            "text": "Coding in Rust 🦀"
+        })).unwrap();
+        assert!(matches!(status, Command::SetCustomStatus { text } if text == "Coding in Rust 🦀"));
+    }
 }

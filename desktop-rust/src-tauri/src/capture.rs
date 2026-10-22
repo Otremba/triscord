@@ -363,4 +363,44 @@ mod tests {
         }
         assert_eq!(accepted, 30);
     }
+    #[test]
+    fn clock_cadence_under_jitter_and_extreme_durations() {
+        let mut clock = Clock::new(60);
+        // Zero duration is due immediately on first call
+        assert!(clock.due(Duration::ZERO));
+        // Same tick does not re-trigger
+        assert!(!clock.due(Duration::ZERO));
+        assert!(!clock.due(Duration::from_micros(100)));
+
+        // Advance by ~16.6ms intervals with jitter (14ms, 19ms, 16ms)
+        let mut current_ns = 0u64;
+        let mut frames = 0;
+        let jitter = [14_000_000, 19_000_000, 16_000_000, 17_000_000];
+        for i in 0..60 {
+            current_ns += jitter[i % jitter.len()];
+            if clock.due(Duration::from_nanos(current_ns)) {
+                frames += 1;
+            }
+        }
+        // Over roughly 1 second (16.5ms * 60 = 990ms), clock should accept roughly 59-60 frames
+        assert!((58..=61).contains(&frames), "Frames accepted: {}", frames);
+
+        // Long duration test: 10 days without panic or overflow
+        let ten_days = Duration::from_secs(86400 * 10);
+        assert!(clock.due(ten_days));
+    }
+    #[test]
+    fn source_metadata_and_cloning() {
+        let screen = Source {
+            name: "Tela 1".into(),
+            kind: "screen",
+            handle: 12345,
+            pid: 0,
+        };
+        let cloned = screen.clone();
+        assert_eq!(cloned.name, "Tela 1");
+        assert_eq!(cloned.kind, "screen");
+        assert_eq!(cloned.handle, 12345);
+        assert_eq!(cloned.pid, 0);
+    }
 }

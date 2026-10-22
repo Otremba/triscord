@@ -95,4 +95,27 @@ mod tests {
         assert_eq!(retry_delay(0).as_millis(), 500);
         assert_eq!(retry_delay(u32::MAX).as_secs(), 15);
     }
+    #[test]
+    fn oversized_packets_are_rejected_before_parsing() {
+        let oversized = "42".to_string() + &" ".repeat(2 * 1024 * 1024);
+        assert!(parse(&oversized).is_err());
+    }
+    #[test]
+    fn closed_and_ignored_packets_parse_correctly() {
+        assert!(matches!(parse("1").unwrap(), Packet::Closed));
+        assert!(matches!(parse("41").unwrap(), Packet::Closed));
+        assert!(matches!(parse("44custom-error").unwrap(), Packet::Closed));
+        assert!(matches!(parse("99unknown").unwrap(), Packet::Ignore));
+        assert!(matches!(parse("").unwrap(), Packet::Ignore));
+    }
+    #[test]
+    fn retry_delay_progression_steps() {
+        assert_eq!(retry_delay(0).as_millis(), 500);
+        assert_eq!(retry_delay(1).as_millis(), 1000);
+        assert_eq!(retry_delay(2).as_millis(), 2000);
+        assert_eq!(retry_delay(3).as_millis(), 4000);
+        assert_eq!(retry_delay(4).as_millis(), 8000);
+        assert_eq!(retry_delay(5).as_millis(), 15000); // 16000 clamped to 15000
+        assert_eq!(retry_delay(6).as_millis(), 15000);
+    }
 }
