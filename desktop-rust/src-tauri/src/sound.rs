@@ -10,9 +10,13 @@ pub enum CallSound {
     Undeafen,
 }
 
+#[allow(dead_code)]
 const JOIN_WAV: &[u8] = include_bytes!("../../../desktop/assets/call-sounds/join.wav");
+#[allow(dead_code)]
 const LEAVE_WAV: &[u8] = include_bytes!("../../../desktop/assets/call-sounds/leave.wav");
+#[allow(dead_code)]
 const MUTE_WAV: &[u8] = include_bytes!("../../../desktop/assets/call-sounds/mute.wav");
+#[allow(dead_code)]
 const UNMUTE_WAV: &[u8] = include_bytes!("../../../desktop/assets/call-sounds/unmute.wav");
 
 /// Returns the bundled soundboard catalog for Triscord.
@@ -91,6 +95,7 @@ fn is_injected_audio() -> bool {
 }
 
 #[cfg(windows)]
+#[allow(dead_code)]
 pub fn play_wav_bytes(bytes: &'static [u8]) {
     if is_injected_audio() {
         return;
@@ -144,21 +149,9 @@ pub fn stop_playback() {
     }
 }
 
-pub fn play_cue(cue: CallSound) {
-    match cue {
-        CallSound::Join => play_wav_bytes(JOIN_WAV),
-        CallSound::Leave => play_wav_bytes(LEAVE_WAV),
-        CallSound::Mute => play_wav_bytes(MUTE_WAV),
-        CallSound::Unmute => play_wav_bytes(UNMUTE_WAV),
-        CallSound::Deafen => {
-            let pcm = synthesize_tone(350.0, 140, 75);
-            play_dynamic_wav(pcm_to_wav(&pcm, 48000, 1));
-        }
-        CallSound::Undeafen => {
-            let pcm = synthesize_tone(550.0, 140, 75);
-            play_dynamic_wav(pcm_to_wav(&pcm, 48000, 1));
-        }
-    }
+pub fn play_cue(_cue: CallSound) {
+    // Sound cues are rendered with full fidelity via Web Audio API in WebView2 using
+    // authentic Discord sound assets and user volume preferences.
 }
 
 pub fn play_sound(sound_id: &str) {

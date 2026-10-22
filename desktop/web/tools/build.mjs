@@ -26,7 +26,7 @@ mkdirSync(dist, { recursive: true });
 await build({
   entryPoints: [resolve(web, 'src/main.tsx')], bundle: true, minify: true, sourcemap: true,
   outfile: resolve(dist, 'app.js'), format: 'iife', target: 'chrome120',
-  jsx: 'automatic', jsxImportSource: 'preact', loader: { '.css': 'css', '.png': 'dataurl' }, legalComments: 'none',
+  jsx: 'automatic', jsxImportSource: 'preact', loader: { '.css': 'css', '.png': 'dataurl', '.mp3': 'dataurl', '.wav': 'dataurl' }, legalComments: 'none',
 });
 // Discord's font, gg sans, when the local-only desktop/assets/fonts-local has it (git-ignored; see its README:
 // proprietary, the user chose to use it on 15/10/2026, and a distributable build must leave it out). Without it
