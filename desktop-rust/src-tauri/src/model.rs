@@ -124,37 +124,6 @@ impl Model {
     }
     /// A room as the interface lists it: the people in it with their live state, and who owns it.
     fn channel(&self, room: &Value) -> Value {
-        let mut owner = String::new();
-        let users: Vec<Value> = room["users"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .map(|user| {
-                let socket = user["socketId"].as_str().unwrap_or_default();
-                let is_self = !self.self_socket.is_empty() && socket == self.self_socket;
-                let account = user["userId"].as_str().unwrap_or_default();
-                let authenticated = flag(user, "authenticated");
-                if !room["ownerUserId"].as_str().unwrap_or_default().is_empty()
-                    && user["userId"] == room["ownerUserId"]
-                {
-                    owner = socket.to_owned();
-                }
-                json!({
-                    "id": socket, "name": user["username"], "self": is_self, "profileAvailable": authenticated,
-                    "avatarUrl": if is_self { self.profile.as_ref().and_then(|p| p["avatarDataUrl"].as_str()).unwrap_or_default() } else { "" },
-                    "accountId": if authenticated { account } else { "" },
-                    "localMuted": self.peer_muted.contains(socket),
-                    "volume": self.peer_volume.get(socket).copied().unwrap_or(100),
-                    "pan": self.peer_pan.get(socket).copied().unwrap_or(0),
-                    "streamVolume": self.peer_stream_volume.get(socket).copied().unwrap_or(100),
-                    "streamMuted": self.peer_stream_muted.contains(socket),
-                    "muted": flag(user, "isMuted"), "deafened": flag(user, "isDeafened"),
-                    "customStatus": user["status"], "speaking": self.speaking.contains(socket),
-                    "camera": flag(user, "isCameraOn"), "live": flag(user, "isScreenSharing") || (is_self && self.sharing),
-                    "serverMuted": flag(user, "isServerMuted"),
-                })
-            })
-            .collect();
         let id_str = room["id"].as_str().unwrap_or_default();
         let is_text = room["kind"].as_str() == Some("text")
             || id_str.starts_with("text_")
