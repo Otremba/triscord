@@ -18,16 +18,20 @@ import { ShareScreenModal } from './components/modals/ShareScreenModal';
 import { ControlsBar } from './components/call/ControlsBar';
 import { ParticipantCard } from './components/call/ParticipantCard';
 import { OwnStreamTile } from './components/call/OwnStreamTile';
+import { MemberList } from './components/MemberList';
 import type { Bridge } from './bridge';
 import type { Session, VoiceUser, Channel } from './protocol';
 import { EVENTS } from './events';
-import { MessageSquare, Volume2, Hash } from 'lucide-react';
+import { MessageSquare, Volume2, Hash, PanelLeftClose, PanelLeftOpen, Users } from 'lucide-react';
 import { Tooltip } from './components/ui/tooltip';
+import { cn } from './lib/utils';
 
 export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) {
     const session: Session | null = useSession(store);
 
     const [showChat, setShowChat] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [membersOpen, setMembersOpen] = useState(true);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [settingsPage, setSettingsPage] = useState<'account' | 'voice' | 'windows'>('voice');
     const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
@@ -42,9 +46,16 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
                 e.preventDefault();
                 setQuickSwitcherOpen(prev => !prev);
+            } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'b' || e.key === '[')) {
+                e.preventDefault();
+                setSidebarOpen(prev => !prev);
+            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
+                e.preventDefault();
+                setMembersOpen(prev => !prev);
             }
         };
         const openSwitcher = () => setQuickSwitcherOpen(prev => !prev);
+        const toggleSidebar = () => setSidebarOpen(prev => !prev);
         const openSettings = (e?: Event) => {
             const detail = (e as CustomEvent)?.detail;
             if (detail?.page) {
@@ -69,12 +80,14 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
 
         window.addEventListener('keydown', onKey);
         window.addEventListener(EVENTS.openQuickSwitcher, openSwitcher);
+        window.addEventListener(EVENTS.toggleSidebar, toggleSidebar);
         window.addEventListener(EVENTS.openSettings, openSettings);
         window.addEventListener(EVENTS.openModal, openModalHandler);
 
         return () => {
             window.removeEventListener('keydown', onKey);
             window.removeEventListener(EVENTS.openQuickSwitcher, openSwitcher);
+            window.removeEventListener(EVENTS.toggleSidebar, toggleSidebar);
             window.removeEventListener(EVENTS.openSettings, openSettings);
             window.removeEventListener(EVENTS.openModal, openModalHandler);
         };
@@ -145,8 +158,11 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
                     bridge={bridge}
                 />
 
-                {/* Second column: Channel Sidebar + Account Panel */}
-                <div className="flex w-60 shrink-0 flex-col border-r border-ink-800 bg-ink-900">
+                {/* Second column: Channel Sidebar + Account Panel (Collapsible) */}
+                <div className={cn(
+                    'flex flex-col border-r border-ink-800 bg-ink-900 transition-all duration-200 ease-in-out overflow-hidden',
+                    sidebarOpen ? 'w-60 shrink-0' : 'w-0 border-r-0'
+                )}>
                     <ChannelSidebar session={session} bridge={bridge} />
                     <AccountPanel session={session} bridge={bridge} />
                 </div>
@@ -160,6 +176,16 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
                             {/* Channel Header */}
                             <header className="flex h-12 shrink-0 items-center justify-between border-b border-ink-800 bg-ink-900/60 px-4">
                                 <div className="flex items-center gap-2 min-w-0">
+                                    <Tooltip label={sidebarOpen ? 'Recolher canais (Ctrl+B)' : 'Mostrar canais (Ctrl+B)'}>
+                                        <button
+                                            type="button"
+                                            aria-label={sidebarOpen ? 'Recolher canais' : 'Mostrar canais'}
+                                            onClick={() => setSidebarOpen(prev => !prev)}
+                                            className="flex h-8 w-8 items-center justify-center rounded-md text-ink-400 hover:bg-ink-800 hover:text-ink-100 transition-colors shrink-0 mr-1"
+                                        >
+                                            {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+                                        </button>
+                                    </Tooltip>
                                     {selectedChannel?.kind === 'voice' ? (
                                         <Volume2 size={18} className="text-ink-400 shrink-0" />
                                     ) : (
@@ -182,6 +208,19 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
                                             </button>
                                         </Tooltip>
                                     )}
+                                    <Tooltip label={membersOpen ? 'Ocultar lista de membros (Ctrl+U)' : 'Mostrar lista de membros (Ctrl+U)'}>
+                                        <button
+                                            type="button"
+                                            aria-label={membersOpen ? 'Ocultar lista de membros' : 'Mostrar lista de membros'}
+                                            onClick={() => setMembersOpen(prev => !prev)}
+                                            className={cn(
+                                                'flex h-8 w-8 items-center justify-center rounded-md text-ink-400 hover:bg-ink-800 hover:text-ink-100 transition-colors',
+                                                membersOpen && 'bg-ink-800 text-ink-100'
+                                            )}
+                                        >
+                                            <Users size={18} />
+                                        </button>
+                                    </Tooltip>
                                 </div>
                             </header>
 
@@ -255,6 +294,11 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
                                             bridge={bridge}
                                         />
                                     </aside>
+                                )}
+
+                                {/* Member List (Collapsible) */}
+                                {membersOpen && (
+                                    <MemberList session={session} bridge={bridge} />
                                 )}
                             </div>
                         </div>
