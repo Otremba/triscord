@@ -102,4 +102,33 @@ describe('CallStage Dynamic Grouping', () => {
         expect(screen.getByText('Tela de Virtu')).toBeInTheDocument();
         expect(screen.getByText('camargo')).toBeInTheDocument();
     });
+
+    it('registers own-stream videoSurface and videoRole when sharing is active', () => {
+        const bridge = createMockBridge();
+        const sessionWithSharing = {
+            ...baseSession,
+            sharing: true,
+            sharingName: 'Minha Tela',
+        };
+
+        render(
+            <CallStage
+                session={sessionWithSharing}
+                bridge={bridge}
+                videoStreams={[]}
+                callParticipants={[]}
+            />
+        );
+
+        expect(screen.getByText('Minha Tela')).toBeInTheDocument();
+        expect(bridge.send).toHaveBeenCalledWith({
+            name: 'videoRole',
+            streamId: 'own-stream',
+            role: 'grid',
+        });
+        expect(bridge.send).toHaveBeenCalledWith(expect.objectContaining({
+            name: 'videoSurface',
+            streamId: 'own-stream',
+        }));
+    });
 });

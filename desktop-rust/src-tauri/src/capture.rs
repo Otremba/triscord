@@ -1,5 +1,6 @@
 use crate::{
     error::{Error, Result},
+    presenter::Presenter,
     video_codec::{Config, Encoder},
     video_gpu::Converter,
 };
@@ -73,13 +74,16 @@ pub struct Flags {
     sender: mpsc::SyncSender<GpuFrame>,
     alive: Arc<AtomicBool>,
     failure: Failure,
+    presenter: Option<Presenter>,
 }
 struct Handler {
     flags: Flags,
     converter: Converter,
     query: ID3D11Query,
     clock: Clock,
+    preview_clock: Clock,
     started: Instant,
+    staging: Option<ID3D11Texture2D>,
 }
 impl GraphicsCaptureApiHandler for Handler {
     type Flags = Flags;
@@ -102,8 +106,33 @@ impl GraphicsCaptureApiHandler for Handler {
         let query = query.ok_or_else(|| {
             windows::core::Error::from_hresult(windows::Win32::Foundation::E_FAIL)
         })?;
+        let staging = if context.flags.presenter.is_some() {
+            let staging_desc = D3D11_TEXTURE2D_DESC {
+                Width: context.flags.config.width,
+                Height: context.flags.config.height,
+                MipLevels: 1,
+                ArraySize: 1,
+                Format: windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_NV12,
+                SampleDesc: windows::Win32::Graphics::Dxgi::Common::DXGI_SAMPLE_DESC {
+                    Count: 1,
+                    Quality: 0,
+                },
+                Usage: D3D11_USAGE_STAGING,
+                BindFlags: 0,
+                CPUAccessFlags: D3D11_CPU_ACCESS_READ.0 as u32,
+                MiscFlags: 0,
+            };
+            let mut staging = None;
+            unsafe {
+                let _ = context.device.CreateTexture2D(&staging_desc, None, Some(&mut staging));
+            }
+            staging
+        } else {
+            None
+        };
         Ok(Self {
             clock: Clock::new(context.flags.config.fps),
+            preview_clock: Clock::new(30),
             converter: Converter::new(
                 context.device,
                 context.device_context,
@@ -112,6 +141,7 @@ impl GraphicsCaptureApiHandler for Handler {
             flags: context.flags,
             query,
             started: Instant::now(),
+            staging,
         })
     }
     fn on_frame_arrived(
@@ -168,6 +198,56 @@ impl GraphicsCaptureApiHandler for Handler {
         })();
         match result {
             Ok(texture) => {
+                if let (Some(presenter), Some(staging)) = (&self.flags.presenter, &self.staging) {
+                    if self.preview_clock.due(self.started.elapsed()) {
+                        unsafe {
+                            frame.device_context().CopyResource(staging, &texture);
+                            let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
+                            if frame
+                                .device_context()
+                                .Map(staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))
+                                .is_ok()
+                            {
+                                let w = self.flags.config.width as usize;
+                                let h = self.flags.config.height as usize;
+                                let pitch = mapped.RowPitch as usize;
+                                let mut bytes = vec![0u8; w * h * 3 / 2];
+                                let src_ptr = mapped.pData as *const u8;
+                                if pitch == w {
+                                    std::ptr::copy_nonoverlapping(
+                                        src_ptr,
+                                        bytes.as_mut_ptr(),
+                                        w * h * 3 / 2,
+                                    );
+                                } else {
+                                    for y in 0..h {
+                                        std::ptr::copy_nonoverlapping(
+                                            src_ptr.add(y * pitch),
+                                            bytes.as_mut_ptr().add(y * w),
+                                            w,
+                                        );
+                                    }
+                                    let uv_src = src_ptr.add(h * pitch);
+                                    let uv_dst = bytes.as_mut_ptr().add(w * h);
+                                    for y in 0..h / 2 {
+                                        std::ptr::copy_nonoverlapping(
+                                            uv_src.add(y * pitch),
+                                            uv_dst.add(y * w),
+                                            w,
+                                        );
+                                    }
+                                }
+                                let _ = frame.device_context().Unmap(staging, 0);
+                                presenter.submit_nv12(
+                                    "own-stream",
+                                    self.flags.config.width,
+                                    self.flags.config.height,
+                                    bytes,
+                                );
+                            }
+                        }
+                    }
+                }
                 let _ = self.flags.sender.try_send(GpuFrame { texture });
             }
             Err(error) => {
@@ -195,6 +275,7 @@ impl Pipeline {
         source: Source,
         config: Config,
         sink: NativeVideoSource,
+        presenter: Option<Presenter>,
         failure: Failure,
     ) -> Result<Self> {
         if !config.valid() {
@@ -208,6 +289,7 @@ impl Pipeline {
             sender,
             alive: alive.clone(),
             failure: failure.clone(),
+            presenter,
         };
         let settings = |item| {
             Settings::new(

@@ -55,9 +55,17 @@ impl Rect {
         (rect.width <= 8192 && rect.height <= 8192).then_some(rect)
     }
 }
+pub enum PresentFrame {
+    Boxed(BoxVideoFrame),
+    Nv12 {
+        width: u32,
+        height: u32,
+        bytes: Vec<u8>,
+    },
+}
 #[derive(Default)]
 struct Slot {
-    frame: Option<BoxVideoFrame>,
+    frame: Option<PresentFrame>,
     rect: Rect,
     scale: f64,
     failed: bool,
@@ -209,7 +217,15 @@ impl Presenter {
     pub fn submit(&self, id: &str, frame: BoxVideoFrame) {
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(slot) = state.slots.get_mut(id) {
-            slot.frame = Some(frame);
+            slot.frame = Some(PresentFrame::Boxed(frame));
+            state.dirty = true;
+            self.wake.notify_one();
+        }
+    }
+    pub fn submit_nv12(&self, id: &str, width: u32, height: u32, bytes: Vec<u8>) {
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(slot) = state.slots.get_mut(id) {
+            slot.frame = Some(PresentFrame::Nv12 { width, height, bytes });
             state.dirty = true;
             self.wake.notify_one();
         }
@@ -424,15 +440,25 @@ impl Surface {
             Ok(())
         }
     }
-    fn draw(&mut self, frame: BoxVideoFrame) -> windows::core::Result<()> {
-        let buffer = frame.buffer.to_i420();
-        let width = buffer.width();
-        let height = buffer.height();
-        let planes = buffer.data();
-        let strides = buffer.strides();
-        let bytes = nv12(width, height, strides, planes).ok_or_else(|| {
-            windows::core::Error::from_hresult(windows::Win32::Foundation::E_INVALIDARG)
-        })?;
+    fn draw(&mut self, frame: PresentFrame) -> windows::core::Result<()> {
+        match frame {
+            PresentFrame::Boxed(frame) => {
+                let buffer = frame.buffer.to_i420();
+                let width = buffer.width();
+                let height = buffer.height();
+                let planes = buffer.data();
+                let strides = buffer.strides();
+                let bytes = nv12(width, height, strides, planes).ok_or_else(|| {
+                    windows::core::Error::from_hresult(windows::Win32::Foundation::E_INVALIDARG)
+                })?;
+                self.draw_nv12(width, height, &bytes)
+            }
+            PresentFrame::Nv12 { width, height, bytes } => {
+                self.draw_nv12(width, height, &bytes)
+            }
+        }
+    }
+    fn draw_nv12(&mut self, width: u32, height: u32, bytes: &[u8]) -> windows::core::Result<()> {
         unsafe {
             let mut texture = None;
             self.device.CreateTexture2D(
@@ -584,5 +610,17 @@ mod tests {
 
         // Insufficient stride rejected
         assert!(nv12(100, 100, (90, 50, 50), (&[0; 10000], &[0; 2500], &[0; 2500])).is_none());
+    }
+    #[test]
+    fn presenter_slot_stores_nv12_frame() {
+        let presenter = Presenter {
+            state: Arc::new(Mutex::new(State::default())),
+            wake: Arc::new(Condvar::new()),
+        };
+        assert!(presenter.register("own-stream").is_ok());
+        presenter.submit_nv12("own-stream", 64, 64, vec![0; 64 * 64 * 3 / 2]);
+        let state = presenter.state.lock().unwrap();
+        let slot = state.slots.get("own-stream").unwrap();
+        assert!(matches!(slot.frame, Some(PresentFrame::Nv12 { width: 64, height: 64, .. })));
     }
 }

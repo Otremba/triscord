@@ -64,6 +64,7 @@ struct Session {
     events: mpsc::UnboundedReceiver<RoomEvent>,
     readers: HashMap<String, Reader>,
     publication: Option<Publication>,
+    presenter: Presenter,
 }
 impl Session {
     async fn connect(
@@ -71,6 +72,7 @@ impl Session {
         membership: u64,
         room_id: String,
         credentials: &Credentials,
+        presenter: Presenter,
     ) -> Result<Self> {
         let mut options = RoomOptions::default();
         options.auto_subscribe = false;
@@ -89,6 +91,7 @@ impl Session {
             events,
             readers: HashMap::new(),
             publication: None,
+            presenter,
         };
         session.subscribe();
         Ok(session)
@@ -111,6 +114,7 @@ impl Session {
     }
     async fn stop_publish(&mut self) {
         if let Some(publication) = self.publication.take() {
+            self.presenter.remove("own-stream");
             drop(publication.capture);
             let _ = timeout(
                 Duration::from_secs(5),
@@ -171,12 +175,14 @@ impl Session {
             .await;
             return Err(Error::invalid());
         }
+        let _ = self.presenter.register("own-stream");
         let failure_model = model.clone();
         let failure_app = app.clone();
         let capture = Pipeline::start(
             source,
             config,
             video,
+            Some(self.presenter.clone()),
             Arc::new(move || {
                 let current = {
                     let state = failure_model.lock().unwrap_or_else(|e| e.into_inner());
@@ -208,6 +214,7 @@ impl Session {
                 Ok(())
             }
             Err(error) => {
+                self.presenter.remove("own-stream");
                 let _ = timeout(
                     Duration::from_secs(5),
                     self.room
@@ -268,8 +275,14 @@ impl Screen {
                         }
                         close(&mut active).await;
                         wanted = None;
-                        match Session::connect(generation, membership, room.clone(), &credentials)
-                            .await
+                        match Session::connect(
+                            generation,
+                            membership,
+                            room.clone(),
+                            &credentials,
+                            presenter.clone(),
+                        )
+                        .await
                         {
                             Ok(session) if watching(&model, generation, membership, &room) => {
                                 active = Some(session)
@@ -320,9 +333,14 @@ impl Screen {
                                 && session.room_id == room
                         }) {
                             close(&mut active).await;
-                            if let Ok(session) =
-                                Session::connect(generation, membership, room.clone(), &credentials)
-                                    .await
+                            if let Ok(session) = Session::connect(
+                                generation,
+                                membership,
+                                room.clone(),
+                                &credentials,
+                                presenter.clone(),
+                            )
+                            .await
                             {
                                 active = Some(session);
                             }
