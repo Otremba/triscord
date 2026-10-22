@@ -11,19 +11,7 @@ export function ChannelSidebar({ session, bridge }: { session: Session; bridge: 
 
     return (
         <div className="flex flex-1 min-h-0 flex-col bg-ink-900">
-            {!isHome && server ? (
-                <div className="flex h-12 shrink-0 items-center justify-between border-b border-ink-800 px-4 font-semibold text-sm text-ink-100">
-                    <span className="truncate">{server.name}</span>
-                    <button
-                        type="button"
-                        aria-label="Opções do Servidor"
-                        onClick={() => emit('tri-open-modal', { kind: 'createChannel', categoryName: 'Canais de Voz' })}
-                        className="text-ink-400 hover:text-ink-100"
-                    >
-                        <Plus size={16} />
-                    </button>
-                </div>
-            ) : isHome ? (
+            {isHome && (
                 <div className="flex h-12 shrink-0 items-center border-b border-ink-800 px-4">
                     <button
                         type="button"
@@ -33,7 +21,7 @@ export function ChannelSidebar({ session, bridge }: { session: Session; bridge: 
                         Buscar ou iniciar conversa (Ctrl+K)
                     </button>
                 </div>
-            ) : null}
+            )}
 
             <div className="flex-1 overflow-y-auto px-2 py-3">
                 {isHome ? (
