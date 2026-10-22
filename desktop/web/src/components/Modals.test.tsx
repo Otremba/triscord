@@ -32,7 +32,7 @@ describe('Modals & Dialogs Components', () => {
         const bridge = createMockBridge();
         const onClose = vi.fn();
 
-        render(<CreateChannelModal categoryName="Canais de Voz" bridge={bridge} onClose={onClose} />);
+        const { unmount } = render(<CreateChannelModal categoryName="Canais de Voz" bridge={bridge} onClose={onClose} />);
 
         const input = screen.getByPlaceholderText(/geral/i);
         fireEvent.change(input, { target: { value: 'jogos-geral' } });
@@ -43,8 +43,24 @@ describe('Modals & Dialogs Components', () => {
         expect(bridge.send).toHaveBeenCalledWith({
             name: 'createChannel',
             channelName: 'jogos-geral',
+            kind: 'voice',
         });
         expect(onClose).toHaveBeenCalled();
+        unmount();
+
+        // Also test creating a text channel
+        const textBridge = createMockBridge();
+        const textOnClose = vi.fn();
+        render(<CreateChannelModal categoryName="Canais de Texto" bridge={textBridge} onClose={textOnClose} />);
+        const textInput = screen.getByPlaceholderText(/bate-papo/i);
+        fireEvent.change(textInput, { target: { value: 'regras-e-avisos' } });
+        fireEvent.click(screen.getByRole('button', { name: /criar canal/i }));
+        expect(textBridge.send).toHaveBeenCalledWith({
+            name: 'createChannel',
+            channelName: 'regras-e-avisos',
+            kind: 'text',
+        });
+        expect(textOnClose).toHaveBeenCalled();
     });
 
     it('CreateServerModal handles creation and invite entry', async () => {

@@ -240,7 +240,7 @@ export type Command =
   | { name: 'selectServer'; serverId: Id }
   | { name: 'selectChannel'; channelId: Id }
   | { name: 'joinVoice'; channelId: Id }
-  | { name: 'createChannel'; channelName: string }   // "name" is the command discriminator
+  | { name: 'createChannel'; channelName: string; kind?: 'text' | 'voice' }
   | { name: 'sendChatMessage'; text: string }        // room we are in; hub limit 2000 characters
   | { name: 'deleteChatMessage'; messageId: Id }     // own messages only
   | { name: 'toggleReaction'; messageId: Id; emoji: string }

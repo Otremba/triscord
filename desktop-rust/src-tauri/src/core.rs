@@ -131,6 +131,8 @@ pub enum Command {
     CreateChannel {
         #[serde(rename = "channelName")]
         channel_name: String,
+        #[serde(default)]
+        kind: Option<String>,
     },
     SetCustomStatus {
         text: String,
@@ -1109,21 +1111,32 @@ impl Core {
                 )?;
                 Ok(Value::Null)
             }
-            Command::CreateChannel { channel_name } => {
+            Command::CreateChannel { channel_name, kind } => {
                 let name = clean_name(&channel_name, 64)?;
-                let generation = {
-                    let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
-                    m.voice_requested = true;
-                    m.voice_state = "connecting".into();
-                    m.generation
-                };
-                self.media.stop(generation)?;
-                if let Err(error) = self.join_text(format!("room_{}", uuid::Uuid::new_v4()), name) {
-                    self.model
-                        .lock()
-                        .unwrap_or_else(|e| e.into_inner())
-                        .voice_requested = false;
-                    return Err(error);
+                let is_text = kind.as_deref() == Some("text");
+                if is_text {
+                    let generation = {
+                        let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                        m.voice_requested = false;
+                        m.generation
+                    };
+                    self.media.stop(generation)?;
+                    self.join_text(format!("text_{}", uuid::Uuid::new_v4()), name)?;
+                } else {
+                    let generation = {
+                        let mut m = self.model.lock().unwrap_or_else(|e| e.into_inner());
+                        m.voice_requested = true;
+                        m.voice_state = "connecting".into();
+                        m.generation
+                    };
+                    self.media.stop(generation)?;
+                    if let Err(error) = self.join_text(format!("room_{}", uuid::Uuid::new_v4()), name) {
+                        self.model
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .voice_requested = false;
+                        return Err(error);
+                    }
                 }
                 Ok(Value::Null)
             }

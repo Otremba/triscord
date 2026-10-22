@@ -155,7 +155,45 @@ impl Model {
                 })
             })
             .collect();
-        let mut channel = json!({"id": room["id"], "name": room["name"], "kind": "voice", "users": users});
+        let id_str = room["id"].as_str().unwrap_or_default();
+        let is_text = room["kind"].as_str() == Some("text")
+            || id_str.starts_with("text_")
+            || id_str.starts_with("t_");
+        let kind = if is_text { "text" } else { "voice" };
+        let mut owner = String::new();
+        let users: Vec<Value> = if is_text {
+            Vec::new()
+        } else {
+            room["users"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|user| {
+                    let socket = user["socketId"].as_str().unwrap_or_default();
+                    let account = user["userId"].as_str().unwrap_or_default();
+                    let authenticated = flag(user, "authenticated");
+                    let is_self = socket == self.self_socket;
+                    if room["ownerUserId"].as_str() == Some(account) {
+                        owner = socket.to_owned();
+                    }
+                    json!({
+                        "id": socket, "name": user["username"], "self": is_self, "profileAvailable": authenticated,
+                        "avatarUrl": if is_self { self.profile.as_ref().and_then(|p| p["avatarDataUrl"].as_str()).unwrap_or_default() } else { "" },
+                        "accountId": if authenticated { account } else { "" },
+                        "localMuted": self.peer_muted.contains(socket),
+                        "volume": self.peer_volume.get(socket).copied().unwrap_or(100),
+                        "pan": self.peer_pan.get(socket).copied().unwrap_or(0),
+                        "streamVolume": self.peer_stream_volume.get(socket).copied().unwrap_or(100),
+                        "streamMuted": self.peer_stream_muted.contains(socket),
+                        "muted": flag(user, "isMuted"), "deafened": flag(user, "isDeafened"),
+                        "customStatus": user["status"], "speaking": self.speaking.contains(socket),
+                        "camera": flag(user, "isCameraOn"), "live": flag(user, "isScreenSharing") || (is_self && self.sharing),
+                        "serverMuted": flag(user, "isServerMuted"),
+                    })
+                })
+                .collect()
+        };
+        let mut channel = json!({"id": room["id"], "name": room["name"], "kind": kind, "users": users});
         if !owner.is_empty() {
             channel["ownerId"] = json!(owner);
         }
@@ -193,7 +231,20 @@ impl Model {
                 .position(|id| room["id"].as_str() == Some(id))
                 .unwrap_or(usize::MAX)
         });
-        let channels: Vec<Value> = rooms.iter().map(|room| self.channel(room)).collect();
+        let mut text_channels = Vec::new();
+        let mut voice_channels = Vec::new();
+        for room in rooms {
+            let ch = self.channel(room);
+            if ch["kind"].as_str() == Some("text") {
+                text_channels.push(ch);
+            } else {
+                voice_channels.push(ch);
+            }
+        }
+        let mut categories = vec![json!({"id": "voice", "name": "Canais de Voz", "channels": voice_channels})];
+        if !text_channels.is_empty() {
+            categories.insert(0, json!({"id": "text", "name": "Canais de Texto", "channels": text_channels}));
+        }
         let call_channel = connected_channel
             .as_deref()
             .and_then(|id| self.rooms.iter().find(|room| room["id"].as_str() == Some(id)))
@@ -221,7 +272,7 @@ impl Model {
             "auth": { "state": if self.signing_in {"signingIn"} else if account.is_some() && nick.is_empty() {"needsNick"} else if account.is_some() { "signedIn" } else { "signedOut" } },
             "servers": self.servers.iter().map(|s| json!({"id": s["id"], "name": s["name"], "owned": s["ownerAccountId"].as_str() == Some(account_id.as_str())})).collect::<Vec<_>>(),
             "selectedServerId": self.selected_server, "callServerId": self.selected_server,
-            "categories": [{"id": "voice", "name": "Canais de Voz", "channels": channels}],
+            "categories": categories,
             "rooms": self.rooms.iter().map(|r| json!({"id": r["id"], "name": r["name"], "userCount": r["userCount"]})).collect::<Vec<_>>(),
             "textRoomId": self.text_room,
             "selectedChannelId": self.text_room.clone().or_else(|| self.desired_room.clone()).or_else(|| self.rooms.first().and_then(|r| r["id"].as_str()).map(str::to_owned)),

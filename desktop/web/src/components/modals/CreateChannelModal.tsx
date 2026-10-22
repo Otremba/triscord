@@ -3,15 +3,16 @@ import type { Bridge } from '@/bridge';
 import { X, Hash, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export function CreateChannelModal({ categoryName: _categoryName, bridge, onClose }: { categoryName?: string; bridge: Bridge; onClose: () => void }) {
+export function CreateChannelModal({ categoryName, bridge, onClose }: { categoryName?: string; bridge: Bridge; onClose: () => void }) {
+    const isTextCategory = categoryName?.toLowerCase().includes('texto') ?? false;
     const [name, setName] = useState('');
-    const [kind, setKind] = useState<'text' | 'voice'>('voice');
+    const [kind, setKind] = useState<'text' | 'voice'>(isTextCategory ? 'text' : 'voice');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const trimmed = name.trim();
         if (!trimmed) return;
-        bridge.send({ name: 'createChannel', channelName: trimmed });
+        bridge.send({ name: 'createChannel', channelName: trimmed, kind });
         onClose();
     };
 
