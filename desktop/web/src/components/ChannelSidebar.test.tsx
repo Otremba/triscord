@@ -79,11 +79,9 @@ describe('ChannelSidebar Component Hierarchy and Behavior', () => {
         render(<ChannelSidebar session={session} bridge={bridge} />);
 
         fireEvent.click(screen.getByText('Voz 1'));
-        expect(bridge.send).toHaveBeenCalledWith({ name: 'selectChannel', channelId: 'v1' });
         expect(bridge.send).toHaveBeenCalledWith({ name: 'joinVoice', channelId: 'v1' });
 
         fireEvent.click(screen.getByText('chat-geral'));
-        expect(bridge.send).toHaveBeenCalledWith({ name: 'selectChannel', channelId: 't1' });
         expect(bridge.send).toHaveBeenCalledWith({ name: 'openTextRoom', channelId: 't1' });
     });
 });

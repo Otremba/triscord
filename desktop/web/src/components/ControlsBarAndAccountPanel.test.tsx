@@ -81,11 +81,13 @@ describe('AccountPanel & ControlsBar Components', () => {
         expect(soundEngine.play).toHaveBeenCalledWith('cameraOn');
         expect(bridge.send).toHaveBeenCalledWith({ name: 'setCamera', on: true });
 
-        // Screen share toggle
+        // Screen share toggle opens shareScreen modal
+        const modalListener = vi.fn();
+        window.addEventListener('tri-open-modal', modalListener);
         const shareBtn = screen.getByRole('button', { name: /compartilhar tela/i });
         fireEvent.click(shareBtn);
-        expect(soundEngine.play).toHaveBeenCalledWith('streamStart');
-        expect(bridge.send).toHaveBeenCalledWith({ name: 'startScreenShare', generation: 'screen-1', index: 0 });
+        expect(modalListener).toHaveBeenCalled();
+        window.removeEventListener('tri-open-modal', modalListener);
 
         // Leave call
         const leaveBtn = screen.getByRole('button', { name: /desconectar da chamada/i });

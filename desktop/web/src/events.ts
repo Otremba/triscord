@@ -7,7 +7,8 @@ export type OpenModalDetail =
     | { kind: 'createChannel'; categoryName: string }
     | { kind: 'invite'; serverId: string; serverName: string }
     | { kind: 'deleteMessage'; message: ChatMessage }
-    | { kind: 'deleteServer' | 'leaveServer'; serverId: string; serverName: string };
+    | { kind: 'deleteServer' | 'leaveServer'; serverId: string; serverName: string }
+    | { kind: 'shareScreen' };
 
 export const EVENTS = {
     openServerModal: 'tri-open-server-modal',

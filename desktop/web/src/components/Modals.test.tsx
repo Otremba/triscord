@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SettingsModal } from './SettingsModal';
 import { CreateChannelModal } from './modals/CreateChannelModal';
 import { CreateServerModal } from './modals/CreateServerModal';
+import { ShareScreenModal } from './modals/ShareScreenModal';
 import { QuickSwitcher } from './QuickSwitcher';
 import { createMockBridge, getFixture } from '../test/test-utils';
 
@@ -82,6 +83,39 @@ describe('Modals & Dialogs Components', () => {
 
         // Escape closes
         fireEvent.keyDown(searchInput, { key: 'Escape' });
+        expect(onClose).toHaveBeenCalled();
+    });
+
+    it('ShareScreenModal lists sources and starts share with real generation and index', async () => {
+        const bridge = createMockBridge(async (cmd) => {
+            if (cmd.name === 'listShareSources') {
+                return {
+                    generation: 'gen-uuid-1234',
+                    sources: [
+                        { index: 0, kind: 'screen', name: 'Tela 1' },
+                        { index: 1, kind: 'window', name: 'Visual Studio Code' },
+                    ],
+                };
+            }
+            return null;
+        });
+        const onClose = vi.fn();
+
+        render(<ShareScreenModal bridge={bridge} onClose={onClose} />);
+
+        await waitFor(() => {
+            expect(screen.getByText('Tela 1')).toBeInTheDocument();
+        });
+
+        // Click share
+        const shareBtn = screen.getByRole('button', { name: /^compartilhar$/i });
+        fireEvent.click(shareBtn);
+
+        expect(bridge.send).toHaveBeenCalledWith({
+            name: 'startScreenShare',
+            generation: 'gen-uuid-1234',
+            index: 0,
+        });
         expect(onClose).toHaveBeenCalled();
     });
 });

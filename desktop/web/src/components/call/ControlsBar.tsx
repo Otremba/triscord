@@ -4,6 +4,7 @@ import { Video, VideoOff, ScreenShare, ScreenShareOff, PhoneOff } from 'lucide-r
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { soundEngine } from '@/sound-engine';
+import { emit, EVENTS } from '@/events';
 
 export function ControlsBar({ session, bridge }: { session: Session; bridge: Bridge }) {
     const hasCamera = !!session.camera;
@@ -41,11 +42,11 @@ export function ControlsBar({ session, bridge }: { session: Session; bridge: Bri
                             : 'bg-ink-800 text-ink-300 hover:bg-ink-700 hover:text-ink-100'
                     )}
                     onClick={() => {
-                        soundEngine.play(isSharing ? 'streamStop' : 'streamStart');
                         if (isSharing) {
+                            soundEngine.play('streamStop');
                             bridge.send({ name: 'stopScreenShare' });
                         } else {
-                            bridge.send({ name: 'startScreenShare', generation: 'screen-1', index: 0 });
+                            emit(EVENTS.openModal, { kind: 'shareScreen' });
                         }
                     }}
                 >

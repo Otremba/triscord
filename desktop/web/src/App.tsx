@@ -13,6 +13,7 @@ import { QuickSwitcher } from './components/QuickSwitcher';
 import { SettingsModal } from './components/SettingsModal';
 import { CreateChannelModal } from './components/modals/CreateChannelModal';
 import { CreateServerModal } from './components/modals/CreateServerModal';
+import { ShareScreenModal } from './components/modals/ShareScreenModal';
 import { ControlsBar } from './components/call/ControlsBar';
 import { ParticipantCard } from './components/call/ParticipantCard';
 import type { Bridge } from './bridge';
@@ -30,6 +31,7 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
     const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
     const [channelModal, setChannelModal] = useState<{ categoryName?: string } | null>(null);
     const [serverModalOpen, setServerModalOpen] = useState(false);
+    const [shareModalOpen, setShareModalOpen] = useState(false);
 
     // Event listeners
     useEffect(() => {
@@ -53,6 +55,8 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
             const detail = (e as CustomEvent).detail;
             if (detail?.kind === 'createChannel') {
                 setChannelModal({ categoryName: detail.categoryName });
+            } else if (detail?.kind === 'shareScreen') {
+                setShareModalOpen(true);
             }
         };
 
@@ -249,6 +253,13 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
                 <CreateServerModal
                     bridge={bridge}
                     onClose={() => setServerModalOpen(false)}
+                />
+            )}
+
+            {shareModalOpen && (
+                <ShareScreenModal
+                    bridge={bridge}
+                    onClose={() => setShareModalOpen(false)}
                 />
             )}
 

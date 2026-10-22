@@ -62,7 +62,6 @@ export function ChannelSidebar({ session, bridge }: { session: Session; bridge: 
                                             <button
                                             type="button"
                                             onClick={() => {
-                                                bridge.send({ name: 'selectChannel', channelId: channel.id });
                                                 if (channel.kind === 'voice') {
                                                     bridge.send({ name: 'joinVoice', channelId: channel.id });
                                                 } else {
