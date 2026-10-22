@@ -4,6 +4,7 @@ import { Mic, MicOff, Headphones, HeadphoneOff, Video, VideoOff, ScreenShare, Sc
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { emit } from '@/events';
+import { soundEngine } from '@/sound-engine';
 
 export function ControlsBar({ session, bridge }: { session: Session; bridge: Bridge }) {
     const isMuted = !!session.muted;
@@ -22,7 +23,10 @@ export function ControlsBar({ session, bridge }: { session: Session; bridge: Bri
                             'flex h-9 w-9 items-center justify-center rounded-md transition-colors',
                             isMuted ? 'bg-critical/20 text-critical hover:bg-critical/30' : 'text-ink-300 hover:bg-ink-700 hover:text-ink-100'
                         )}
-                        onClick={() => bridge.send({ name: 'setMuted', muted: !isMuted })}
+                        onClick={() => {
+                            soundEngine.play(isMuted ? 'unmute' : 'mute');
+                            bridge.send({ name: 'setMuted', muted: !isMuted });
+                        }}
                     >
                         {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
                     </button>
@@ -36,7 +40,10 @@ export function ControlsBar({ session, bridge }: { session: Session; bridge: Bri
                             'flex h-9 w-9 items-center justify-center rounded-md transition-colors',
                             isDeafened ? 'bg-critical/20 text-critical hover:bg-critical/30' : 'text-ink-300 hover:bg-ink-700 hover:text-ink-100'
                         )}
-                        onClick={() => bridge.send({ name: 'setDeafened', deafened: !isDeafened })}
+                        onClick={() => {
+                            soundEngine.play(isDeafened ? 'undeafen' : 'deafen');
+                            bridge.send({ name: 'setDeafened', deafened: !isDeafened });
+                        }}
                     >
                         {isDeafened ? <HeadphoneOff size={18} /> : <Headphones size={18} />}
                     </button>
@@ -50,7 +57,10 @@ export function ControlsBar({ session, bridge }: { session: Session; bridge: Bri
                             'flex h-9 w-9 items-center justify-center rounded-md transition-colors',
                             hasCamera ? 'bg-positive/20 text-positive hover:bg-positive/30' : 'text-ink-300 hover:bg-ink-700 hover:text-ink-100'
                         )}
-                        onClick={() => bridge.send({ name: 'setCamera', on: !hasCamera })}
+                        onClick={() => {
+                            soundEngine.play(hasCamera ? 'cameraOff' : 'cameraOn');
+                            bridge.send({ name: 'setCamera', on: !hasCamera });
+                        }}
                     >
                         {hasCamera ? <Video size={18} /> : <VideoOff size={18} />}
                     </button>
@@ -65,6 +75,7 @@ export function ControlsBar({ session, bridge }: { session: Session; bridge: Bri
                             isSharing ? 'bg-positive/20 text-positive hover:bg-positive/30' : 'text-ink-300 hover:bg-ink-700 hover:text-ink-100'
                         )}
                         onClick={() => {
+                            soundEngine.play(isSharing ? 'streamStop' : 'streamStart');
                             if (isSharing) {
                                 bridge.send({ name: 'stopScreenShare' });
                             } else {
@@ -94,7 +105,10 @@ export function ControlsBar({ session, bridge }: { session: Session; bridge: Bri
                         type="button"
                         aria-label="Desconectar da chamada"
                         className="flex h-9 w-9 items-center justify-center rounded-md bg-critical text-white hover:bg-critical/90 transition-colors"
-                        onClick={() => bridge.send({ name: 'leaveVoice' })}
+                        onClick={() => {
+                            soundEngine.play('leave');
+                            bridge.send({ name: 'leaveVoice' });
+                        }}
                     >
                         <PhoneOff size={18} />
                     </button>

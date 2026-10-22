@@ -1,98 +1,118 @@
-import { Mic, MicOff, Headphones, HeadphoneOff, Video, VideoOff, UserX } from 'lucide-react';
+import { Mic, MicOff, HeadphoneOff, Video, UserX } from 'lucide-react';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { VoiceUser } from '@/protocol';
 import { cn } from '@/lib/utils';
+import { useSpeakingHold } from '@/hooks/useSpeakingHold';
 
 interface ParticipantCardProps {
     user: VoiceUser;
     isSpeaking?: boolean;
-    onMuteToggle?: () => void;
-    onDeafenToggle?: () => void;
-    onVideoToggle?: () => void;
+    variant?: 'stage' | 'compact';
     onKick?: () => void;
 }
 
 export function ParticipantCard({
     user,
     isSpeaking = false,
-    onMuteToggle,
-    onDeafenToggle,
-    onVideoToggle,
+    variant = 'stage',
     onKick,
 }: ParticipantCardProps) {
-    const isMuted = user.muted;
+    const activeSpeaking = useSpeakingHold(isSpeaking, 400);
+    const isMuted = user.muted || user.serverMuted;
     const isDeafened = user.deafened;
     const hasVideo = user.camera ?? false;
     const isSelf = user.self ?? false;
 
+    if (variant === 'compact') {
+        return (
+            <div className={cn('flex items-center gap-3 px-2 py-1.5 text-sm text-ink-300 hover:bg-ink-800 rounded-md transition-colors', isSelf && 'bg-ink-800/60')}>
+                <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-ink-700 text-xs font-semibold text-ink-200">
+                    {user.avatarUrl ? (
+                        <img src={user.avatarUrl} alt="" className={cn('h-8 w-8 rounded-full object-cover transition-all duration-150', activeSpeaking && 'ring-2 ring-positive ring-offset-1 ring-offset-ink-900')} />
+                    ) : (
+                        user.name.slice(0, 1).toUpperCase()
+                    )}
+                    {activeSpeaking && !user.avatarUrl && (
+                        <span className="absolute -inset-0.5 rounded-full ring-2 ring-positive pointer-events-none" />
+                    )}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-ink-100 truncate">{user.name}</p>
+                    {isSelf && (
+                        <span className="text-xs text-ink-400 font-normal">(você)</span>
+                    )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                    {isDeafened ? (
+                        <HeadphoneOff size={16} className="text-critical" />
+                    ) : isMuted ? (
+                        <MicOff size={16} className="text-critical" />
+                    ) : activeSpeaking ? (
+                        <Mic size={16} className="text-positive" />
+                    ) : null}
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className={cn('flex items-center gap-3 px-2 py-1.5 text-sm text-ink-300 hover:bg-ink-800 rounded-md transition-colors', isSelf && 'bg-ink-800/60')}>
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-ink-700 text-xs font-semibold text-ink-200">
-                {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
-                ) : (
-                    user.name.slice(0, 1).toUpperCase()
-                )}
-                {isSpeaking && (
-                    <span className="absolute -inset-0.5 rounded-full ring-2 ring-positive animate-pulse pointer-events-none" />
-                )}
+        <div
+            className={cn(
+                'group relative flex aspect-video w-full flex-col items-center justify-center rounded-2xl border bg-ink-900/90 p-4 transition-all duration-150 select-none shadow-lg',
+                activeSpeaking
+                    ? 'border-[#23a55a] shadow-[0_0_24px_rgba(35,165,90,0.35),inset_0_0_16px_rgba(35,165,90,0.15)] ring-1 ring-[#23a55a]'
+                    : 'border-ink-800/80 hover:border-ink-700 hover:bg-ink-900'
+            )}
+        >
+            {/* Center Avatar */}
+            <div className="relative flex items-center justify-center">
+                <div
+                    className={cn(
+                        'flex h-20 w-20 items-center justify-center rounded-full bg-ink-800 text-2xl font-bold text-ink-100 shadow-xl transition-all duration-150',
+                        activeSpeaking
+                            ? 'ring-4 ring-[#23a55a] ring-offset-4 ring-offset-ink-900 shadow-[0_0_20px_rgba(35,165,90,0.55)]'
+                            : ''
+                    )}
+                >
+                    {user.avatarUrl ? (
+                        <img src={user.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                    ) : (
+                        user.name.slice(0, 1).toUpperCase()
+                    )}
+                </div>
             </div>
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-ink-100 truncate">{user.name}</p>
-                {isSelf && (
-                    <span className="text-xs text-ink-400 font-normal">(você)</span>
-                )}
+
+            {/* Bottom Name & Status Pill */}
+            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 rounded-md bg-ink-950/80 px-2.5 py-1 backdrop-blur-sm max-w-[80%]">
+                    <span className="truncate text-xs font-medium text-ink-200">{user.name}</span>
+                    {isSelf && <span className="text-[10px] text-ink-400 shrink-0">(você)</span>}
+                </div>
+
+                <div className="flex items-center gap-1 rounded-md bg-ink-950/80 p-1 backdrop-blur-sm">
+                    {isDeafened ? (
+                        <HeadphoneOff size={14} className="text-critical" />
+                    ) : isMuted ? (
+                        <MicOff size={14} className="text-critical" />
+                    ) : null}
+                    {hasVideo && <Video size={14} className="text-positive" />}
+                </div>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-                {/* Microphone */}
-                {onMuteToggle && (
-                    <Tooltip label={isMuted ? 'Ativar áudio' : 'Desativar áudio'} side="top">
+
+            {/* Hover Actions */}
+            {!isSelf && onKick && (
+                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Tooltip label="Remover da chamada" side="left">
                         <button
                             type="button"
-                            className="p-1.5 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-700"
-                            onClick={onMuteToggle}
-                        >
-                            {isMuted ? <MicOff size={16} className="text-critical" /> : <Mic size={16} />}
-                        </button>
-                    </Tooltip>
-                )}
-                {/* Headphones/Deafen */}
-                {onDeafenToggle && (
-                    <Tooltip label={isDeafened ? 'Reativar áudio' : 'Desativar áudio'} side="top">
-                        <button
-                            type="button"
-                            className="p-1.5 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-700"
-                            onClick={onDeafenToggle}
-                        >
-                            {isDeafened ? <HeadphoneOff size={16} className="text-critical" /> : <Headphones size={16} />}
-                        </button>
-                    </Tooltip>
-                )}
-                {/* Video */}
-                {onVideoToggle && (
-                    <Tooltip label={hasVideo ? 'Desativar vídeo' : 'Ativar vídeo'} side="top">
-                        <button
-                            type="button"
-                            className="p-1.5 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-700"
-                            onClick={onVideoToggle}
-                        >
-                            {hasVideo ? <Video size={16} className="text-positive" /> : <VideoOff size={16} />}
-                        </button>
-                    </Tooltip>
-                )}
-                {/* Kick button (if not self) */}
-                {!isSelf && onKick && (
-                    <Tooltip label="Remover da chamada" side="top">
-                        <button
-                            type="button"
-                            className="p-1.5 rounded text-critical hover:bg-critical/20"
                             onClick={onKick}
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-ink-950/80 text-critical hover:bg-critical hover:text-white transition-colors"
                         >
-                            <UserX size={16} />
+                            <UserX size={14} />
                         </button>
                     </Tooltip>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 }

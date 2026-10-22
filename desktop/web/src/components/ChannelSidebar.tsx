@@ -3,6 +3,7 @@ import type { Bridge } from '../bridge';
 import type { Session, VoiceUser } from '../protocol';
 import { cn } from '../lib/utils';
 import { emit } from '../events';
+import { useSpeakingHold } from '@/hooks/useSpeakingHold';
 
 export function ChannelSidebar({ session, bridge }: { session: Session; bridge: Bridge }) {
     const server = session.servers.find(s => s.id === session.selectedServerId);
@@ -110,9 +111,14 @@ export function ChannelSidebar({ session, bridge }: { session: Session; bridge: 
 }
 
 function VoiceUserRow({ user }: { user: VoiceUser }) {
+    const isSpeaking = useSpeakingHold(!!user.speaking, 400);
+
     return (
-        <div className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-ink-300 hover:bg-ink-800/60">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ink-700 text-[10px] font-semibold text-ink-200">
+        <div className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-ink-300 hover:bg-ink-800/60 transition-colors">
+            <span className={cn(
+                'flex h-5 w-5 items-center justify-center rounded-full bg-ink-700 text-[10px] font-semibold text-ink-200 transition-all duration-150',
+                isSpeaking && 'ring-2 ring-positive ring-offset-1 ring-offset-ink-900 shadow-[0_0_8px_rgba(35,165,90,0.6)]'
+            )}>
                 {user.avatarUrl ? (
                     <img src={user.avatarUrl} alt="" className="h-5 w-5 rounded-full object-cover" />
                 ) : (
@@ -124,8 +130,8 @@ function VoiceUserRow({ user }: { user: VoiceUser }) {
                 <HeadphoneOff size={12} className="ml-auto text-critical" />
             ) : user.muted || user.serverMuted ? (
                 <MicOff size={12} className="ml-auto text-ink-400" />
-            ) : user.speaking ? (
-                <Mic size={12} className="ml-auto text-positive animate-pulse" />
+            ) : isSpeaking ? (
+                <Mic size={12} className="ml-auto text-positive" />
             ) : null}
         </div>
     );

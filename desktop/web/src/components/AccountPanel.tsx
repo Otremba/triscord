@@ -3,6 +3,7 @@ import type { Bridge } from '../bridge';
 import type { Session } from '../protocol';
 import { cn } from '../lib/utils';
 import { Tooltip } from './ui/tooltip';
+import { soundEngine } from '../sound-engine';
 
 export function AccountPanel({ session, bridge }: { session: Session; bridge: Bridge }) {
     const { account, muted, deafened } = session;
@@ -26,7 +27,10 @@ export function AccountPanel({ session, bridge }: { session: Session; bridge: Br
                     type="button"
                     aria-label={muted ? 'Dessilenciar' : 'Silenciar'}
                     aria-pressed={muted}
-                    onClick={() => bridge.send({ name: 'setMuted', muted: !muted })}
+                    onClick={() => {
+                        soundEngine.play(muted ? 'unmute' : 'mute');
+                        bridge.send({ name: 'setMuted', muted: !muted });
+                    }}
                     className={cn('flex h-8 w-8 items-center justify-center rounded-md text-ink-300 hover:bg-ink-700', muted && 'text-critical')}
                 >
                     {muted ? <MicOff size={18} /> : <Mic size={18} />}
@@ -37,7 +41,10 @@ export function AccountPanel({ session, bridge }: { session: Session; bridge: Br
                     type="button"
                     aria-label={deafened ? 'Reativar áudio' : 'Desativar áudio'}
                     aria-pressed={deafened}
-                    onClick={() => bridge.send({ name: 'setDeafened', deafened: !deafened })}
+                    onClick={() => {
+                        soundEngine.play(deafened ? 'undeafen' : 'deafen');
+                        bridge.send({ name: 'setDeafened', deafened: !deafened });
+                    }}
                     className={cn('flex h-8 w-8 items-center justify-center rounded-md text-ink-300 hover:bg-ink-700', deafened && 'text-critical')}
                 >
                     {deafened ? <HeadphoneOff size={18} /> : <Headphones size={18} />}

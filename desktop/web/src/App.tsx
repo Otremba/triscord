@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSession, type SessionStore } from './store';
+import { soundEngine } from './sound-engine';
 import { TitleBar } from './components/TitleBar';
 import { ServerRail } from './components/ServerRail';
 import { ChannelSidebar } from './components/ChannelSidebar';
@@ -58,6 +59,44 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
             window.removeEventListener(EVENTS.openModal, openModalHandler);
         };
     }, []);
+
+    // Synchronize sound settings with SoundEngine
+    useEffect(() => {
+        if (session?.settings) {
+            soundEngine.setEnabled(session.settings.callSounds ?? true);
+            soundEngine.setVolume(session.settings.soundboardVolume ?? 70);
+        }
+    }, [session?.settings?.callSounds, session?.settings?.soundboardVolume]);
+
+    // Play join / leave sound cues when connecting/disconnecting from a voice channel
+    const prevConnectedRef = useRef<string | null | undefined>(undefined);
+    useEffect(() => {
+        if (prevConnectedRef.current !== undefined) {
+            if (!prevConnectedRef.current && session?.connectedChannelId) {
+                soundEngine.play('join');
+            } else if (prevConnectedRef.current && !session?.connectedChannelId) {
+                soundEngine.play('leave');
+            }
+        }
+        prevConnectedRef.current = session?.connectedChannelId;
+    }, [session?.connectedChannelId]);
+
+    // Play userJoin / userLeave sound cues when other participants join or leave the active call
+    const prevParticipantsRef = useRef<string[]>([]);
+    useEffect(() => {
+        if (!session?.connectedChannelId) {
+            prevParticipantsRef.current = [];
+            return;
+        }
+        const currentIds = (session.callChannel?.users ?? []).map(u => u.id);
+        if (prevParticipantsRef.current.length > 0) {
+            const joined = currentIds.filter(id => !prevParticipantsRef.current.includes(id));
+            const left = prevParticipantsRef.current.filter(id => !currentIds.includes(id));
+            if (joined.length > 0) soundEngine.play('userJoin');
+            else if (left.length > 0) soundEngine.play('userLeave');
+        }
+        prevParticipantsRef.current = currentIds;
+    }, [session?.callChannel?.users, session?.connectedChannelId]);
 
     if (!session || (session.auth && session.auth.state !== 'signedIn')) {
         return <LoginScreen auth={session?.auth} bridge={bridge} />;
@@ -156,6 +195,7 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
                                                             key={user.id}
                                                             user={user}
                                                             isSpeaking={user.speaking}
+                                                            onKick={!user.self ? () => bridge.send({ name: 'disconnectParticipant', socketId: user.id }) : undefined}
                                                         />
                                                     ))}
                                                 </div>

@@ -1,6 +1,6 @@
 {
   "name": "triscord",
-  "version": "0.9.64",
+  "version": "0.9.65",
   "private": true,
   "description": "Triscord",
   "scripts": {

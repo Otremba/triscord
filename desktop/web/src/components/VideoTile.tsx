@@ -40,19 +40,33 @@ export function VideoTile({ stream, bridge }: { stream: VideoStream; bridge: Bri
     }, [stream.id, bridge]);
 
     return (
-        <div className="relative aspect-video overflow-hidden rounded-lg bg-ink-900" data-stream={stream.id}>
+        <div className="relative aspect-video overflow-hidden rounded-xl bg-ink-950 border border-ink-800 shadow-md group" data-stream={stream.id}>
             <div ref={surface} className="absolute inset-0" />
             {stream.hidden ? (
                 <button
                     type="button"
-                    className="absolute inset-0 flex items-center justify-center text-sm text-ink-400"
+                    className="absolute inset-0 flex items-center justify-center text-sm text-ink-400 bg-ink-900/90 hover:text-ink-200 transition-colors"
                     onClick={() => bridge.request({ name: 'setStreamHidden', streamId: stream.id, hidden: false })}
                 >
-                    {stream.kind === 'screen' ? 'Transmissão oculta para você' : 'Vídeo oculto para você'}
+                    {stream.kind === 'screen' ? 'Transmissão oculta (clique para exibir)' : 'Vídeo oculto (clique para exibir)'}
                 </button>
             ) : stream.loading ? (
-                <div className="absolute inset-0 flex items-center justify-center text-sm text-ink-400">Conectando à transmissão…</div>
+                <div className="absolute inset-0 flex items-center justify-center text-sm text-ink-400 bg-ink-900/60 backdrop-blur-sm">
+                    Conectando à transmissão…
+                </div>
             ) : null}
+
+            {/* Bottom Title Pill */}
+            {!stream.hidden && (
+                <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2 rounded-md bg-ink-950/80 px-2.5 py-1 text-xs text-ink-200 backdrop-blur-sm shadow-sm pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity">
+                    <span className="font-medium truncate max-w-[200px]">{stream.title}</span>
+                    {stream.kind === 'screen' && (
+                        <span className="rounded bg-brand-500/20 px-1 py-0.5 text-[10px] font-semibold text-brand-300 uppercase tracking-wider">
+                            AO VIVO
+                        </span>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

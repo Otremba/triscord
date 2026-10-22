@@ -5,8 +5,6 @@ import { Button } from './ui/button';
 
 export function LoginScreen({ auth, bridge, onSuccess }: { auth?: AuthState; bridge: Bridge; onSuccess?: () => void }) {
     const [nick, setNick] = useState(auth?.suggestedNick ?? '');
-    const [password, setPassword] = useState('');
-    const [mode, setMode] = useState<'google' | 'nick'>('google');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -23,14 +21,10 @@ export function LoginScreen({ auth, bridge, onSuccess }: { auth?: AuthState; bri
         setLoading(true);
         setError(null);
         try {
-            if (isNeedsNick) {
-                await bridge.request({ name: 'setNick', nick: trimmed });
-            } else {
-                await bridge.request({ name: 'signInNick', nick: trimmed, password: password || undefined });
-            }
+            await bridge.request({ name: 'setNick', nick: trimmed });
             onSuccess?.();
         } catch (err: any) {
-            setError(err.message ?? 'Falha ao entrar.');
+            setError(err.message ?? 'Falha ao salvar apelido.');
         } finally {
             setLoading(false);
         }
@@ -78,7 +72,7 @@ export function LoginScreen({ auth, bridge, onSuccess }: { auth?: AuthState; bri
                             {loading ? 'Salvando...' : 'Continuar'}
                         </Button>
                     </form>
-                ) : mode === 'google' ? (
+                ) : (
                     <div className="space-y-4">
                         <button
                             type="button"
@@ -95,63 +89,8 @@ export function LoginScreen({ auth, bridge, onSuccess }: { auth?: AuthState; bri
                             <span>{auth?.state === 'signingIn' ? 'Conectando ao navegador...' : 'Entrar com Google'}</span>
                         </button>
 
-                        <div className="relative my-4 flex items-center justify-center">
-                            <span className="absolute inset-x-0 h-px bg-ink-800" />
-                            <span className="relative bg-ink-900 px-2 text-[11px] uppercase tracking-wider text-ink-500">ou</span>
-                        </div>
-
-                        <button
-                            type="button"
-                            onClick={() => setMode('nick')}
-                            className="w-full text-center text-xs text-brand-400 hover:text-brand-300 transition-colors"
-                        >
-                            Entrar com nome de usuário e senha
-                        </button>
+                        {error && <p className="text-xs text-center text-critical">{error}</p>}
                     </div>
-                ) : (
-                    <form onSubmit={handleNickSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-ink-400 mb-1.5">
-                                Nome de usuário
-                            </label>
-                            <input
-                                type="text"
-                                value={nick}
-                                onChange={e => setNick(e.target.value)}
-                                autoFocus
-                                maxLength={32}
-                                className="w-full rounded-md border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 focus:border-brand-500 focus:outline-none"
-                                placeholder="Seu nome"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-ink-400 mb-1.5">
-                                Senha (opcional)
-                            </label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={e => setPassword(e.target.value)}
-                                className="w-full rounded-md border border-ink-700 bg-ink-950 px-3 py-2 text-sm text-ink-100 focus:border-brand-500 focus:outline-none"
-                                placeholder="••••••••"
-                            />
-                        </div>
-
-                        {error && <p className="text-xs text-critical">{error}</p>}
-
-                        <Button type="submit" variant="default" className="w-full" disabled={loading || !nick.trim()}>
-                            {loading ? 'Entrando...' : 'Entrar'}
-                        </Button>
-
-                        <button
-                            type="button"
-                            onClick={() => setMode('google')}
-                            className="w-full text-center text-xs text-ink-400 hover:text-ink-200 transition-colors"
-                        >
-                            Voltar para login com Google
-                        </button>
-                    </form>
                 )}
             </div>
         </div>
