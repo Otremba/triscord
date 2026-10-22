@@ -457,30 +457,6 @@ export function SettingsModal({ session, bridge, initialPage = 'voice', onClose 
                                         </div>
                                     </div>
                                 )}
-
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <span className="text-sm font-medium text-ink-100 block">Sons da Chamada</span>
-                                        <span className="text-xs text-ink-400 block">Efeitos sonoros ao conectar, desconectar e mutar.</span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={s.callSounds ?? true}
-                                        onClick={() => setSetting('callSounds', !(s.callSounds ?? true))}
-                                        className={cn(
-                                            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                                            (s.callSounds ?? true) ? 'bg-brand-500' : 'bg-ink-700'
-                                        )}
-                                    >
-                                        <span
-                                            className={cn(
-                                                'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out',
-                                                (s.callSounds ?? true) ? 'translate-x-5' : 'translate-x-0'
-                                            )}
-                                        />
-                                    </button>
-                                </div>
                             </div>
                         </div>
                     )}

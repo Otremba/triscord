@@ -76,13 +76,13 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
         };
     }, []);
 
-    // Synchronize sound settings with SoundEngine
+    // Synchronize sound settings with SoundEngine (call sounds are always active)
     useEffect(() => {
+        soundEngine.setEnabled(true);
         if (session?.settings) {
-            soundEngine.setEnabled(session.settings.callSounds ?? true);
             soundEngine.setVolume(session.settings.soundboardVolume ?? 70);
         }
-    }, [session?.settings?.callSounds, session?.settings?.soundboardVolume]);
+    }, [session?.settings?.soundboardVolume]);
 
     // Play join / leave sound cues when connecting/disconnecting from a voice channel
     const prevConnectedRef = useRef<string | null | undefined>(undefined);
