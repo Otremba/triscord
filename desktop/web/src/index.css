@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+/* Triscord design system — "studio dark".
+   A neutral, layered dark surface with a single distinct brand accent and semantic state colors.
+   Depth comes from subtle 1px borders and minimal shadows, never glow. */
+
+@theme {
+    /* Brand accent — a cool, desaturated teal-cyan that reads as "signal", not the generic indigo. */
+    --color-brand-50: #eefbf7;
+    --color-brand-100: #d6f5ec;
+    --color-brand-200: #b0eadb;
+    --color-brand-300: #7cd8c4;
+    --color-brand-400: #4abfa9;
+    --color-brand-500: #2aa48f;
+    --color-brand-600: #1f8474;
+    --color-brand-700: #1c6a5e;
+    --color-brand-800: #1a544c;
+    --color-brand-900: #184640;
+    --color-brand-950: #082824;
+
+    /* Neutral surfaces — layered steps of a cool near-black. */
+    --color-ink-950: #0a0b0d;
+    --color-ink-900: #101216;
+    --color-ink-850: #14161b;
+    --color-ink-800: #191c22;
+    --color-ink-750: #1e2229;
+    --color-ink-700: #242830;
+    --color-ink-600: #2e333d;
+    --color-ink-500: #3d434f;
+
+    /* Semantic state. */
+    --color-positive: #3fb27f;
+    --color-critical: #e5534b;
+    --color-warning: #d9a441;
+
+    /* Typography — a modern variable sans, distinct from Discord's "gg sans". */
+    --font-sans: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+
+    /* Radii — restrained, consistent. */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+}
+
+@layer base {
+    :root {
+        color-scheme: dark;
+    }
+
+    html,
+    body,
+    #root {
+        height: 100%;
+    }
+
+    body {
+        margin: 0;
+        background-color: var(--color-ink-950);
+        color: #e6e8ec;
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        overflow: hidden;
+        user-select: none;
+    }
+
+    /* The app is a desktop window; text selection is opt-in per surface. */
+    .selectable {
+        user-select: text;
+    }
+
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--color-ink-600);
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--color-ink-500);
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+}
+
+/* Respect reduced motion globally for any CSS transition/animation. */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

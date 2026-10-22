@@ -1,214 +1,132 @@
-import { useEffect, useState } from 'preact/hooks';
+import { Hash, Volume2, Plus, Mic, MicOff, HeadphoneOff, Users } from 'lucide-react';
 import type { Bridge } from '../bridge';
-import type { Category, Server, Session, VoiceUser } from '../protocol';
-import { openParticipantMenu } from './ParticipantMenu';
-import { openParticipantProfile } from './ParticipantProfile';
-import { Icon } from './Icon';
-import { Tooltip } from './Tooltip';
-import { openContextMenu, type MenuEntry } from './ContextMenu';
-import { AudioRipple } from './ui/AudioRipple';
-import { useSpeakingHold } from './ui/useSpeakingHold';
-import { soundEngine } from '../sound-engine';
+import type { Session, VoiceUser } from '../protocol';
+import { cn } from '../lib/utils';
+import { emit } from '../events';
 
-// Server header dropdown menu options.
-function serverDropdown(server: Server): MenuEntry[] {
-  const invite = () => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'invite', serverId: server.id, serverName: server.name } }));
-  return [
-    ...(server.owned ? [{ kind: 'item' as const, label: 'Convidar para o servidor', icon: 'UserPlus' as const, action: invite }] : []),
-    { kind: 'item' as const, label: 'Criar canal', icon: 'CirclePlus' as const,
-      action: () => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'createChannel', categoryName: 'Canais de Voz' } })) },
-    ...(!server.owned ? [{ kind: 'separator' as const }, { kind: 'item' as const, label: 'Sair do servidor', icon: 'DoorExit' as const, danger: true,
-      action: () => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'leaveServer', serverId: server.id, serverName: server.name } })) }] : []),
-  ];
-}
+export function ChannelSidebar({ session, bridge }: { session: Session; bridge: Bridge }) {
+    const server = session.servers.find(s => s.id === session.selectedServerId);
+    const isHome = !session.selectedServerId || session.selectedServerId === '@me';
 
-function ServerHeader({ server, bridge }: { server: Server; bridge: Bridge }) {
-  const [open, setOpen] = useState(false);
-  useEffect(() => { const closed = () => setOpen(false); addEventListener('tri-context-menu-closed', closed); return () => removeEventListener('tri-context-menu-closed', closed); }, []);
-  const toggle = (e: MouseEvent) => {
-    if (open) { dispatchEvent(new Event('tri-context-menu-close')); return; }
-    const r = (e.currentTarget as HTMLElement).closest('header')!.getBoundingClientRect();
-    setOpen(true);
-    openContextMenu(e, serverDropdown(server), { width: 'fixed', label: server.name, at: { x: r.left + (r.width - 220) / 2, y: r.bottom + 4 } });
-  };
-  return (
-    <header class={`tri-server-header ${open ? 'is-open' : ''}`}>
-      <button class="tri-server-header__button" aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
-        <span class="tri-server-header__name">{server.name}</span>
-        <Icon name="ChevronSmallDown" size={18} className="tri-server-header__chevron" />
-      </button>
-      {server.owned && server.id && (
-        <button class="tri-icon-button" aria-label="Convidar pessoas" onClick={() => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'invite', serverId: server.id, serverName: server.name } }))}>
-          <Icon name="UserPlus" size={18} />
-        </button>
-      )}
-    </header>
-  );
-}
-
-// Voice channel participant row.
-function VoiceUserRow({ user, session, bridge }: { user: VoiceUser; session: Session; bridge: Bridge }) {
-  const isSpeaking = useSpeakingHold(!!user.speaking, 400);
-  const open=(anchor:HTMLElement)=>user.self ? dispatchEvent(new Event('tri-open-profile')) : openParticipantProfile(user.id,anchor);
-  return (
-    <li class={`tri-voice-user ${isSpeaking ? 'is-speaking' : ''}`} title={user.customStatus || undefined} role="button" tabIndex={0} aria-label={`Ver perfil de ${user.name}`}
-      onClick={e=>open(e.currentTarget)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open(e.currentTarget);}}}
-      onContextMenu={e=>openParticipantMenu(e,user,session,bridge)}>
-      <AudioRipple speaking={isSpeaking}>
-        <span class="tri-avatar tri-avatar--24">{user.avatarUrl ? <img src={user.avatarUrl} alt=""/> : <span class="tri-avatar__letter">{user.name.slice(0, 1).toUpperCase()}</span>}</span>
-      </AudioRipple>
-      <span class="tri-voice-user__name">{user.name}</span>
-      {user.live && <span class="tri-live-badge">AO VIVO</span>}
-      <span class="tri-voice-user__icons">
-        {user.camera && <Icon name="Video" size={16} />}
-        {user.localMuted && !user.serverMuted && <span title="Silenciado para você" aria-label="Silenciado para você"><Icon name="MicrophoneMuted" size={16} className="tri-voice-user__muted"/></span>}
-        {/* Server mute before the others (Discord's voice user status order: serverDeaf, deaf, serverMute, localMute,
-            mute; "Servidor silenciado" colorized). triscord: muted by the room owner. */}
-        {user.serverMuted && <span title="Silenciado na sala" aria-label="Silenciado na sala"><Icon name="MicrophoneMuted" size={16} className="tri-voice-user__muted is-server"/></span>}
-        {user.muted && !user.serverMuted && !user.localMuted && <Icon name="MicrophoneMuted" size={16} className="tri-voice-user__muted" />}
-        {user.deafened && <Icon name="HeadphonesDeafened" size={16} className="tri-voice-user__muted" />}
-      </span>
-    </li>
-  );
-}
-
-// Hover actions for voice channel row.
-function ChannelActions({ server, channelId, connected }: { server?: Server; channelId: string; connected: boolean }) {
-  return (
-    <span class="tri-channel__actions">
-      {connected && (
-        <Tooltip text="Abrir chat">
-          <button class="tri-channel__action" aria-label="Abrir chat" onClick={e => { e.stopPropagation(); dispatchEvent(new CustomEvent('tri-open-chat', { detail: channelId })); }}>
-            <Icon name="Chat" size={16} />
-          </button>
-        </Tooltip>
-      )}
-      {server?.owned && server.id && (
-        <Tooltip text="Criar convite">
-          <button class="tri-channel__action" aria-label="Criar convite"
-            onClick={e => { e.stopPropagation(); dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'invite', serverId: server.id, serverName: server.name } })); }}>
-            <Icon name="UserPlus" size={16} />
-          </button>
-        </Tooltip>
-      )}
-    </span>
-  );
-}
-
-// Elapsed call timer.
-function CallTimer({ since }: { since: number }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-  const s = Math.max(0, Math.floor((now - since) / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = String(s % 60).padStart(2, '0');
-  return <span class="tri-channel__timer">{h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`}</span>;
-}
-
-// Voice channel context menu.
-function channelMenu(bridge: Bridge, server: Server | undefined, channelId: string, channelName: string, connected: boolean, categoryName: string): MenuEntry[] {
-  return [
-    ...(server?.owned && server.id ? [{ kind: 'item' as const, label: 'Convidar para voz',
-      action: () => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'invite', serverId: server.id, serverName: server.name } })) }] : []),
-    { kind: 'separator' as const },
-    ...(connected ? [{ kind: 'item' as const, label: 'Abrir chat', action: () => dispatchEvent(new CustomEvent('tri-open-chat', { detail: channelId })) }] : []),
-    { kind: 'separator' as const },
-    { kind: 'item' as const, label: 'Duplicar canal', action: () => bridge.send({ name: 'createChannel', channelName }) },
-    { kind: 'item' as const, label: 'Criar canal de voz', action: () => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'createChannel', categoryName } })) },
-  ];
-}
-
-function CategoryList({ category, session, bridge }: { category: Category; session: Session; bridge: Bridge }) {
-  const server = session.servers.find(s => s.id === session.selectedServerId);
-  const [collapsed, setCollapsed] = useState(false);
-  return (
-    <li class="tri-category">
-      <div class="tri-category__header">
-        <button class="tri-category__toggle" aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>
-          <span class="tri-category__name">{category.name}</span>
-          <Icon name="ChevronSmallDown" size={12} className={`tri-category__chevron ${collapsed ? 'is-collapsed' : ''}`} />
-        </button>
-        <button class="tri-category__add" aria-label="Criar canal" title="Criar canal"
-          onClick={() => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'createChannel', categoryName: category.name } }))}>
-          <Icon name="PlusSmall" size={16} />
-        </button>
-      </div>
-      {!collapsed && (
-        <ul class="tri-channels">
-          {category.channels.map(channel => {
-            const selected = channel.id === session.selectedChannelId;
-            // Room ids can repeat across servers: only the call's server marks its channel as connected.
-            const connected = channel.id === session.connectedChannelId && session.selectedServerId === (session.callServerId ?? session.selectedServerId);
-            return (
-              <li key={channel.id} class={`tri-channel ${selected ? 'is-selected' : ''} ${connected ? 'is-connected' : ''}`}>
-                <div class="tri-channel__link"
-                  onContextMenu={e => openContextMenu(e, channelMenu(bridge, server, channel.id, channel.name, connected, category.name), { label: channel.name })}>
-                  <button type="button" class="tri-channel__select" aria-current={selected?'page':undefined} aria-label={channel.name}
-                    onClick={() => { soundEngine.play('channelSwitch'); bridge.send({ name: 'openTextRoom', channelId: channel.id }); }}>
-                  {(() => {
-                    const isText = channel.kind === 'text';
-                    return <Icon name={isText ? 'TextChannel' : 'VoiceSpeaker'} size={20} className="tri-channel__icon" />;
-                  })()}
-                  <span class="tri-channel__name">{channel.name}</span>
-                  {connected && session.connectedAt && <CallTimer since={session.connectedAt} />}
-                  </button>
-                  <ChannelActions server={server} channelId={channel.id} connected={connected} />
-                </div>
-                {channel.users.length > 0 && (
-                  <ul class="tri-voice-users">{channel.users.map(user => <VoiceUserRow key={user.id} user={user} session={session} bridge={bridge} />)}</ul>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </li>
-  );
-}
-
-export function ChannelSidebar({ session, bridge }: { session: Session; bridge: Bridge; workspace?:boolean }) {
-  const isHome = !session.selectedServerId || session.selectedServerId === '@me';
-  if (isHome) {
     return (
-      <section class="tri-sidebar-list tri-sidebar-list--home" aria-label="Mensagens Diretas">
-        <header class="tri-dm-header">
-          <button class="tri-dm-search-button" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Busca rápida em desenvolvimento.' }))}>
-            Encontre ou comece uma conversa
-          </button>
-        </header>
-        <div class="tri-dm-nav">
-          <button class="tri-dm-nav__item is-selected">
-            <Icon name="Friends" size={20} className="tri-dm-nav__icon" />
-            <span class="tri-dm-nav__name">Amigos</span>
-          </button>
-          <button class="tri-dm-nav__item" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Página do Nitro em desenvolvimento.' }))}>
-            <Icon name="Nitro" size={20} className="tri-dm-nav__icon" />
-            <span class="tri-dm-nav__name">Nitro</span>
-          </button>
-          <button class="tri-dm-nav__item" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Loja de itens em desenvolvimento.' }))}>
-            <Icon name="Shop" size={20} className="tri-dm-nav__icon" />
-            <span class="tri-dm-nav__name">Loja</span>
-          </button>
+        <div className="flex flex-1 min-h-0 flex-col bg-ink-900">
+            {!isHome && server ? (
+                <div className="flex h-12 shrink-0 items-center justify-between border-b border-ink-800 px-4 font-semibold text-sm text-ink-100">
+                    <span className="truncate">{server.name}</span>
+                    <button
+                        type="button"
+                        aria-label="Opções do Servidor"
+                        onClick={() => emit('tri-open-modal', { kind: 'createChannel', categoryName: 'Canais de Voz' })}
+                        className="text-ink-400 hover:text-ink-100"
+                    >
+                        <Plus size={16} />
+                    </button>
+                </div>
+            ) : isHome ? (
+                <div className="flex h-12 shrink-0 items-center border-b border-ink-800 px-4">
+                    <button
+                        type="button"
+                        onClick={() => emit('tri-open-quick-switcher')}
+                        className="w-full rounded bg-ink-950 px-2 py-1 text-left text-xs text-ink-400 hover:text-ink-200"
+                    >
+                        Buscar ou iniciar conversa (Ctrl+K)
+                    </button>
+                </div>
+            ) : null}
+
+            <div className="flex-1 overflow-y-auto px-2 py-3">
+                {isHome ? (
+                    <div className="space-y-1">
+                        <button
+                            type="button"
+                            className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium text-ink-100 bg-ink-750"
+                        >
+                            <Users size={18} className="text-ink-300" />
+                            <span>Amigos</span>
+                        </button>
+                        <div className="pt-4 pb-1 px-2 text-xs font-bold uppercase tracking-wider text-ink-500">
+                            Mensagens Diretas
+                        </div>
+                        <div className="px-2 py-3 text-xs text-ink-500 text-center">
+                            Nenhuma conversa recente
+                        </div>
+                    </div>
+                ) : (
+                    session.categories.map(category => (
+                        <div key={category.id} className="mb-4">
+                            <div className="flex items-center justify-between px-2 py-1 text-xs font-bold uppercase tracking-wider text-ink-400">
+                                <span className="truncate">{category.name}</span>
+                                <button
+                                    type="button"
+                                    aria-label={`Criar canal em ${category.name}`}
+                                    className="text-ink-400 hover:text-ink-100"
+                                    onClick={() => emit('tri-open-modal', { kind: 'createChannel', categoryName: category.name })}
+                                >
+                                    <Plus size={14} />
+                                </button>
+                            </div>
+                            {category.channels.map(channel => {
+                                const active = channel.id === session.selectedChannelId;
+                                const connected = channel.id === session.connectedChannelId;
+                                return (
+                                    <button
+                                        key={channel.id}
+                                        type="button"
+                                        onClick={() => {
+                                            bridge.send({ name: 'selectChannel', channelId: channel.id });
+                                            if (channel.kind === 'voice') {
+                                                bridge.send({ name: 'joinVoice', channelId: channel.id });
+                                            } else {
+                                                bridge.send({ name: 'openTextRoom', channelId: channel.id });
+                                            }
+                                        }}
+                                        className={cn(
+                                            'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-ink-300 hover:bg-ink-800 hover:text-ink-100 transition-colors',
+                                            active && 'bg-ink-700/80 text-ink-100 font-medium',
+                                            connected && 'text-positive'
+                                        )}
+                                    >
+                                        {channel.kind === 'voice' ? <Volume2 size={16} className={connected ? 'text-positive' : 'text-ink-400'} /> : <Hash size={16} className="text-ink-400" />}
+                                        <span className="truncate">{channel.name}</span>
+                                        {connected && (
+                                            <span className="ml-auto flex h-2 w-2 rounded-full bg-positive animate-pulse" />
+                                        )}
+                                    </button>
+                                );
+                            })}
+                            {category.channels.some(c => c.users?.length) && (
+                                <div className="mt-1 space-y-0.5 pl-2">
+                                    {category.channels.flatMap(c => c.users).map(user => (
+                                        <VoiceUserRow key={user.id} user={user} />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))
+                )}
+            </div>
         </div>
-        <div class="tri-dm-list-header">
-          <span class="tri-dm-list-header__title">MENSAGENS DIRETAS</span>
-          <Tooltip text="Criar DM" position="top">
-            <button class="tri-dm-list-header__add" aria-label="Criar DM" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Criação de mensagens diretas em desenvolvimento.' }))}>
-              <Icon name="PlusSmall" size={16} />
-            </button>
-          </Tooltip>
-        </div>
-        <div class="tri-dm-empty">
-          <p>Nenhuma conversa recente</p>
-        </div>
-      </section>
     );
-  }
-  const server = session.servers.find(s => s.id === session.selectedServerId) ?? session.servers[0];
-  return (
-    <section class="tri-sidebar-list" aria-label="Canais">
-      {server && <ServerHeader server={server} bridge={bridge} />}
-      <ul class="tri-categories">
-        {session.categories.map(category => <CategoryList key={category.id} category={category} session={session} bridge={bridge} />)}
-      </ul>
-    </section>
-  );
+}
+
+function VoiceUserRow({ user }: { user: VoiceUser }) {
+    return (
+        <div className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-ink-300 hover:bg-ink-800/60">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-ink-700 text-[10px] font-semibold text-ink-200">
+                {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="" className="h-5 w-5 rounded-full object-cover" />
+                ) : (
+                    user.name.slice(0, 1).toUpperCase()
+                )}
+            </span>
+            <span className="truncate">{user.name}</span>
+            {user.deafened ? (
+                <HeadphoneOff size={12} className="ml-auto text-critical" />
+            ) : user.muted || user.serverMuted ? (
+                <MicOff size={12} className="ml-auto text-ink-400" />
+            ) : user.speaking ? (
+                <Mic size={12} className="ml-auto text-positive animate-pulse" />
+            ) : null}
+        </div>
+    );
 }

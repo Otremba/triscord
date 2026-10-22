@@ -1,114 +1,77 @@
-import { useState } from 'preact/hooks';
+import { Plus, Home } from 'lucide-react';
 import type { Bridge } from '../bridge';
 import type { Server } from '../protocol';
-import type { MenuEntry } from './ContextMenu';
-import { Icon } from './Icon';
-import { Tooltip } from './Tooltip';
-import { openContextMenu } from './ContextMenu';
-import { TriscordLogo } from './ui/TriscordLogo';
+import { cn } from '../lib/utils';
+import { Tooltip } from './ui/tooltip';
 
-// Generate acronym from server name.
-export function acronym(name: string): string {
-  return name.replace(/'s /g, ' ').replace(/\w+/g, w => w[0]).replace(/\s/g, '');
-}
-
-// Calculate font size for server acronym tile.
-const measure = (() => { let ctx: CanvasRenderingContext2D | null = null; return (text: string, px: number) => {
-  ctx ??= document.createElement('canvas').getContext('2d');
-  if (!ctx) return 0;
-  ctx.font = `500 ${px}px ${getComputedStyle(document.body).fontFamily}`;
-  return ctx.measureText(text).width;
-}; })();
-function acronymSize(text: string, tile: number): number {
-  let px = Math.round(tile * 0.4);
-  while (px > 8 && measure(text, px) > tile - 8) px--;
-  return px;
+function acronym(name: string): string {
+    return name.replace(/'s /g, ' ').replace(/\w+/g, w => w[0]).replace(/\s/g, '').slice(0, 3).toUpperCase();
 }
 
 export function ServerIcon({ server, size = 40 }: { server: Server; size?: number }) {
-  if (server.iconUrl) return <img class="tri-server-icon" src={server.iconUrl} width={size} height={size} alt="" />;
-  const text = acronym(server.name);
-  return <span class="tri-server-acronym" style={{ width: `${size}px`, height: `${size}px`, fontSize: `${acronymSize(text, size)}px` }}>{text}</span>;
+    if (server.iconUrl) {
+        return <img src={server.iconUrl} width={size} height={size} alt="" className="rounded-full object-cover" />;
+    }
+    return (
+        <span
+            className="flex items-center justify-center rounded-full bg-ink-700 font-semibold text-ink-200"
+            style={{ width: size, height: size, fontSize: size * 0.36 }}
+        >
+            {acronym(server.name)}
+        </span>
+    );
 }
 
-// Server context menu actions.
-const openRemoval = (kind: 'deleteServer' | 'leaveServer', server: Server) =>
-  dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind, serverId: server.id, serverName: server.name } }));
-export function serverMenuEntries(server: Server, selected: boolean): MenuEntry[] {
-  return [
-    ...(server.owned && server.id ? [{ kind: 'item' as const, label: 'Convidar para o servidor',
-      action: () => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'invite', serverId: server.id, serverName: server.name } })) }] : []),
-    { kind: 'separator' as const },
-    ...(selected ? [{ kind: 'item' as const, label: 'Criar canal',
-      action: () => dispatchEvent(new CustomEvent('tri-open-modal', { detail: { kind: 'createChannel', categoryName: 'Canais de Voz' } })) }] : []),
-    ...(server.id ? [{ kind: 'separator' as const },
-      server.owned ? { kind: 'item' as const, label: 'Excluir servidor', danger: true, action: () => openRemoval('deleteServer', server) }
-                   : { kind: 'item' as const, label: 'Sair do servidor', danger: true, action: () => openRemoval('leaveServer', server) }] : []),
-  ];
-}
-
-// Voice badge (observed, motion/voice-join): 16px circle at the tile's top-right corner (1px above it), cut out
-// of the tile by a 2px ring of the rail colour, white 12px speaker (screen while sharing); colour measured
-// #3d9e60 = --icon-voice-speaking (module __650eb names --status-positive for isCurrentUserConnected).
-function RailItem({ server, selected, onSelect, voice }: { server: Server; selected: boolean; onSelect: () => void; voice?: 'voice' | 'screen' }) {
-  const [hovered, setHovered] = useState(false);
-  const pill = selected ? 'selected' : hovered ? 'hovered' : server.unread ? 'unread' : '';
-  return (
-    <div class="tri-rail__item">
-      <div class="tri-rail__pill-wrapper"><span class={`tri-rail__pill ${pill ? `tri-rail__pill--${pill}` : ''}`} /></div>
-      <Tooltip text={server.name} position="right" spacing={12} guild>
-        <button class={`tri-rail__button tri-magnetic-item ${selected ? 'is-selected' : ''}`} aria-label={server.name} aria-current={selected}
-          onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onClick={onSelect}
-          onContextMenu={e => openContextMenu(e, serverMenuEntries(server, selected), { width: 'fixed', label: server.name })}>
-          <ServerIcon server={server} />
-        </button>
-      </Tooltip>
-      {voice && <span class="tri-rail__voice-badge" aria-hidden="true"><Icon name={voice === 'screen' ? 'ScreenArrow' : 'VoiceSpeaker'} size={12} /></span>}
-    </div>
-  );
-}
-
-export function ServerRail({ servers, selectedId, callServerId, bridge, voice }: { servers: Server[]; selectedId: string; callServerId?: string; bridge: Bridge; voice?: 'voice' | 'screen' }) {
-  const [homeHovered, setHomeHovered] = useState(false);
-  const homeSelected = !selectedId || selectedId === '@me' || selectedId === '';
-  const serverList = servers.filter(s => s.id && s.id !== '@me');
-  return (
-    <nav class="tri-rail tri-floating-dock" aria-label="Servidores">
-      <div class="tri-rail__item">
-        <div class="tri-rail__pill-wrapper">
-          <span class={`tri-rail__pill ${homeSelected ? 'tri-rail__pill--selected' : homeHovered ? 'tri-rail__pill--hovered' : ''}`} />
-        </div>
-        <Tooltip text="Mensagens diretas" position="right" spacing={12} guild>
-          <button class={`tri-rail__button tri-rail__home-button tri-magnetic-item ${homeSelected ? 'is-selected' : ''}`} aria-label="Mensagens diretas"
-            onMouseEnter={() => setHomeHovered(true)} onMouseLeave={() => setHomeHovered(false)}
-            onClick={() => bridge.send({ name: 'selectServer', serverId: '' })}>
-            <TriscordLogo size={28} />
-          </button>
-        </Tooltip>
-      </div>
-      <div class="tri-rail__separator" role="separator" />
-
-      {serverList.map(server => (
-        <RailItem key={server.id} server={server} selected={server.id === selectedId} voice={server.id === (callServerId ?? selectedId) ? voice : undefined}
-          onSelect={() => bridge.send({ name: 'selectServer', serverId: server.id })} />
-      ))}
-      {/* Module __5bc7e circleIconButton: 40x40, --background-mod-subtle, brand on hover; 20px CirclePlus. */}
-      <div class="tri-rail__item">
-        <div class="tri-rail__pill-wrapper" />
-        <Tooltip text="Adicionar um servidor" position="right" spacing={12} guild>
-        <button class="tri-rail__circle" aria-label="Adicionar um servidor" onClick={() => dispatchEvent(new Event('tri-open-server-modal'))}>
-          <Icon name="CirclePlus" size={20} />
-        </button>
-        </Tooltip>
-      </div>
-      <div class="tri-rail__item">
-        <div class="tri-rail__pill-wrapper" />
-        <Tooltip text="Explorar servidores detectáveis" position="right" spacing={12} guild>
-        <button class="tri-rail__circle" aria-label="Explorar servidores detectáveis" onClick={() => dispatchEvent(new CustomEvent('tri-preview-notice', { detail: 'Exploração de servidores públicos em desenvolvimento.' }))}>
-          <Icon name="Compass" size={20} />
-        </button>
-        </Tooltip>
-      </div>
-    </nav>
-  );
+export function ServerRail({
+    servers,
+    selectedId,
+    bridge,
+}: {
+    servers: Server[];
+    selectedId: string;
+    bridge: Bridge;
+}) {
+    return (
+        <nav className="flex w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-ink-800 bg-ink-900 py-3">
+            <Tooltip label="Início" side="right">
+                <button
+                    type="button"
+                    aria-label="Início"
+                    onClick={() => bridge.send({ name: 'selectServer', serverId: '@me' })}
+                    className={cn(
+                        'flex h-12 w-12 items-center justify-center rounded-full transition-all',
+                        selectedId === '@me' ? 'bg-brand-500 text-ink-950' : 'bg-ink-700 text-ink-300 hover:bg-brand-500 hover:text-ink-950',
+                    )}
+                >
+                    <Home size={22} />
+                </button>
+            </Tooltip>
+            <div className="h-px w-8 bg-ink-700" />
+            {servers.map(server => (
+                <Tooltip key={server.id} label={server.name} side="right">
+                    <button
+                        type="button"
+                        aria-label={server.name}
+                        onClick={() => bridge.send({ name: 'selectServer', serverId: server.id })}
+                        className={cn(
+                            'flex h-12 w-12 items-center justify-center rounded-full transition-all',
+                            selectedId === server.id ? 'rounded-2xl bg-brand-500' : 'hover:rounded-2xl',
+                        )}
+                    >
+                        <ServerIcon server={server} size={48} />
+                    </button>
+                </Tooltip>
+            ))}
+            <Tooltip label="Adicionar servidor" side="right">
+                <button
+                    type="button"
+                    aria-label="Adicionar servidor"
+                    onClick={() => bridge.send({ name: 'openServerDialog' })}
+                    className="flex h-12 w-12 items-center justify-center rounded-full bg-ink-700 text-positive transition-all hover:rounded-2xl hover:bg-positive hover:text-ink-950"
+                >
+                    <Plus size={22} />
+                </button>
+            </Tooltip>
+        </nav>
+    );
 }

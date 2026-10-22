@@ -1,7 +1,7 @@
 // Transport between this interface and the native core.
-// - WebView2Bridge: window.chrome.webview (PostWebMessageAsJson / WebMessageReceived) in the real app.
+// - TauriBridge: the real Rust/Tauri core (invoke + events).
 // - FixtureBridge: a fixed session for development and the Playwright tests (no core, no network).
-import type { Command, CoreMessage, Session, UiMessage } from './protocol';
+import type { Command, CoreMessage, Session } from './protocol';
 import { PROTOCOL_VERSION } from './protocol';
 
 export interface Bridge {
@@ -11,62 +11,21 @@ export interface Bridge {
   request<T = unknown>(command: Command): Promise<T>;
 }
 
-// Shared bookkeeping for request/response on top of fire-and-forget messages.
-const waiting = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
-function settle(message: CoreMessage): boolean {
-  if (message.type !== 'result') return false;
-  const entry = waiting.get(message.requestId);
-  if (!entry) return true;
-  waiting.delete(message.requestId);
-  clearTimeout(entry.timer);
-  if (message.ok) entry.resolve(message.value); else entry.reject(new Error(message.error.message));
-  return true;
-}
-function awaitResult<T>(requestId: string, timeoutMs = 10000): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer=setTimeout(() => { if (waiting.delete(requestId)) reject(new Error('A operação demorou demais. Tente novamente.')); }, timeoutMs);
-    waiting.set(requestId, { resolve: value => resolve(value as T), reject, timer });
-  });
-}
-
 let counter = 0;
 // The call popout page (?popout=call) shares the core with the main page and receives its late answers too: its own
 // prefix keeps the two pages' request ids apart.
 const idPrefix = new URLSearchParams(location.search).has('popout') ? 'p' : 'r';
 const nextRequestId = () => `${idPrefix}${Date.now().toString(36)}-${(counter++).toString(36)}`;
 
-interface WebViewHost {
-  postMessage(message: unknown): void;
-  addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
-}
-
-export class WebView2Bridge implements Bridge {
-  constructor(private readonly host: WebViewHost) {}
-  send(command: Command): string {
-    const requestId = nextRequestId();
-    const message: UiMessage = { v: PROTOCOL_VERSION, type: 'command', requestId, command };
-    this.host.postMessage(message);
-    return requestId;
-  }
-  onMessage(handler: (message: CoreMessage) => void): void {
-    this.host.addEventListener('message', event => { const message = event.data as CoreMessage; if (!settle(message)) handler(message); });
-  }
-  request<T>(command: Command): Promise<T> {
-    const timeout = command.name === 'finishProfileMedia' || command.name === 'removeProfileMedia' ? 35000
-      : command.name === 'getParticipantProfile' || command.name === 'getOwnProfile' || command.name === 'saveOwnProfile' ? 20000 : 10000;
-    return awaitResult<T>(this.send(command), timeout);
-  }
-}
-
 export class FixtureBridge implements Bridge {
   readonly sent: Command[] = [];
   private handler: ((message: CoreMessage) => void) | null = null;
-  constructor(private session: Session) {}
+  constructor(private session: Session) { }
   send(command: Command): string {
     this.sent.push(command);
     const requestId = nextRequestId();
     if (command.name === 'requestSnapshot') queueMicrotask(() => this.push());
-    if (command.name === 'selectServer') this.patch({selectedServerId:command.serverId});
+    if (command.name === 'selectServer') this.patch({ selectedServerId: command.serverId });
     if (command.name === 'selectChannel') this.patch({ selectedChannelId: command.channelId });
     if (command.name === 'setMuted') this.patch({ muted: command.muted });
     if (command.name === 'setDeafened') this.patch({ deafened: command.deafened });
@@ -82,7 +41,7 @@ export class FixtureBridge implements Bridge {
     this.send(command);
     if (command.name === 'getOwnProfile') return this.session.profile ? Promise.resolve(this.session.profile as T) : Promise.reject(new Error('Falha de carregamento simulada para revisão.'));
     if (command.name === 'saveOwnProfile' && this.session.profile) {
-      this.patch({profile:{...this.session.profile,...command.fields}});
+      this.patch({ profile: { ...this.session.profile, ...command.fields } });
       return Promise.resolve(this.session.profile as T);
     }
     if (command.name === 'listShareSources')
@@ -101,9 +60,7 @@ export class FixtureBridge implements Bridge {
 
 export function createBridge(fixture: () => Session): Bridge {
   const tauri = (window as unknown as { __TAURI__?: TauriHost }).__TAURI__;
-  if (tauri) return new TauriBridge(tauri);
-  const host = (window as unknown as { chrome?: { webview?: WebViewHost } }).chrome?.webview;
-  return host ? new WebView2Bridge(host) : new FixtureBridge(fixture());
+  return tauri ? new TauriBridge(tauri) : new FixtureBridge(fixture());
 }
 
 interface TauriHost {
@@ -119,7 +76,7 @@ export function previewNotice(message: string): void {
 // Native failure never selects fixture data. Session tokens stay in Rust and never cross this bridge.
 export class TauriBridge implements Bridge {
   private ready: Promise<unknown> = Promise.resolve();
-  constructor(private readonly host: TauriHost) {}
+  constructor(private readonly host: TauriHost) { }
   onMessage(handler: (message: CoreMessage) => void): void {
     this.ready = Promise.all([
       this.host.event.listen<CoreMessage>('triscord-core', event => handler(event.payload)),

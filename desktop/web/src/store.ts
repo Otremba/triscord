@@ -1,6 +1,6 @@
 // Holds the session the core sent and applies its deltas in revision order (protocol.ts).
 // Presentation-only state (hover, open menus, scroll, drafts) stays in components, not here.
-import { useEffect, useState } from 'preact/hooks';
+import { useSyncExternalStore } from 'react';
 import type { CoreMessage, Session } from './protocol';
 import { PROTOCOL_VERSION } from './protocol';
 
@@ -11,7 +11,7 @@ export class SessionStore {
   private revision = -1;
   private listeners = new Set<Listener>();
 
-  constructor(private readonly requestSnapshot: () => void) {}
+  constructor(private readonly requestSnapshot: () => void) { }
 
   get current(): Session | null { return this.session; }
 
@@ -45,12 +45,9 @@ export class SessionStore {
 }
 
 export function useSession(store: SessionStore): Session | null {
-  const [session, setSession] = useState(store.current);
-  useEffect(() => {
-    const unsubscribe = store.subscribe(setSession);
-    // Effects run after the first paint: a snapshot that arrived in between must not be lost.
-    setSession(store.current);
-    return unsubscribe;
-  }, [store]);
-  return session;
+  return useSyncExternalStore(
+    (listener) => store.subscribe(() => listener()),
+    () => store.current,
+    () => store.current,
+  );
 }

@@ -41,15 +41,9 @@ try {
     $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS = '-C target-feature=+crt-static'
     & node desktop/web/node_modules/typescript/bin/tsc --noEmit --project desktop/web/tsconfig.json
     if ($LASTEXITCODE -ne 0) { throw 'TypeScript check failed' }
-    & node desktop/web/tools/test-tauri-bridge.mjs
-    if ($LASTEXITCODE -ne 0) { throw 'IPC tests failed' }
-    & node desktop/web/tools/test-call-status.mjs
-    if ($LASTEXITCODE -ne 0) { throw 'Call status tests failed' }
-    & node desktop/web/tools/test-workspace-contract.mjs
-    if ($LASTEXITCODE -ne 0) { throw 'Workspace contract tests failed' }
-    & node desktop/web/tools/test-workspace-themes.mjs
-    if ($LASTEXITCODE -ne 0) { throw 'Workspace theme tests failed' }
-    & node desktop/web/tools/build.mjs --tauri
+    & node desktop/web/tools/test-contract.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Contract tests failed' }
+    & node desktop/web/node_modules/vite/bin/vite.js build desktop/web --outDir dist-rust
     if ($LASTEXITCODE -ne 0) { throw 'UI build failed' }
     if ($LintOnly) {
         & $cargo clippy --offline --all-targets --all-features --locked --target x86_64-pc-windows-msvc --manifest-path desktop-rust/src-tauri/Cargo.toml -j 2 -- -D warnings
