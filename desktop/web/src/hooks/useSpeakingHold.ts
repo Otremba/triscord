@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 
 /**
  * Smooth speaking hold hook that activates immediately when speech starts
- * and sustains for `holdMs` (default 400ms) across natural pauses, preventing
+ * and sustains for `holdMs` (default 200ms) across natural pauses, preventing
  * flickering and premature cut-off of the voice activity green indicator.
  */
-export function useSpeakingHold(active: boolean, holdMs = 400): boolean {
+export function useSpeakingHold(active: boolean, holdMs = 200): boolean {
     const [speaking, setSpeaking] = useState(active);
 
     useEffect(() => {

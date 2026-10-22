@@ -25,7 +25,7 @@ export function ParticipantCard({
     const isDeafened = Boolean(user.deafened);
     const canSpeak = !isMuted && !isDeafened;
     const rawSpeaking = canSpeak && Boolean(isSpeaking);
-    const activeSpeaking = canSpeak && useSpeakingHold(rawSpeaking, 400);
+    const activeSpeaking = canSpeak && useSpeakingHold(rawSpeaking, 200);
     const hasVideo = user.camera ?? false;
     const isSelf = user.self ?? false;
 

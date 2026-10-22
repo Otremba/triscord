@@ -2,12 +2,14 @@ use crate::{
     error::{Error, Result},
     model::{notice, publish, Shared},
 };
+use futures_util::StreamExt;
 use livekit::{
-    options::TrackPublishOptions, prelude::*, AudioProcessingOptions, PlatformAudio,
-    PlayoutDeviceId, RecordingDeviceId,
+    options::TrackPublishOptions, prelude::*, webrtc::audio_stream::native::NativeAudioStream,
+    AudioProcessingOptions, PlatformAudio, PlayoutDeviceId, RecordingDeviceId,
 };
 use serde_json::Value;
 use std::{collections::HashMap, time::Duration};
+use tauri::async_runtime::JoinHandle;
 use tokio::{sync::mpsc, time::timeout};
 use zeroize::{Zeroize, Zeroizing};
 
@@ -88,7 +90,7 @@ impl Media {
                                     RoomEvent::TrackUnsubscribed {track:RemoteTrack::Audio(track),..}=> {voice.remote.remove(&track.sid().to_string());}
                                     RoomEvent::TrackPublished {..}=> {voice.configure(&model);}
                                     RoomEvent::Reconnecting=>status(&app,&model,voice.generation,"reconnecting"),
-                                    RoomEvent::Reconnected=> {voice.configure(&model);status(&app,&model,voice.generation,"connected");}
+                                    RoomEvent::Reconnected=> {voice.configure(&model);voice.start_vad(&app, &model);status(&app,&model,voice.generation,"connected");}
                                     RoomEvent::Disconnected {..}=> {
                                         let generation=voice.generation;
                                         close(&mut active).await;
@@ -169,6 +171,7 @@ impl Media {
                                     continue;
                                 }
                                 if voice.configure(&model) {
+                                    voice.start_vad(&app, &model);
                                     status(&app, &model, generation, "connected");
                                     active = Some(voice);
                                 } else {
@@ -225,6 +228,7 @@ struct Voice {
     remote: HashMap<String, (String, RemoteAudioTrack)>,
     input_device: String,
     output_device: String,
+    vad_task: Option<JoinHandle<()>>,
 }
 impl Voice {
     async fn connect(generation: u64, credentials: &Credentials) -> Result<Self> {
@@ -268,6 +272,7 @@ impl Voice {
             remote: HashMap::new(),
             input_device: String::new(),
             output_device: String::new(),
+            vad_task: None,
         })
     }
     fn configure(&mut self, model: &Shared) -> bool {
@@ -355,6 +360,59 @@ impl Voice {
         }
         true
     }
+    fn start_vad(&mut self, app: &tauri::AppHandle, model: &Shared) {
+        if let Some(task) = self.vad_task.take() {
+            task.abort();
+        }
+        let mut stream = NativeAudioStream::new(self.microphone.rtc_track(), 48000, 1);
+        let app = app.clone();
+        let model = model.clone();
+        self.vad_task = Some(tauri::async_runtime::spawn(async move {
+            let mut silence_count = 0u32;
+            let mut is_speaking = false;
+            while let Some(frame) = stream.next().await {
+                let level = crate::mic_test::calculate_i16_rms_level(&frame.data);
+                let speaking_now = level >= 3;
+                if speaking_now {
+                    silence_count = 0;
+                    if !is_speaking {
+                        is_speaking = true;
+                        let changed = model
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .set_self_speaking(true);
+                        if changed {
+                            publish(&app, &model);
+                        }
+                    }
+                } else if is_speaking {
+                    silence_count += 1;
+                    // NativeAudioStream yields ~10ms frames.
+                    // 15 frames = 150ms of silence avoids syllable stutter while ending promptly.
+                    if silence_count >= 15 {
+                        is_speaking = false;
+                        let changed = model
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .set_self_speaking(false);
+                        if changed {
+                            publish(&app, &model);
+                        }
+                    }
+                }
+            }
+            stream.close();
+            if is_speaking {
+                let changed = model
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .set_self_speaking(false);
+                if changed {
+                    publish(&app, &model);
+                }
+            }
+        }));
+    }
 }
 async fn next_event(active: &mut Option<Voice>) -> Option<RoomEvent> {
     if let Some(voice) = active {
@@ -364,7 +422,10 @@ async fn next_event(active: &mut Option<Voice>) -> Option<RoomEvent> {
     }
 }
 async fn close(active: &mut Option<Voice>) {
-    if let Some(voice) = active.take() {
+    if let Some(mut voice) = active.take() {
+        if let Some(task) = voice.vad_task.take() {
+            task.abort();
+        }
         voice.microphone.mute();
         let _ = voice.audio.stop_recording();
         let _ = timeout(Duration::from_secs(5), voice.room.close()).await;

@@ -6,10 +6,10 @@ import { OwnStreamTile } from './call/OwnStreamTile';
 import type { VoiceUser } from '../protocol';
 
 describe('Voice Speaking Indicator & ParticipantCard', () => {
-    it('useSpeakingHold activates immediately and holds speaking state for 400ms', () => {
+    it('useSpeakingHold activates immediately and holds speaking state for 200ms', () => {
         vi.useFakeTimers();
 
-        const { result, rerender } = renderHook(({ active }) => useSpeakingHold(active, 400), {
+        const { result, rerender } = renderHook(({ active }) => useSpeakingHold(active, 200), {
             initialProps: { active: false },
         });
 
@@ -23,15 +23,15 @@ describe('Voice Speaking Indicator & ParticipantCard', () => {
         rerender({ active: false });
         expect(result.current).toBe(true);
 
-        // Advance 250ms (still within 400ms hold)
+        // Advance 120ms (still within 200ms hold)
         act(() => {
-            vi.advanceTimersByTime(250);
+            vi.advanceTimersByTime(120);
         });
         expect(result.current).toBe(true);
 
-        // Advance past 400ms
+        // Advance past 200ms
         act(() => {
-            vi.advanceTimersByTime(160);
+            vi.advanceTimersByTime(100);
         });
         expect(result.current).toBe(false);
 

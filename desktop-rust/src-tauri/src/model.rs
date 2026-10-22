@@ -306,8 +306,25 @@ impl Model {
         self.call_focus = None;
         self.generation
     }
+    /// Sets whether the local user (self_socket) is currently speaking, computed with 0ms latency locally.
+    pub fn set_self_speaking(&mut self, speaking: bool) -> bool {
+        if self.self_socket.is_empty() {
+            return false;
+        }
+        let should_speak = speaking && !self.muted && !self.server_muted && !self.deafened;
+        if should_speak {
+            self.speaking.insert(self.self_socket.clone())
+        } else {
+            self.speaking.remove(&self.self_socket)
+        }
+    }
     /// The people LiveKit hears speaking, as hub socket ids. Returns whether anything changed.
     pub fn set_speaking(&mut self, mut sockets: HashSet<String>) -> bool {
+        // If local user is already speaking according to instant local VAD, keep them speaking
+        // so delayed LiveKit SFU packets (which haven't registered the speech yet) don't turn them off.
+        if !self.self_socket.is_empty() && self.speaking.contains(&self.self_socket) {
+            sockets.insert(self.self_socket.clone());
+        }
         if self.muted || self.server_muted || self.deafened {
             if !self.self_socket.is_empty() {
                 sockets.remove(&self.self_socket);
@@ -809,6 +826,33 @@ mod tests {
         let mut model = signed_in();
         let snap = model.snapshot();
         assert_eq!(snap["session"]["runtime"]["individualVolume"], true);
+    }
+    #[test]
+    fn local_vad_speaking_is_instant_and_preserved_against_remote_sfu_latency() {
+        let mut model = signed_in();
+        model.self_socket = "s1".into();
+        assert!(!model.speaking.contains("s1"));
+
+        // Instant local speaking
+        assert!(model.set_self_speaking(true));
+        assert!(model.speaking.contains("s1"));
+
+        // Remote LiveKit SFU update arrives without s1 yet (due to latency): s1 must NOT be dropped
+        let mut remote_heard = HashSet::new();
+        remote_heard.insert("s2".into());
+        assert!(model.set_speaking(remote_heard));
+        assert!(model.speaking.contains("s1"));
+        assert!(model.speaking.contains("s2"));
+
+        // Local VAD turns speaking off
+        assert!(model.set_self_speaking(false));
+        assert!(!model.speaking.contains("s1"));
+        assert!(model.speaking.contains("s2"));
+
+        // While muted, speaking cannot be turned on
+        model.muted = true;
+        assert!(!model.set_self_speaking(true));
+        assert!(!model.speaking.contains("s1"));
     }
 }
 
