@@ -26,6 +26,7 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
 
     const [showChat, setShowChat] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [settingsPage, setSettingsPage] = useState<'account' | 'voice' | 'windows'>('voice');
     const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
     const [channelModal, setChannelModal] = useState<{ categoryName?: string } | null>(null);
     const [serverModalOpen, setServerModalOpen] = useState(false);
@@ -39,7 +40,15 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
             }
         };
         const openSwitcher = () => setQuickSwitcherOpen(prev => !prev);
-        const openSettings = () => setSettingsOpen(true);
+        const openSettings = (e?: Event) => {
+            const detail = (e as CustomEvent)?.detail;
+            if (detail?.page) {
+                setSettingsPage(detail.page);
+            } else {
+                setSettingsPage('voice');
+            }
+            setSettingsOpen(true);
+        };
         const openModalHandler = (e: Event) => {
             const detail = (e as CustomEvent).detail;
             if (detail?.kind === 'createChannel') {
@@ -223,6 +232,7 @@ export function App({ store, bridge }: { store: SessionStore; bridge: Bridge }) 
                 <SettingsModal
                     session={session}
                     bridge={bridge}
+                    initialPage={settingsPage}
                     onClose={() => setSettingsOpen(false)}
                 />
             )}

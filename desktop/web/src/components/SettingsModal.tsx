@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 
 type Page = 'account' | 'voice' | 'windows';
 
-export function SettingsModal({ session, bridge, onClose }: { session: Session; bridge: Bridge; onClose: () => void }) {
-    const [page, setPage] = useState<Page>('voice');
+export function SettingsModal({ session, bridge, initialPage = 'voice', onClose }: { session: Session; bridge: Bridge; initialPage?: Page; onClose: () => void }) {
+    const [page, setPage] = useState<Page>(initialPage);
     const s = session.settings;
 
     const setSetting = (key: any, value: any) => {

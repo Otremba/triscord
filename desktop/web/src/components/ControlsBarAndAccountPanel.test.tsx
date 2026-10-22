@@ -42,6 +42,31 @@ describe('AccountPanel & ControlsBar Components', () => {
         window.removeEventListener('tri-open-settings', settingsListener);
     });
 
+    it('AccountPanel opens UserProfilePopout when clicking user profile and handles edit profile', () => {
+        const bridge = createMockBridge();
+        const session = getFixture('call');
+        render(<AccountPanel session={session} bridge={bridge} />);
+
+        // Popout is initially not rendered
+        expect(screen.queryByText(/editar perfil/i)).not.toBeInTheDocument();
+
+        // Click user profile button
+        const profileBtn = screen.getByRole('button', { name: /meu perfil/i });
+        fireEvent.click(profileBtn);
+
+        // Popout is now visible with profile info
+        expect(screen.getByText(/editar perfil/i)).toBeInTheDocument();
+
+        // Clicking "Editar Perfil" triggers openSettings on 'account' page
+        const settingsListener = vi.fn();
+        window.addEventListener('tri-open-settings', settingsListener);
+        const editBtn = screen.getByRole('button', { name: /editar perfil/i });
+        fireEvent.click(editBtn);
+
+        expect(settingsListener).toHaveBeenCalled();
+        window.removeEventListener('tri-open-settings', settingsListener);
+    });
+
     it('ControlsBar toggles camera, sharing, and leaveVoice with sound effects', () => {
         const bridge = createMockBridge();
         const session = getFixture('call');
