@@ -1,21 +1,80 @@
 {
   "name": "triscord",
-  "version": "0.9.68",
-  "private": true,
-  "description": "Triscord",
+  "version": "1.1.9",
+  "description": "Triscord: aplicativo de voz, vídeo e compartilhamento de tela com Electron e WebRTC",
+  "main": "src/main.js",
   "scripts": {
-    "build:web": "npm --prefix desktop/web run build",
-    "typecheck": "npm --prefix desktop/web run typecheck",
-    "test:web": "npm --prefix desktop/web test",
-    "test:cloudflare": "npm --prefix cloudflare run test",
-    "test:native": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop-rust/build.ps1 -CheckOnly",
-    "test:all": "npm run test:web && npm run test:cloudflare && npm run test:native",
-    "test": "npm run test:all",
-    "build:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop-rust/build.ps1",
-    "build:release": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop-rust/build.ps1 -Release"
+    "start": "concurrently \"npm run server\" \"npm run electron\"",
+    "preelectron": "npm run build:native",
+    "electron": "electron .",
+    "server": "node server/server.js",
+    "build:native": "powershell -NoProfile -ExecutionPolicy Bypass -File native/loopback-capture/build.ps1",
+    "prebuild:win": "npm run build:native",
+    "build:win": "electron-builder --win",
+    "test": "jest",
+    "lint": "eslint server src --ext .js"
   },
+  "keywords": [
+    "electron",
+    "webrtc",
+    "voice-chat",
+    "triscord",
+    "screen-sharing"
+  ],
+  "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=22"
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "electron-updater": "^6.3.9",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "electron": "^33.2.1",
+    "electron-builder": "^26.15.3",
+    "eslint": "^8.57.1",
+    "jest": "^29.7.0",
+    "lucide": "^1.47.0",
+    "supertest": "^7.0.0"
+  },
+  "build": {
+    "appId": "com.triscord.app",
+    "productName": "Triscord",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "server/**/*",
+      "package.json",
+      "!node_modules/.cache/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "native/bin/loopback-capture.exe",
+        "to": "loopback-capture.exe"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "artifactName": "Triscord-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Triscord"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Otremba",
+      "repo": "triscord",
+      "releaseType": "release"
+    }
   }
 }

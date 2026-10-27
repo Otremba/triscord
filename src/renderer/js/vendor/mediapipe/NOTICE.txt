@@ -1,0 +1,5 @@
+MediaPipe Tasks Vision (@mediapipe/tasks-vision 1.0.1) — Apache License 2.0
+https://github.com/google-ai-edge/mediapipe
+
+selfie_segmenter_landscape.tflite — MediaPipe Selfie Segmentation model, Apache License 2.0
+https://ai.google.dev/edge/mediapipe/solutions/vision/image_segmenter

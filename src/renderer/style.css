@@ -1,0 +1,3954 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap');
+
+:root {
+  --bg-primary: #313338;
+  --bg-secondary: #2b2d31;
+  --bg-tertiary: #1e1f22;
+  --bg-floating: #232428;
+  --bg-modals: #313338;
+  
+  --channel-hover: rgba(255, 255, 255, 0.04);
+  --channel-active: rgba(255, 255, 255, 0.08);
+
+  --text-normal: #dbdee1;
+  --text-muted: #949ba4;
+  --text-header: #f2f3f5;
+  --text-interactive-hover: #ffffff;
+
+  --accent-blurple: #5865f2;
+  --accent-blurple-hover: #4752c4;
+  --accent-green: #23a55a;
+  --accent-green-hover: #1f9250;
+  --accent-red: #f23f43;
+  --accent-red-hover: #da373c;
+  --accent-yellow: #f0b232;
+
+  --speaking-border: #23a55a;
+  --speaking-glow: rgba(35, 165, 90, 0.55);
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  --shadow-low: 0 1px 3px rgba(0, 0, 0, 0.24);
+  --shadow-high: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  /* Motion. One easing for things entering, one for things moving in place,
+     so the whole app decelerates the same way. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 280ms;
+
+  /* Unchecked checkbox/radio outline, and the focus ring around any control */
+  --control-border: rgba(255, 255, 255, 0.28);
+  --focus-ring: 0 0 0 3px rgba(88, 101, 242, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+/* Text fields stay selectable, so Ctrl+A / Ctrl+C / Ctrl+X work inside them */
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-tertiary);
+  color: var(--text-normal);
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* App Container */
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* 1. Left Guilds / Servers Bar */
+.guilds-sidebar {
+  width: 72px;
+  background-color: var(--bg-tertiary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 8px;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.guild-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  background-color: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.guild-icon.active {
+  border-radius: 16px;
+  background-color: var(--accent-blurple);
+  color: #fff;
+}
+
+.guild-icon:hover:not(.active) {
+  border-radius: 16px;
+  background-color: var(--accent-blurple);
+  color: #fff;
+}
+
+.guild-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* Brand icon: the artwork already has its own background */
+#brandIcon,
+#brandIcon:hover {
+  background-color: transparent;
+  overflow: hidden;
+}
+
+#brandIcon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.guild-separator {
+  width: 32px;
+  height: 2px;
+  background-color: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+}
+
+/* 2. Channels Sidebar */
+.channels-sidebar {
+  /* --channels-width is set by initSidebarLayout() when the column is resized */
+  width: var(--channels-width, 240px);
+  position: relative;
+  background-color: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.server-header {
+  height: 52px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.24);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-header);
+  box-shadow: var(--shadow-low);
+}
+
+.channels-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 8px;
+}
+
+.channel-category {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.btn-icon-small {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.btn-icon-small:hover {
+  color: var(--text-header);
+  background-color: var(--channel-active);
+}
+
+.channel-item {
+  margin-bottom: 2px;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.15s ease;
+}
+
+.channel-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.channel-main:hover {
+  background-color: var(--channel-hover);
+  color: var(--text-normal);
+}
+
+.channel-item.active .channel-main {
+  background-color: var(--channel-active);
+  color: var(--text-header);
+}
+
+.channel-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.channel-item.active .channel-icon {
+  color: var(--text-header);
+}
+
+.channel-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channel-badge {
+  background-color: var(--bg-tertiary);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.channel-user-list {
+  padding-left: 28px;
+  padding-right: 8px;
+  margin-top: 2px;
+  margin-bottom: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.channel-user-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--text-normal);
+}
+
+.channel-user-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  color: #fff;
+  flex-shrink: 0;
+  transition: box-shadow 0.15s ease;
+}
+
+.channel-user-item.speaking .channel-user-avatar {
+  box-shadow: 0 0 0 2px var(--speaking-border);
+}
+
+.channel-user-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channel-user-icons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+}
+
+/* User Panel (Bottom Left) */
+.user-panel {
+  height: 54px;
+  background-color: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.user-profile-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.user-profile-summary:hover {
+  background-color: var(--channel-hover);
+}
+
+.user-avatar-badge {
+  position: relative;
+}
+
+.user-avatar-circle {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+}
+
+.status-indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-green);
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  border: 2px solid var(--bg-tertiary);
+}
+
+.user-text-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.user-username {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-header);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-status-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.user-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.icon-button:hover {
+  background-color: var(--channel-active);
+  color: var(--text-interactive-hover);
+}
+
+.icon-button.muted, .icon-button.deafened {
+  color: var(--accent-red);
+}
+
+/* 3. Main Chat & Voice Stage Area */
+.main-stage-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-primary);
+  min-width: 0;
+  position: relative;
+}
+
+.stage-top-bar {
+  height: 52px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.24);
+  box-shadow: var(--shadow-low);
+  background-color: var(--bg-primary);
+  z-index: 10;
+}
+
+.stage-title-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.channel-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-header);
+}
+
+.channel-divider {
+  width: 1px;
+  height: 16px;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.channel-topic {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.stage-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.connection-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* This PC's load during a call; yellow when something is at its limit */
+.pc-health-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background-color: rgba(0, 0, 0, 0.2);
+  color: var(--text-muted);
+  cursor: default;
+  white-space: nowrap;
+  transition: background-color var(--dur-slow) var(--ease-in-out), color var(--dur-slow) var(--ease-in-out);
+}
+
+.pc-health-badge .lucide {
+  width: 14px;
+  height: 14px;
+}
+
+.pc-health-badge.warn {
+  background-color: rgba(240, 178, 50, 0.16);
+  color: var(--accent-yellow);
+}
+
+.status-badge-mini.yellow { color: var(--accent-yellow); }
+
+.connection-status-badge.connected { color: var(--accent-green); }
+.connection-status-badge.connecting { color: var(--accent-yellow); }
+.connection-status-badge.disconnected { color: var(--accent-red); }
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.connection-status-badge.connected .status-dot {
+  box-shadow: 0 0 8px var(--accent-green);
+}
+
+.btn-stage-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--bg-secondary);
+  border: none;
+  color: var(--text-normal);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.btn-stage-action:hover {
+  background-color: var(--accent-blurple);
+  color: #fff;
+}
+
+.btn-stage-action.has-unread::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--accent-red);
+}
+
+/* Stage Main Content */
+.stage-content-wrapper {
+  flex: 1;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Welcome Screen */
+.welcome-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+}
+
+.welcome-hero-card {
+  max-width: 480px;
+  background: linear-gradient(180deg, rgba(43, 45, 49, 0.7) 0%, rgba(30, 31, 34, 0.8) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  padding: 36px 32px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-high);
+}
+
+.welcome-icon-glow {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-blurple);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px auto;
+  box-shadow: 0 0 32px rgba(88, 101, 242, 0.5);
+}
+
+.welcome-brand-icon {
+  background-color: transparent;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+.welcome-brand-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.welcome-hero-card h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-header);
+  margin-bottom: 8px;
+}
+
+.welcome-hero-card p {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.welcome-features {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.feat-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md);
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.feat-item span:first-child {
+  font-size: 18px;
+}
+
+/* Active Voice Stage */
+.voice-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  background-color: var(--bg-primary);
+}
+
+.stage-channel-header-bar {
+  padding: 12px 24px 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stage-channel-header-bar h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-header);
+}
+
+.stage-channel-header-bar span {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.video-grid-container {
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.video-grid {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  height: 100%;
+  max-width: 1300px;
+  max-height: 800px;
+  align-content: center;
+}
+
+/* Responsive Dynamic Grid */
+.video-grid.grid-1 {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+.video-grid.grid-2 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
+}
+
+.video-grid.grid-4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.video-grid.grid-6 {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 1fr 1fr;
+}
+
+.video-grid.grid-many {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+/* Spotlight / Focus Mode */
+.video-grid.focus-mode {
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-content: stretch;
+}
+
+/* Every focused tile gets an equal share of the big area */
+.focus-main {
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--focus-cols, 1), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--focus-rows, 1), minmax(0, 1fr));
+  gap: 14px;
+}
+
+.focus-main .video-tile {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.focus-main .video-tile.focus-enter {
+  animation: focus-tile-in 0.22s ease-out;
+}
+
+@keyframes focus-tile-in {
+  from {
+    opacity: 0.6;
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focus-main .video-tile.focus-enter {
+    animation: none;
+  }
+}
+
+.focus-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.focus-strip .video-tile {
+  flex: 0 0 200px;
+  height: 116px;
+  min-height: 0;
+}
+
+.focus-strip .tile-avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+}
+
+.focus-strip .tile-overlay {
+  padding: 6px 9px;
+}
+
+.focus-strip .tile-username {
+  font-size: 11px;
+}
+
+.focus-strip .live-tag {
+  top: 6px;
+  left: 6px;
+  font-size: 9px;
+  padding: 2px 5px;
+}
+
+/* Tile Action Bar (Zoom, Fullscreen, Focus) */
+.tile-actions-bar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: var(--radius-md);
+  background-color: rgba(18, 19, 22, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.2s cubic-bezier(0.2, 0, 0, 1), transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.video-tile:hover .tile-actions-bar,
+.tile-actions-bar:focus-within,
+.video-tile.is-zoomed .tile-actions-bar,
+.video-tile:fullscreen .tile-actions-bar,
+.video-tile.is-fullscreen .tile-actions-bar {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.tile-action-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tile-action-divider {
+  width: 1px;
+  height: 16px;
+  background-color: rgba(255, 255, 255, 0.15);
+  margin: 0 2px;
+}
+
+.tile-action-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-normal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.tile-action-btn svg {
+  width: 15px;
+  height: 15px;
+  pointer-events: none;
+}
+
+.tile-action-btn:hover {
+  background-color: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  transform: scale(1.06);
+}
+
+.tile-action-btn:active {
+  transform: scale(0.94);
+}
+
+.tile-zoom-badge {
+  min-width: 44px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--text-normal);
+  font-family: 'JetBrains Mono', Consolas, monospace, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tile-zoom-badge:hover {
+  background-color: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+
+.tile-zoom-badge.zoomed {
+  background-color: rgba(88, 101, 242, 0.25);
+  border-color: rgba(88, 101, 242, 0.6);
+  color: #8da0f7;
+  font-weight: 700;
+}
+
+.tile-zoom-badge.zoomed:hover {
+  background-color: var(--accent-blue);
+  color: #fff;
+}
+
+/* Floating Zoom Indicator on video */
+.tile-zoom-pill {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-10px);
+  z-index: 12;
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.tile-zoom-pill.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tile-zoom-pill .pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--accent-blue);
+}
+
+/* Compact controls in strip */
+.focus-strip .tile-actions-bar {
+  top: 6px;
+  right: 6px;
+  padding: 2px 4px;
+}
+
+.focus-strip .tile-action-btn {
+  width: 22px;
+  height: 22px;
+}
+
+.focus-strip .tile-action-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.focus-strip .tile-action-group.zoom-controls {
+  display: none;
+}
+
+.focus-strip .tile-action-divider {
+  display: none;
+}
+
+/* Cursor states for Zoom and Pan */
+.tile-content.is-zoomed {
+  cursor: grab;
+}
+
+.tile-content.is-dragging {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.tile-content video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: #000;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+.tile-content video.transition-smooth {
+  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Native Fullscreen & Simulated Fullscreen */
+.video-tile:fullscreen,
+.video-tile:-webkit-full-screen,
+.video-tile.is-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: #000 !important;
+  z-index: 99999 !important;
+  box-shadow: none !important;
+}
+
+.video-tile:fullscreen .tile-content,
+.video-tile:-webkit-full-screen .tile-content,
+.video-tile.is-fullscreen .tile-content {
+  width: 100vw;
+  height: 100vh;
+}
+
+.video-tile:fullscreen .tile-actions-bar,
+.video-tile:-webkit-full-screen .tile-actions-bar,
+.video-tile.is-fullscreen .tile-actions-bar {
+  top: 18px;
+  right: 20px;
+  padding: 6px 10px;
+  background-color: rgba(18, 19, 22, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.video-tile:fullscreen .tile-action-btn,
+.video-tile:-webkit-full-screen .tile-action-btn,
+.video-tile.is-fullscreen .tile-action-btn {
+  width: 32px;
+  height: 32px;
+}
+
+.video-tile:fullscreen .tile-action-btn svg,
+.video-tile:-webkit-full-screen .tile-action-btn svg,
+.video-tile.is-fullscreen .tile-action-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.video-tile:fullscreen .tile-zoom-badge,
+.video-tile:-webkit-full-screen .tile-zoom-badge,
+.video-tile.is-fullscreen .tile-zoom-badge {
+  height: 28px;
+  font-size: 12px;
+  padding: 0 9px;
+}
+
+.video-tile:fullscreen .tile-overlay,
+.video-tile:-webkit-full-screen .tile-overlay,
+.video-tile.is-fullscreen .tile-overlay {
+  padding: 18px 24px;
+  font-size: 15px;
+}
+
+.video-tile:fullscreen .live-tag,
+.video-tile:-webkit-full-screen .live-tag,
+.video-tile.is-fullscreen .live-tag {
+  top: 20px;
+  left: 20px;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+/* Inactivity in Fullscreen: auto-hide overlay & controls */
+.video-tile.fullscreen-idle {
+  cursor: none !important;
+}
+
+.video-tile.fullscreen-idle .tile-actions-bar,
+.video-tile.fullscreen-idle .tile-overlay,
+.video-tile.fullscreen-idle .live-tag,
+.video-tile.fullscreen-idle .tile-volume-btn {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-8px);
+}
+
+/* Backward compatibility fallback */
+.tile-focus-hint {
+  display: none;
+}
+
+/* Camera effects modal */
+.modal-dialog.effects-dialog {
+  max-width: 920px;
+}
+
+.modal-body.effects-body {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.effects-preview {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  aspect-ratio: 16 / 9;
+  background-color: #000;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.effects-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.effects-preview-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  background-color: rgba(0, 0, 0, 0.55);
+  color: var(--text-header);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.effects-options {
+  width: 250px;
+  flex-shrink: 0;
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+
+.effects-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-header);
+  margin-bottom: 12px;
+}
+
+.effects-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.effect-option {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  background-color: var(--bg-tertiary);
+  background-size: cover;
+  background-position: center;
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.effect-option:hover:not(:disabled) {
+  background-color: var(--bg-floating);
+  color: var(--text-interactive-hover);
+}
+
+.effect-option.selected {
+  border-color: var(--accent-blurple);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.35);
+}
+
+.effect-option:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.effects-note {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--accent-yellow);
+}
+
+@media (max-width: 720px) {
+  .modal-body.effects-body {
+    flex-direction: column;
+  }
+
+  .effects-preview,
+  .effects-options {
+    width: 100%;
+  }
+}
+
+/* Per-user / per-stream volume */
+.tile-volume-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.video-tile:hover .tile-volume-btn,
+.tile-volume-btn:focus-visible,
+.tile-volume-btn.adjusted {
+  opacity: 1;
+}
+
+.tile-volume-btn:hover {
+  background-color: rgba(0, 0, 0, 0.85);
+}
+
+/* Lowered or silenced by you: always visible so it isn't forgotten */
+.tile-volume-btn.adjusted {
+  background-color: rgba(242, 63, 67, 0.85);
+}
+
+.focus-strip .tile-volume-btn {
+  width: 24px;
+  height: 24px;
+  right: 6px;
+  bottom: 5px;
+  font-size: 12px;
+}
+
+.volume-popover {
+  position: fixed;
+  z-index: 1000;
+  width: 240px;
+  padding: 12px 14px;
+  background-color: var(--bg-floating);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-high);
+  color: var(--text-normal);
+  font-size: 13px;
+}
+
+.volume-popover-title {
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: var(--text-header);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.volume-popover-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.volume-popover-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent-blurple);
+}
+
+.volume-popover-value {
+  width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.volume-popover-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.volume-popover-mute {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.volume-popover-mute input {
+  accent-color: var(--accent-red);
+}
+
+.volume-popover-reset {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.volume-popover-reset:hover {
+  color: var(--text-interactive-hover);
+  text-decoration: underline;
+}
+
+/* Video & Voice User Tiles */
+.video-tile {
+  cursor: pointer;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-low);
+  min-height: 180px;
+}
+
+.video-tile.speaking {
+  border-color: var(--speaking-border);
+  box-shadow: 0 0 0 3px var(--speaking-border), 0 0 20px var(--speaking-glow);
+}
+
+.tile-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.tile-content video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: #000;
+}
+
+.avatar-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.tile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Outfit', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: var(--shadow-high);
+}
+
+.video-tile.speaking .tile-avatar {
+  box-shadow: 0 0 0 4px var(--speaking-border), 0 0 16px var(--speaking-glow);
+  transform: scale(1.04);
+}
+
+.live-tag {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background-color: var(--accent-red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.watch-paused-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  background-color: #111318;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 16px;
+}
+
+.watch-paused-view i {
+  width: 34px;
+  height: 34px;
+  opacity: 0.6;
+}
+
+.watch-paused-view span {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.watch-paused-view button {
+  margin-top: 4px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-color);
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.watch-paused-view button:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+
+.tile-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 14px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tile-overlay-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.tile-username {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-header);
+}
+
+.tile-user-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-badge-mini {
+  font-size: 12px;
+}
+
+/* Floating Voice Controls Bar */
+.voice-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 20px;
+  background-color: var(--bg-secondary);
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.btn-voice-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-normal);
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-voice-control:hover {
+  background-color: var(--bg-floating);
+  color: var(--text-interactive-hover);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.btn-voice-control.active {
+  background-color: var(--accent-green);
+  border-color: var(--accent-green);
+  color: #fff;
+}
+
+.btn-voice-control.btn-disconnect {
+  background-color: var(--accent-red);
+  border-color: var(--accent-red);
+  color: #fff;
+}
+
+.btn-voice-control.btn-disconnect:hover {
+  background-color: var(--accent-red-hover);
+}
+
+/* 4. Chat Drawer (Right Side) */
+.chat-drawer {
+  width: 340px;
+  background-color: var(--bg-secondary);
+  border-left: 1px solid rgba(0, 0, 0, 0.24);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chat-drawer.hidden {
+  display: none;
+}
+
+.chat-drawer-header {
+  height: 52px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  font-weight: 700;
+  color: var(--text-header);
+}
+
+.chat-messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-message-item {
+  display: flex;
+  gap: 10px;
+}
+
+.chat-message-item.system-msg {
+  padding: 6px 10px;
+  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.msg-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.msg-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.msg-sender {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-header);
+}
+
+.msg-sender.self {
+  color: var(--accent-blurple);
+}
+
+.msg-timestamp {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.msg-text {
+  font-size: 13px;
+  color: var(--text-normal);
+  word-break: break-word;
+  /* The app turns selection off everywhere (see *); messages must be copyable */
+  user-select: text;
+  cursor: text;
+}
+
+.chat-input-area {
+  padding: 12px 16px;
+  background-color: var(--bg-secondary);
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.chat-input-box {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+}
+
+.chat-input-box input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-normal);
+  padding: 8px 6px;
+  font-size: 13px;
+  outline: none;
+}
+
+.chat-input-box input::placeholder {
+  color: var(--text-muted);
+}
+
+.chat-input-box button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.chat-input-box button:hover {
+  color: var(--accent-blurple);
+}
+
+/* Modals (Screen Share & Settings) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal-dialog {
+  background-color: var(--bg-modals);
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 680px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-high);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+/* A transition rather than a keyframe, so the dialog animates out on close
+   as well as in on open (the overlay stays rendered while hidden, see Motion) */
+.modal-dialog {
+  transition:
+    transform var(--dur-slow) var(--ease-pop),
+    opacity var(--dur-base) var(--ease-out);
+}
+
+.modal-overlay.hidden .modal-dialog {
+  transform: scale(0.94) translateY(12px);
+  opacity: 0;
+  transition-timing-function: var(--ease-in-out), var(--ease-in-out);
+  transition-duration: var(--dur-base), var(--dur-fast);
+}
+
+.modal-header {
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.modal-header h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-header);
+}
+
+.modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  background-color: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Screen Share Picker Modal */
+.screen-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+}
+
+.screen-tab-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.screen-tab-btn.active {
+  background-color: var(--accent-blurple);
+  color: #fff;
+}
+
+.screen-sources-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+/* Advice above the windows tab: spans the whole grid row */
+.sources-hint {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-tertiary);
+  border-left: 3px solid var(--accent-blurple);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-normal);
+}
+
+.sources-hint .lucide {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--accent-blurple);
+}
+
+.source-card {
+  background-color: var(--bg-tertiary);
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.source-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.source-card.selected {
+  border-color: var(--accent-blurple);
+  box-shadow: 0 0 0 2px var(--accent-blurple);
+}
+
+.source-thumb-container {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background-color: #000;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.source-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.source-app-icon {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+.source-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.screen-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* The kind of share: a game (720p60) or everyday use (1080p30) */
+.screen-mode-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.screen-mode-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 8px 12px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  background-color: var(--bg-tertiary);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--dur-fast) ease;
+}
+
+.screen-mode-option:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* The radio itself stays reachable by keyboard, but the card shows the choice */
+.screen-mode-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.screen-mode-option:has(input:checked) {
+  border-color: var(--accent-blurple);
+}
+
+.screen-mode-option:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+
+.screen-mode-option .lucide {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.screen-mode-option:has(input:checked) .lucide {
+  color: var(--accent-blurple);
+}
+
+.screen-mode-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.screen-mode-text strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.screen-mode-text span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* A share's quality as a dot over it, under the AO VIVO tag (the top-right
+   corner belongs to the tile's hover actions): the viewer's label and the
+   sharer's panel. Only hovering the dot opens the details. */
+.screen-quality-label,
+.screen-send-panel {
+  position: absolute;
+  top: 40px;
+  left: 12px;
+  z-index: 4;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: min(400px, calc(100% - 24px));
+  padding: 6px;
+  border-radius: 14px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+  cursor: default;
+  transition:
+    background-color var(--dur-slow) var(--ease-out),
+    color var(--dur-slow) var(--ease-out),
+    padding var(--dur-slow) var(--ease-out);
+}
+
+.screen-quality-label.hidden,
+.screen-send-panel.hidden {
+  display: none;
+}
+
+.screen-quality-label:hover,
+.screen-send-panel:hover {
+  padding: 7px 11px 8px 8px;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.screen-quality-label.degraded:hover {
+  background-color: rgba(240, 178, 50, 0.95);
+  color: #1e1f22;
+}
+
+/* Green when it arrives well; yellow (red: the sharer's own limit) pulses so
+   it is noticed even folded */
+.screen-quality-dot,
+.screen-send-dot {
+  width: 10px;
+  height: 10px;
+  margin: 1px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background-color: var(--accent-green);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+
+.screen-quality-label.degraded .screen-quality-dot,
+.screen-send-panel[data-level="warn"] .screen-send-dot {
+  background-color: var(--accent-yellow);
+}
+
+.screen-send-panel[data-level="bad"] .screen-send-dot {
+  background-color: var(--accent-red);
+}
+
+.screen-send-panel[data-level="idle"] .screen-send-dot {
+  background-color: var(--text-muted);
+}
+
+.screen-quality-label.degraded .screen-quality-dot,
+.screen-send-panel[data-level="warn"] .screen-send-dot,
+.screen-send-panel[data-level="bad"] .screen-send-dot {
+  animation: qualityDotPulse 1.6s ease-in-out infinite;
+}
+
+/* On the yellow of an open degraded label the dot turns dark */
+.screen-quality-label.degraded:hover .screen-quality-dot {
+  background-color: #1e1f22;
+  animation: none;
+}
+
+@keyframes qualityDotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-quality-dot,
+  .screen-send-dot {
+    animation: none !important;
+  }
+}
+
+/* Folded: only the dot */
+.screen-quality-details,
+.screen-send-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 0;
+  max-height: 12px;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    opacity var(--dur-slow) var(--ease-out),
+    max-width var(--dur-slow) var(--ease-out),
+    max-height var(--dur-slow) var(--ease-out);
+}
+
+.screen-quality-label:hover .screen-quality-details,
+.screen-send-panel:hover .screen-send-details {
+  max-width: 370px;
+  max-height: 260px;
+  opacity: 1;
+  white-space: normal;
+}
+
+/* Viewer: quality, then what limits it and what to do */
+.screen-quality-cause {
+  font-weight: 700;
+}
+
+.screen-quality-action {
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+/* Sharer: summary, what to check, then a line per viewer */
+.screen-send-details {
+  gap: 3px;
+}
+
+.screen-send-summary {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.screen-send-hint {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  opacity: 0.85;
+  margin-bottom: 2px;
+}
+
+.screen-send-row {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  opacity: 0.85;
+}
+
+.screen-send-row.limited {
+  color: var(--accent-yellow);
+  opacity: 1;
+}
+
+.screen-send-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screen-send-detail {
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+/* Small tiles (the strip under focused ones) */
+.focus-strip .screen-quality-label,
+.focus-strip .screen-send-panel {
+  top: 26px;
+  left: 6px;
+}
+
+.option-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+/* Settings Form Controls */
+.setting-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setting-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.setting-input, .setting-select {
+  background-color: var(--bg-tertiary);
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  color: var(--text-normal);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  outline: none;
+}
+
+.setting-input:focus, .setting-select:focus {
+  border-color: var(--accent-blurple);
+  box-shadow: var(--focus-ring);
+}
+
+.setting-input:hover:not(:focus), .setting-select:hover:not(:focus) {
+  border-color: var(--control-border);
+}
+
+.avatar-color-picker {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.avatar-color-option {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.15s ease;
+}
+
+.avatar-color-option:hover {
+  transform: scale(1.15);
+}
+
+.avatar-color-option.selected {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--bg-modals);
+}
+
+.mic-test-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: var(--bg-tertiary);
+  padding: 12px;
+  border-radius: var(--radius-md);
+}
+
+.mic-vu-meter-bg {
+  height: 8px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mic-vu-meter-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent-green) 0%, var(--accent-yellow) 70%, var(--accent-red) 100%);
+  transition: width 0.08s ease;
+}
+
+.slider-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider-group input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent-blurple);
+}
+
+.btn-primary {
+  background-color: var(--accent-blurple);
+  color: #fff;
+  border: none;
+  padding: 9px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--accent-blurple-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: none;
+  border: none;
+  color: var(--text-normal);
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  text-decoration: underline;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* =====================================================================
+   Icons
+   Every glyph is a Lucide SVG (js/icons.js). Size and colour are set
+   here rather than on the markup, so an icon matches whatever it sits in.
+   ===================================================================== */
+
+.lucide {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  stroke-width: 2;
+  vertical-align: middle;
+}
+
+.guild-icon .lucide {
+  width: 26px;
+  height: 26px;
+}
+
+.server-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.server-header .lucide {
+  width: 17px;
+  height: 17px;
+  color: var(--text-muted);
+}
+
+.server-name .lucide {
+  color: var(--accent-blurple);
+}
+
+.btn-icon-small .lucide {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.channel-user-icons .lucide {
+  width: 13px;
+  height: 13px;
+}
+
+.status-mini-icon,
+.status-badge-mini {
+  display: inline-flex;
+  align-items: center;
+}
+
+.status-badge-mini .lucide {
+  width: 14px;
+  height: 14px;
+}
+
+.status-mini-icon.red { color: var(--accent-red); }
+.status-mini-icon.green { color: var(--accent-green); }
+.status-mini-icon.blurple { color: var(--accent-blurple); }
+.status-badge-mini.red { color: var(--accent-red); }
+
+.feat-item .lucide {
+  width: 20px;
+  height: 20px;
+  color: var(--accent-blurple);
+}
+
+.effect-option .lucide {
+  width: 26px;
+  height: 26px;
+}
+
+.tile-username .lucide {
+  width: 14px;
+  height: 14px;
+}
+
+.tile-focus-hint .lucide,
+.tile-volume-btn .lucide {
+  width: 16px;
+  height: 16px;
+}
+
+.focus-strip .tile-volume-btn .lucide {
+  width: 13px;
+  height: 13px;
+}
+
+.tile-volume-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Join and leave notices in the chat. The icon flows with the sentence, so
+   the text wraps as one paragraph instead of breaking at every element. */
+.system-msg-content .lucide {
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  color: var(--text-muted);
+  vertical-align: -2px;
+}
+
+/* =====================================================================
+   Motion
+   Anything that appears, moves or changes colour does it over time.
+   Everything below collapses to nothing under prefers-reduced-motion.
+   ===================================================================== */
+
+/* Interactive surfaces: colour and lift on hover, a press that answers back */
+.guild-icon,
+.icon-button,
+.btn-icon-small,
+.btn-stage-action,
+.btn-voice-control,
+.btn-primary,
+.btn-secondary,
+.effect-option,
+.screen-tab-btn,
+.source-card,
+.avatar-color-option,
+.volume-popover-reset,
+.chat-input-box button {
+  transition:
+    background-color var(--dur-fast) var(--ease-in-out),
+    border-color var(--dur-fast) var(--ease-in-out),
+    color var(--dur-fast) var(--ease-in-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+.icon-button:active,
+.btn-icon-small:active,
+.btn-stage-action:active,
+.btn-voice-control:active,
+.btn-primary:active,
+.btn-secondary:active,
+.effect-option:active,
+.chat-input-box button:active {
+  transform: scale(0.94);
+  transition-duration: var(--dur-fast);
+}
+
+.btn-voice-control:hover,
+.btn-stage-action:hover {
+  transform: translateY(-2px);
+}
+
+.btn-primary:disabled,
+.btn-primary:disabled:active,
+.effect-option:disabled,
+.effect-option:disabled:active {
+  transform: none;
+}
+
+.source-card:hover {
+  transform: translateY(-3px);
+}
+
+.avatar-color-option:hover {
+  transform: scale(1.12);
+}
+
+/* The mic and headphone icons swap when muted, so fade the swap in */
+.icon-button .lucide,
+.btn-voice-control .lucide {
+  animation: iconIn var(--dur-base) var(--ease-out);
+}
+
+@keyframes iconIn {
+  0% { opacity: 0; transform: scale(0.7); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Channel list */
+.channel-main {
+  transition:
+    background-color var(--dur-fast) var(--ease-in-out),
+    color var(--dur-fast) var(--ease-in-out);
+}
+
+.channel-user-item {
+  transition: background-color var(--dur-fast) var(--ease-in-out);
+}
+
+.channel-badge {
+  transition:
+    background-color var(--dur-base) var(--ease-in-out),
+    color var(--dur-base) var(--ease-in-out);
+}
+
+/* Connection badge: the dot breathes while we are still connecting */
+.connection-status-badge {
+  transition:
+    background-color var(--dur-slow) var(--ease-in-out),
+    color var(--dur-slow) var(--ease-in-out);
+}
+
+.connection-status-badge.connecting .status-dot {
+  animation: statusPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+
+/* Stage: whichever half is showing slides up into place */
+.welcome-stage:not(.hidden),
+.voice-stage:not(.hidden) {
+  animation: stageIn var(--dur-slow) var(--ease-out);
+}
+
+@keyframes stageIn {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Video tiles: a short rise as the grid is rebuilt */
+.video-tile {
+  animation: tileIn var(--dur-slow) var(--ease-out);
+}
+
+@keyframes tileIn {
+  0% { opacity: 0; transform: translateY(8px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.tile-focus-hint,
+.tile-volume-btn {
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-in-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+.tile-focus-hint:hover,
+.tile-volume-btn:hover {
+  transform: scale(1.08);
+}
+
+.live-tag {
+  animation: iconIn var(--dur-slow) var(--ease-pop);
+}
+
+/* Modals: the backdrop fades, the dialog pops (see .modal-dialog above).
+   .hidden is display:none, which nothing can animate, so these components
+   keep their box and become invisible instead. */
+.modal-overlay {
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    visibility var(--dur-base) linear,
+    backdrop-filter var(--dur-base) var(--ease-out);
+}
+
+.modal-overlay.hidden {
+  display: flex !important;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  backdrop-filter: blur(0);
+}
+
+/* The stage is a flex item, and a flex item refuses to shrink past its own
+   content unless told to — without this the drawer pushes the grid off the
+   right edge on a narrow window instead of squeezing it. */
+.welcome-stage,
+.voice-stage {
+  min-width: 0;
+}
+
+/* Chat drawer: slides the stage over rather than snapping shut */
+.chat-drawer {
+  transition:
+    width var(--dur-slow) var(--ease-out),
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-slow) var(--ease-out);
+  overflow: hidden;
+}
+
+.chat-drawer.hidden {
+  display: flex !important;
+  width: 0;
+  min-width: 0;
+  opacity: 0;
+  transform: translateX(24px);
+  border-left-width: 0;
+  pointer-events: none;
+}
+
+/* Keeps the panel's contents from reflowing while the drawer width animates */
+.chat-drawer-header,
+.chat-messages-container,
+.chat-input-area {
+  min-width: 340px;
+}
+
+/* Each message arrives from below */
+.chat-message-item {
+  animation: messageIn var(--dur-base) var(--ease-out);
+}
+
+@keyframes messageIn {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.btn-stage-action.has-unread::after {
+  animation: iconIn var(--dur-base) var(--ease-pop);
+}
+
+/* Volume popover */
+.volume-popover {
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    visibility var(--dur-fast) linear,
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.volume-popover.hidden {
+  display: block !important;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(0.96) translateY(-4px);
+}
+
+/* Settings, sliders and meters */
+.setting-input,
+.setting-select,
+.chat-input-box input {
+  transition:
+    border-color var(--dur-fast) var(--ease-in-out),
+    background-color var(--dur-fast) var(--ease-in-out),
+    box-shadow var(--dur-base) var(--ease-out);
+}
+
+.modal-body,
+.channels-scrollable,
+.chat-messages-container {
+  scroll-behavior: smooth;
+}
+
+/* Settings sections settle in one after another when a dialog opens */
+.modal-overlay:not(.hidden) .setting-section {
+  animation: sectionIn var(--dur-slow) var(--ease-out) backwards;
+}
+
+.modal-overlay:not(.hidden) .setting-section:nth-child(2) { animation-delay: 25ms; }
+.modal-overlay:not(.hidden) .setting-section:nth-child(3) { animation-delay: 50ms; }
+.modal-overlay:not(.hidden) .setting-section:nth-child(4) { animation-delay: 75ms; }
+.modal-overlay:not(.hidden) .setting-section:nth-child(5) { animation-delay: 100ms; }
+.modal-overlay:not(.hidden) .setting-section:nth-child(n+6) { animation-delay: 125ms; }
+
+@keyframes sectionIn {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Switching theme cross-fades instead of flashing (class set by applyTheme) */
+:root.theme-transition,
+:root.theme-transition *,
+:root.theme-transition *::before,
+:root.theme-transition *::after {
+  transition:
+    background-color var(--dur-slow) var(--ease-in-out),
+    border-color var(--dur-slow) var(--ease-in-out),
+    color var(--dur-slow) var(--ease-in-out),
+    fill var(--dur-slow) var(--ease-in-out) !important;
+}
+
+/* ==========================================================================
+   Soundboard panel (positioned above its button by positionSoundboardPanel)
+   ========================================================================== */
+.soundboard-panel {
+  position: fixed;
+  z-index: 900;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(420px, 60vh);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-floating);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-high);
+  overflow: hidden;
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-pop),
+    visibility var(--dur-base) linear;
+}
+
+/* Kept rendered while hidden so it can animate out, like the modals */
+.soundboard-panel.hidden {
+  display: flex !important;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.97);
+}
+
+.soundboard-panel.drag-over {
+  border-color: var(--accent-blurple);
+  box-shadow: var(--shadow-high), var(--focus-ring);
+}
+
+.soundboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--control-border);
+}
+
+.soundboard-title {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  color: var(--text-header);
+}
+
+.soundboard-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.soundboard-header-actions input[type="range"] {
+  width: 110px;
+  accent-color: var(--accent-blurple);
+}
+
+/* A folder per person who added sounds (see soundFolders in app.js) */
+.soundboard-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  overflow-y: auto;
+}
+
+.sound-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.sound-folder-header:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-normal);
+}
+
+.sound-folder-header:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.sound-folder-header .lucide {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.sound-folder-chevron {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.sound-folder.collapsed .sound-folder-chevron {
+  transform: rotate(-90deg);
+}
+
+.sound-folder-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sound-folder-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background-color: var(--bg-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sound-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.sound-folder.collapsed .sound-folder-grid {
+  display: none;
+}
+
+.soundboard-empty {
+  padding: 20px 8px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sound-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 10px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-in-out),
+    border-color var(--dur-fast) var(--ease-in-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+.sound-tile:hover {
+  border-color: var(--accent-blurple);
+}
+
+.sound-tile:active {
+  transform: scale(0.95);
+}
+
+.sound-tile:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* A short pulse when a clip is sent, so the click visibly registered */
+.sound-tile.just-played {
+  animation: soundPulse 600ms var(--ease-out);
+}
+
+@keyframes soundPulse {
+  0% { box-shadow: 0 0 0 0 rgba(88, 101, 242, 0.6); }
+  100% { box-shadow: 0 0 0 10px rgba(88, 101, 242, 0); }
+}
+
+.sound-tile.downloading {
+  opacity: 0.55;
+}
+
+.sound-tile-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.sound-tile-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Preview / edit / delete appear on hover, over the end of the name */
+.sound-tile-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background-color: var(--bg-floating);
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-in-out);
+}
+
+.sound-tile:hover .sound-tile-actions,
+.sound-tile:focus-within .sound-tile-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sound-tile-actions button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.sound-tile-actions button:hover {
+  background-color: var(--channel-hover);
+  color: var(--text-header);
+}
+
+.sound-tile-actions .lucide {
+  width: 14px;
+  height: 14px;
+}
+
+/* Inline rename */
+.sound-tile.editing {
+  cursor: default;
+}
+
+.sound-tile.editing input {
+  min-width: 0;
+  padding: 4px 6px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-normal);
+  font: inherit;
+}
+
+.sound-tile.editing .sound-edit-emoji {
+  width: 36px;
+  text-align: center;
+}
+
+.sound-tile.editing .sound-edit-name {
+  flex: 1;
+}
+
+.soundboard-hint {
+  padding: 8px 12px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--control-border);
+}
+
+.btn-voice-control.panel-open {
+  border-color: var(--accent-blurple);
+  color: var(--text-header);
+}
+
+/* "Fulano tocou 🔊 Buzina", floating over the player's tile */
+.soundboard-badge {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  z-index: 5;
+  max-width: calc(100% - 20px);
+  padding: 4px 10px;
+  background-color: rgba(0, 0, 0, 0.72);
+  border-radius: var(--radius-full);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  animation: soundBadge 2600ms var(--ease-out) forwards;
+}
+
+@keyframes soundBadge {
+  0% { opacity: 0; transform: translate(-50%, -6px) scale(0.9); }
+  10% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -4px) scale(0.98); }
+}
+
+/* Someone who never wants motion gets none of it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Light theme — same structure, lighter surfaces. Everything above is built
+   on the CSS variables redefined here, so this is the only place a light
+   palette needs to live.
+   ========================================================================== */
+:root[data-theme="light"] {
+  --control-border: rgba(0, 0, 0, 0.3);
+  --bg-primary: #ffffff;
+  --bg-secondary: #f2f3f5;
+  --bg-tertiary: #e3e5e8;
+  --bg-floating: #ffffff;
+  --bg-modals: #ffffff;
+
+  --channel-hover: rgba(0, 0, 0, 0.05);
+  --channel-active: rgba(0, 0, 0, 0.08);
+
+  --text-normal: #313338;
+  --text-muted: #5c5e66;
+  --text-header: #060607;
+  --text-interactive-hover: #060607;
+}
+
+/* ==========================================================================
+   Custom status (below the username in the bottom user panel)
+   ========================================================================== */
+.user-custom-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+/* ==========================================================================
+   Settings: checkboxes/radios, push-to-talk key row
+   ========================================================================== */
+.setting-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--text-normal);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Checkboxes and radios: the native ones render as bright white boxes on the
+   dark theme, so they are drawn here from the theme's own colours */
+input[type="checkbox"],
+input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  display: inline-grid;
+  place-content: center;
+  background-color: var(--bg-tertiary);
+  border: 2px solid var(--control-border);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-in-out),
+    border-color var(--dur-fast) var(--ease-in-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out);
+}
+
+input[type="checkbox"] {
+  border-radius: 5px;
+}
+
+input[type="radio"] {
+  border-radius: 50%;
+}
+
+/* The tick: a clipped square that pops in when checked */
+input[type="checkbox"]::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background-color: #fff;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  transform: scale(0);
+  transition: transform var(--dur-base) var(--ease-pop);
+}
+
+input[type="radio"]::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--accent-blurple);
+  transform: scale(0);
+  transition: transform var(--dur-base) var(--ease-pop);
+}
+
+input[type="checkbox"]:checked {
+  background-color: var(--accent-blurple);
+  border-color: var(--accent-blurple);
+}
+
+input[type="radio"]:checked {
+  border-color: var(--accent-blurple);
+}
+
+input[type="checkbox"]:checked::before,
+input[type="radio"]:checked::before {
+  transform: scale(1);
+}
+
+input[type="checkbox"]:hover:not(:disabled),
+input[type="radio"]:hover:not(:disabled),
+.setting-checkbox:hover input:not(:disabled),
+.option-group:hover input:not(:disabled) {
+  border-color: var(--accent-blurple);
+}
+
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+input[type="checkbox"]:active:not(:disabled),
+input[type="radio"]:active:not(:disabled) {
+  transform: scale(0.88);
+}
+
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.option-group label {
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ==========================================================================
+   Name gate: first-run dialog that asks for a username
+   ========================================================================== */
+.name-gate {
+  /* Above every other dialog: nothing else is usable until a name is set */
+  z-index: 1100;
+}
+
+.name-dialog {
+  max-width: 440px;
+}
+
+.name-dialog-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 24px 4px;
+  text-align: center;
+}
+
+.name-dialog-hero h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-header);
+}
+
+.name-dialog-hero p {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.name-avatar-preview {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: 'Outfit', sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: var(--shadow-high);
+}
+
+.name-avatar-preview.pop {
+  animation: iconIn var(--dur-base) var(--ease-pop);
+}
+
+.name-dialog .btn-primary {
+  width: 100%;
+  padding: 11px 20px;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: color var(--dur-fast) var(--ease-in-out);
+}
+
+.field-hint.error {
+  color: var(--accent-red);
+}
+
+/* Settings: diagnostics */
+.diagnostics-summary {
+  font-size: 12px;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnostics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.diagnostics-actions .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.diagnostics-actions .lucide {
+  width: 14px;
+  height: 14px;
+}
+
+.diagnostics-test-result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.diagnostics-test-result .ok {
+  color: var(--accent-green);
+}
+
+.diagnostics-test-result .fail {
+  color: var(--accent-red);
+}
+
+.ptt-key-row {
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* ==========================================================================
+   Owner controls: room lock/limit + per-user kick/force-mute icons
+   ========================================================================== */
+.status-mini-icon.yellow { color: var(--accent-yellow); }
+
+.lock-toggle,
+.owner-action {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.lock-toggle:hover { color: var(--text-interactive-hover); }
+.owner-action { color: var(--text-muted); }
+.owner-action:hover { color: var(--accent-red); }
+
+/* ==========================================================================
+   Connection quality dot on remote tiles
+   ========================================================================== */
+.quality-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.quality-dot.quality-good { background-color: var(--accent-green); }
+.quality-dot.quality-ok { background-color: var(--accent-yellow); }
+.quality-dot.quality-bad { background-color: var(--accent-red); }
+.quality-dot.quality-unknown { background-color: var(--text-muted); }
+
+/* ==========================================================================
+   Recording toggle (pulses red while active)
+   ========================================================================== */
+.btn-voice-control.recording {
+  background-color: var(--accent-red);
+  border-color: var(--accent-red);
+  color: #fff;
+  animation: recordingPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes recordingPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(242, 63, 67, 0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(242, 63, 67, 0); }
+}
+
+/* ==========================================================================
+   Chat: image attachments + reactions
+   ========================================================================== */
+.chat-attachment-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.chat-attachment-preview img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+
+.chat-attachment-preview button {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.msg-attachment-img {
+  display: block;
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: var(--radius-md);
+  margin-top: 6px;
+  cursor: pointer;
+  object-fit: cover;
+}
+
+.msg-reactions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  position: relative;
+}
+
+.reaction-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.reaction-pill:hover { border-color: var(--accent-blurple); }
+.reaction-pill.mine {
+  background-color: rgba(88, 101, 242, 0.18);
+  border-color: var(--accent-blurple);
+}
+
+.reaction-count { font-size: 11px; color: var(--text-muted); }
+
+.reaction-add-wrap { position: relative; }
+
+.reaction-add-btn {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+}
+
+.reaction-add-btn:hover { color: var(--accent-blurple); }
+.reaction-add-btn .lucide { width: 15px; height: 15px; }
+
+.reaction-picker {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  gap: 2px;
+  background-color: var(--bg-floating);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  box-shadow: var(--shadow-high);
+  z-index: 20;
+}
+
+.reaction-picker.hidden { display: none; }
+
+.reaction-picker-option {
+  background: none;
+  border: none;
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.reaction-picker-option:hover { background-color: var(--channel-hover); }
+
+/* ==========================================================================
+   Toast notifications
+   ========================================================================== */
+.app-toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+}
+
+.app-toast {
+  background-color: var(--bg-floating);
+  color: var(--text-normal);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-high);
+  font-size: 13px;
+  max-width: 320px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+  border-left: 3px solid var(--accent-blurple);
+}
+
+.app-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.app-toast.error { border-left-color: var(--accent-red); }
+
+/* ==========================================================================
+   Persistent Remote Audio Container & Mobile Audio Unlock Banner
+   ========================================================================== */
+.hidden-audio-container {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.audio-unlock-banner {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: linear-gradient(135deg, var(--accent-blurple), #4752c4);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--dur-base) var(--ease-out);
+  animation: bannerSlideDown 0.35s var(--ease-pop);
+}
+
+.audio-unlock-banner.hidden {
+  display: none !important;
+}
+
+.audio-unlock-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.audio-unlock-content .lucide {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.btn-unlock-audio {
+  background-color: #ffffff;
+  color: var(--accent-blurple);
+  border: none;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.btn-unlock-audio:hover {
+  transform: scale(1.05);
+}
+
+@keyframes bannerSlideDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.mobile-only {
+  display: none !important;
+}
+
+/* ==========================================================================
+   Channel list column: resizable and collapsible on desktop. On mobile the
+   column is a drawer instead, and none of this applies.
+   ========================================================================== */
+@media (min-width: 769px) {
+  .channels-sidebar {
+    overflow: hidden;
+    transition:
+      width var(--dur-slow) var(--ease-out),
+      border-right-width var(--dur-slow) var(--ease-out);
+  }
+
+  /* The contents keep their width while the column animates shut, so they
+     slide out of view instead of squashing */
+  .channels-sidebar > .server-header,
+  .channels-sidebar > .channels-scrollable,
+  .channels-sidebar > .user-panel {
+    min-width: 180px;
+  }
+
+  .app-container.sidebar-collapsed .channels-sidebar {
+    width: 0;
+    border-right-width: 0;
+  }
+
+  /* While dragging the width follows the pointer, with no easing behind it */
+  .app-container.sidebar-resizing .channels-sidebar {
+    transition: none;
+  }
+
+  .app-container.sidebar-resizing,
+  .app-container.sidebar-resizing * {
+    cursor: col-resize !important;
+    user-select: none;
+  }
+
+  .app-container:not(.sidebar-collapsed) #btnExpandSidebar {
+    display: none;
+  }
+
+  .app-container.sidebar-collapsed .stage-title-info {
+    margin-left: 12px;
+    margin-right: auto;
+  }
+}
+
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 20;
+  touch-action: none;
+}
+
+/* A thin accent line shows where to grab */
+.sidebar-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 2px;
+  background-color: var(--accent-blurple);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-in-out);
+}
+
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after,
+.app-container.sidebar-resizing .sidebar-resizer::after {
+  opacity: 1;
+}
+
+.sidebar-resizer:focus-visible {
+  outline: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+/* ==========================================================================
+   Mobile Responsive Overhaul (iOS Safari, Android Chrome, Tablets)
+   ========================================================================== */
+@media (max-width: 768px) {
+  html, body {
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-only {
+    display: inline-flex !important;
+  }
+
+  .desktop-only {
+    display: none !important;
+  }
+
+  .app-container {
+    height: 100dvh;
+    width: 100vw;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Backdrop */
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 120;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s var(--ease-out);
+  }
+
+  .sidebar-backdrop.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Sidebar Drawer on Mobile */
+  .guilds-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 140;
+    transform: translateX(-100%);
+    transition: transform 0.28s var(--ease-out);
+    box-shadow: var(--shadow-high);
+  }
+
+  .guilds-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Opens beside the 72px icon bar rather than underneath it (which hid the
+     first 72px of the list), still leaving a strip of backdrop to tap-close */
+  .channels-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 72px;
+    z-index: 135;
+    width: calc(100vw - 72px - 48px);
+    max-width: 320px;
+    transform: translateX(calc(-100% - 72px));
+    transition: transform 0.28s var(--ease-out);
+    box-shadow: var(--shadow-high);
+  }
+
+  .channels-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .channels-scrollable {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Main Stage Area */
+  .main-stage-area {
+    width: 100vw;
+    height: 100dvh;
+    flex: 1;
+  }
+
+  /* Top Bar */
+  .stage-top-bar {
+    height: 52px;
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .stage-title-info {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .stage-title-info .channel-title {
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stage-title-info .channel-divider,
+  .stage-title-info .channel-topic {
+    display: none !important;
+  }
+
+  .stage-top-actions {
+    gap: 6px;
+  }
+
+  .connection-status-badge {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  /* Only the gauge on a narrow screen, unless something is at its limit */
+  .pc-health-badge:not(.warn) .pc-health-text {
+    display: none;
+  }
+
+  .connection-status-badge .status-text {
+    max-width: 80px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .btn-stage-action {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-height: 36px;
+  }
+
+  /* Voice Action Bar */
+  .voice-action-bar {
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)) 8px;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    background-color: var(--bg-secondary);
+    border-top: 1px solid rgba(0, 0, 0, 0.2);
+  }
+
+  .btn-voice-control {
+    min-height: 44px;
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: var(--radius-full);
+    flex: 1 1 auto;
+    min-width: 60px;
+    justify-content: center;
+  }
+
+  .btn-voice-control.btn-disconnect {
+    flex-grow: 1.2;
+    min-width: 110px;
+  }
+
+  .btn-voice-control .btn-label {
+    display: inline;
+  }
+
+  /* Video Grid on Mobile */
+  .video-grid-container {
+    padding: 6px;
+  }
+
+  .video-grid {
+    gap: 6px;
+  }
+
+  .video-grid.grid-1 {
+    grid-template-columns: 1fr;
+  }
+
+  .video-grid.grid-2 {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+
+  .video-grid.grid-4,
+  .video-grid.grid-6,
+  .video-grid.grid-many {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Too narrow for side by side: focused tiles stack */
+  .focus-main {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-auto-rows: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .video-tile {
+    min-height: 140px;
+    border-radius: var(--radius-md);
+  }
+
+  .tile-avatar {
+    width: 64px;
+    height: 64px;
+    font-size: 24px;
+  }
+
+  .tile-username {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  /* Chat Drawer Mobile (Full Screen Overlay) */
+  .chat-drawer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    z-index: 200;
+    border-left: none;
+    box-shadow: none;
+  }
+
+  .chat-drawer-header {
+    height: 52px;
+    padding: 0 16px;
+    font-size: 15px;
+  }
+
+  .chat-input-area {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) 12px;
+  }
+
+  .chat-input-box {
+    min-height: 44px;
+  }
+
+  .chat-input-box input {
+    font-size: 15px; /* prevents iOS Safari auto-zoom on input focus */
+  }
+
+  /* Modals Mobile */
+  .modal-overlay {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .modal-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: 90dvh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 16px;
+    transition:
+      transform var(--dur-slow) var(--ease-out),
+      opacity var(--dur-base) var(--ease-out);
+  }
+
+  .modal-overlay.hidden .modal-dialog {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+
+  .modal-body {
+    max-height: calc(90dvh - 120px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Welcome Screen on Mobile */
+  .welcome-hero-card {
+    padding: 24px 16px;
+    max-width: 94%;
+  }
+
+  .welcome-hero-card h2 {
+    font-size: 20px;
+  }
+
+  .welcome-features {
+    gap: 12px;
+  }
+
+  .feat-item {
+    font-size: 12px;
+  }
+
+  /* Toasts */
+  .app-toast-container {
+    bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+    right: 12px;
+    left: 12px;
+  }
+
+  .app-toast {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .btn-voice-control .btn-label {
+    display: none;
+  }
+
+  .btn-voice-control {
+    min-width: 44px;
+    padding: 8px;
+  }
+
+  .btn-voice-control.btn-disconnect {
+    min-width: 44px;
+  }
+
+  .btn-voice-control.btn-disconnect span {
+    display: none;
+  }
+
+  .video-tile {
+    min-height: 120px;
+  }
+}
+
+/* Sliders: a dark track and a blurple knob, instead of Chromium's white track */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border: none;
+  border-radius: 50%;
+  background-color: var(--accent-blurple);
+  box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.25);
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+input[type="range"]:focus-visible {
+  outline: none;
+}
+
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: var(--focus-ring);
+}
+
+input[type="range"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* A light theme needs a visible track too */
+:root[data-theme="light"] input[type="range"]::-webkit-slider-runnable-track {
+  background-color: rgba(0, 0, 0, 0.16);
+}

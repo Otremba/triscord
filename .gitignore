@@ -1,15 +1,3 @@
 node_modules/
 release/
-.toolchain/
-desktop/out/
-desktop/assets/fonts-local/
-desktop/web/dist/
-desktop/web/dist-rust/
-desktop-rust/src-tauri/target/
-desktop-rust/src-tauri/gen/
-
-# Local test output, IDE settings and Wrangler cache
-/build/
-/.claude/
-/.agents/
-**/.wrangler/
+native/bin/

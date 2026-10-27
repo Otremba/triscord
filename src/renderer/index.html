@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1e1f22">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Triscord</title>
+  <link rel="icon" href="assets/icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Persistent Audio Container (never destroyed by DOM tile re-renders) -->
+  <div id="remoteAudioContainer" class="hidden-audio-container" aria-hidden="true"></div>
+
+  <!-- Audio Unlock Banner for Mobile Browsers -->
+  <div class="audio-unlock-banner hidden" id="audioUnlockBanner">
+    <div class="audio-unlock-content">
+      <i data-lucide="volume-2"></i>
+      <span>Áudio em espera. <strong>Toque para ouvir a chamada</strong></span>
+    </div>
+    <button type="button" id="btnUnlockAudioConfirm" class="btn-unlock-audio">Ouvir</button>
+  </div>
+
+  <div class="app-container">
+    <!-- Backdrop for mobile drawer -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    
+    <!-- 1. Guilds / Servers Left Sidebar -->
+    <aside class="guilds-sidebar" id="guildsSidebar">
+      <div class="guild-icon active" id="brandIcon" title="Triscord">
+        <img src="assets/icon.png" alt="Triscord" />
+      </div>
+      <div class="guild-separator"></div>
+      <div class="guild-icon" id="btnCreateRoom" title="Criar Canal de Voz">
+        <i data-lucide="plus"></i>
+      </div>
+    </aside>
+
+    <!-- 2. Channels Sidebar -->
+    <aside class="channels-sidebar" id="channelsSidebar">
+      <div class="server-header">
+        <span class="server-name"><i data-lucide="audio-lines"></i>Triscord</span>
+        <button class="btn-icon-small desktop-only" id="btnCollapseSidebar" title="Ocultar canais (Ctrl+B)" aria-label="Ocultar canais"><i data-lucide="panel-left-close"></i></button>
+        <button class="btn-icon-small mobile-only" id="btnCloseSidebar" title="Fechar menu"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="channels-scrollable">
+        <div class="channel-category">
+          <span>Canais de Voz</span>
+          <button class="btn-icon-small" id="btnRefreshRooms" title="Atualizar"><i data-lucide="refresh-cw"></i></button>
+        </div>
+        <div class="channels-list" id="channelsList">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- Bottom User Profile Bar -->
+      <div class="user-panel">
+        <div class="user-profile-summary">
+          <div class="user-avatar-badge">
+            <div class="user-avatar-circle" id="userAvatar">U</div>
+            <div class="status-indicator-dot"></div>
+          </div>
+          <div class="user-text-info">
+            <span class="user-username" id="userUsername">Carregando...</span>
+            <span class="user-status-tag" id="userStatusTag">Online</span>
+            <span class="user-custom-status hidden" id="userCustomStatus"></span>
+          </div>
+        </div>
+
+        <div class="user-controls">
+          <button class="icon-button" id="btnToggleMute" title="Mutar Microfone">
+            <i data-lucide="mic"></i>
+          </button>
+          <button class="icon-button" id="btnToggleDeafen" title="Ensurdecer">
+            <i data-lucide="headphones"></i>
+          </button>
+          <button class="icon-button" id="btnOpenSettings" title="Configurações">
+            <i data-lucide="settings"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Drag to resize the column; double-click restores the default width -->
+      <div class="sidebar-resizer desktop-only" id="sidebarResizer" role="separator" tabindex="0"
+        aria-orientation="vertical" aria-label="Redimensionar lista de canais"
+        aria-valuemin="180" aria-valuemax="420" aria-valuenow="240"
+        title="Arraste para redimensionar · clique duplo para o tamanho padrão"></div>
+    </aside>
+
+    <!-- 3. Main Stage / Voice Area -->
+    <main class="main-stage-area">
+      <!-- Stage Top Bar -->
+      <header class="stage-top-bar">
+        <button class="btn-stage-action desktop-only" id="btnExpandSidebar" title="Mostrar canais (Ctrl+B)" aria-label="Mostrar canais">
+          <i data-lucide="panel-left-open"></i>
+        </button>
+        <button class="btn-stage-action mobile-only" id="btnToggleSidebar" title="Ver Canais">
+          <i data-lucide="menu"></i>
+          <span>Canais</span>
+        </button>
+
+        <div class="stage-title-info">
+          <span class="channel-title" id="currentChannelHeader">Nenhum canal selecionado</span>
+          <div class="channel-divider"></div>
+          <span class="channel-topic" id="channelTopicHeader">Clique em um canal de voz para entrar</span>
+        </div>
+
+        <div class="stage-top-actions">
+          <!-- How loaded this PC is during a call (see initPcHealth in app.js) -->
+          <div class="pc-health-badge hidden" id="pcHealthBadge">
+            <i data-lucide="gauge"></i>
+            <span class="pc-health-text"></span>
+          </div>
+
+          <div class="connection-status-badge connecting" id="connectionStatusBadge">
+            <span class="status-dot"></span>
+            <span class="status-text">Conectando...</span>
+          </div>
+
+          <button class="btn-stage-action" id="btnToggleChat" title="Chat de Texto">
+            <i data-lucide="message-square"></i>
+            <span>Chat</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Stage Content -->
+      <div class="stage-content-wrapper">
+        
+        <!-- Welcome Screen (when not in a voice channel) -->
+        <div class="welcome-stage" id="welcomeStage">
+          <div class="welcome-hero-card">
+            <div class="welcome-icon-glow welcome-brand-icon">
+              <img src="assets/icon.png" alt="Triscord" />
+            </div>
+            <h2>Bem-vindo ao Triscord</h2>
+            <p>Selecione um dos canais de voz à esquerda para entrar na chamada com seus amigos.</p>
+            
+            <div class="welcome-features">
+              <div class="feat-item">
+                <i data-lucide="mic"></i>
+                <span>Áudio de alta fidelidade com WebRTC e cancelamento de ruído</span>
+              </div>
+              <div class="feat-item">
+                <i data-lucide="monitor-up"></i>
+                <span>Compartilhe telas e janelas de jogos ou programas em 60 FPS</span>
+              </div>
+              <div class="feat-item">
+                <i data-lucide="video"></i>
+                <span>Câmera e chat de texto integrados na mesma sala</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Voice Stage (when in a voice channel) -->
+        <div class="voice-stage hidden" id="voiceStage">
+          <div class="stage-channel-header-bar">
+            <h3 id="stageChannelTitle"># Geral</h3>
+            <span id="stageUserCount">1 membro</span>
+          </div>
+
+          <div class="video-grid-container">
+            <div class="video-grid grid-1" id="videoGrid">
+              <!-- Dynamically populated video/voice tiles -->
+            </div>
+          </div>
+
+          <!-- Soundboard: opens above the action bar -->
+          <div class="soundboard-panel hidden" id="soundboardPanel" role="dialog" aria-label="Soundboard">
+            <div class="soundboard-header">
+              <span class="soundboard-title">Soundboard</span>
+              <div class="soundboard-header-actions">
+                <button type="button" class="btn-icon-small" id="btnSoundboardMute" title="Silenciar sons de todos" aria-label="Silenciar sons de todos"><i data-lucide="volume-2"></i></button>
+                <input type="range" id="soundboardVolume" min="0" max="100" step="5" value="70" aria-label="Volume do soundboard" title="Volume dos sons que você ouve" />
+                <button type="button" class="btn-icon-small" id="btnSoundboardImport" title="Adicionar sons" aria-label="Adicionar sons"><i data-lucide="plus"></i></button>
+                <input type="file" id="soundboardFileInput" accept="audio/*,.mp3,.ogg,.wav,.m4a,.webm,.opus" multiple hidden />
+              </div>
+            </div>
+            <div class="soundboard-grid" id="soundboardGrid"></div>
+            <div class="soundboard-hint">Sons compartilhados com todo mundo · clique para tocar · arraste arquivos aqui · MP3, OGG, WAV, M4A · até 1 MB e 10 s</div>
+          </div>
+
+          <!-- Bottom Voice Action Controls -->
+          <div class="voice-action-bar">
+            <button class="btn-voice-control" id="btnToggleCamera">
+              <i data-lucide="video"></i>
+              <span class="btn-label">Câmera</span>
+            </button>
+
+            <button class="btn-voice-control" id="btnCameraEffects" title="Efeitos de câmera">
+              <i data-lucide="aperture"></i>
+              <span class="btn-label">Efeitos</span>
+            </button>
+
+            <button class="btn-voice-control" id="btnToggleScreenShare">
+              <i data-lucide="screen-share"></i>
+              <span class="btn-label">Compartilhar</span>
+            </button>
+
+            <button class="btn-voice-control hidden" id="btnToggleRecording" title="Gravar chamada">
+              <i data-lucide="circle-dot"></i>
+              <span class="btn-label">Gravar</span>
+            </button>
+
+            <button class="btn-voice-control" id="btnSoundboard" title="Soundboard" aria-expanded="false" aria-controls="soundboardPanel">
+              <i data-lucide="music-2"></i>
+              <span class="btn-label">Sons</span>
+            </button>
+
+            <button class="btn-voice-control btn-disconnect" id="btnDisconnectVoice">
+              <i data-lucide="phone-off"></i>
+              <span>Desconectar</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Chat Drawer (Right Side) -->
+        <aside class="chat-drawer hidden" id="chatDrawer">
+          <div class="chat-drawer-header">
+            <span>Chat do Canal</span>
+            <button class="btn-icon-small" id="btnCloseChat" aria-label="Fechar"><i data-lucide="x"></i></button>
+          </div>
+
+          <div class="chat-messages-container" id="chatMessages">
+            <div class="chat-message-item system-msg">
+              <div class="system-msg-content">Bem-vindo ao chat da sala!</div>
+            </div>
+          </div>
+
+          <div class="chat-input-area">
+            <div class="chat-attachment-preview hidden" id="chatAttachmentPreview">
+              <img id="chatAttachmentThumb" alt="Anexo" />
+              <button type="button" id="btnRemoveAttachment" aria-label="Remover anexo"><i data-lucide="x"></i></button>
+            </div>
+            <div class="chat-input-box">
+              <button id="btnAttachImage" title="Enviar imagem" type="button">
+                <i data-lucide="paperclip"></i>
+              </button>
+              <input type="text" id="chatInput" placeholder="Conversar no canal..." />
+              <input type="file" id="chatAttachmentInput" accept="image/*" hidden />
+              <button id="btnSendChat" title="Enviar Mensagem">
+                <i data-lucide="send-horizontal"></i>
+              </button>
+            </div>
+          </div>
+        </aside>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Screen Share Picker Modal -->
+  <div class="modal-overlay hidden" id="screenShareModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2>Compartilhar sua Tela</h2>
+      </div>
+
+      <div class="modal-body">
+        <div class="screen-tabs" id="screenShareTabs">
+          <button class="screen-tab-btn active" data-tab="screens">Telas Inteiras</button>
+          <button class="screen-tab-btn" data-tab="windows">Janelas de Programas</button>
+        </div>
+
+        <div class="screen-sources-grid" id="screenSourcesGrid">
+          <!-- Populated dynamically with thumbnails -->
+        </div>
+
+        <div class="screen-options-row">
+          <div class="screen-mode-choice" role="radiogroup" aria-label="Tipo de transmissão">
+            <label class="screen-mode-option">
+              <input type="radio" name="screenMode" value="game" />
+              <i data-lucide="gamepad-2"></i>
+              <span class="screen-mode-text">
+                <strong>Jogo</strong>
+                <span>720p · 60 FPS, mais fluido</span>
+              </span>
+            </label>
+            <label class="screen-mode-option">
+              <input type="radio" name="screenMode" value="everyday" checked />
+              <i data-lucide="monitor"></i>
+              <span class="screen-mode-text">
+                <strong>Dia a dia</strong>
+                <span>1080p · 30 FPS, mais nítido</span>
+              </span>
+            </label>
+          </div>
+
+          <div class="option-group">
+            <input type="checkbox" id="screenAudioCheckbox" checked />
+            <label for="screenAudioCheckbox">Compartilhar áudio do PC (sem as vozes da chamada)</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" id="screenShareCancel">Cancelar</button>
+        <button class="btn-primary" id="screenShareConfirm" disabled>Compartilhar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera Effects Modal -->
+  <div class="modal-overlay hidden" id="effectsModal">
+    <div class="modal-dialog effects-dialog">
+      <div class="modal-header">
+        <h2>Efeitos de Câmera</h2>
+        <button class="btn-icon-small" id="btnCloseEffects" aria-label="Fechar"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="modal-body effects-body">
+        <div class="effects-preview">
+          <video id="effectsPreviewVideo" autoplay playsinline muted></video>
+          <div class="effects-preview-status hidden" id="effectsPreviewStatus"></div>
+        </div>
+
+        <div class="effects-options">
+          <div class="effects-section-title">Desfoque e fundos pessoais</div>
+          <div class="effects-grid">
+            <button class="effect-option" data-effect="none" title="Sem efeito" aria-label="Sem efeito">
+              <i data-lucide="ban"></i>
+            </button>
+            <button class="effect-option" data-effect="blur-light" title="Desfoque leve" aria-label="Desfoque leve">
+              <i data-lucide="droplet"></i>
+            </button>
+            <button class="effect-option" data-effect="blur-strong" title="Desfoque forte" aria-label="Desfoque forte">
+              <i data-lucide="droplets"></i>
+            </button>
+            <button class="effect-option effect-image" data-effect="image" data-preset="gradient-blue" title="Fundo azul" aria-label="Fundo azul"></button>
+            <button class="effect-option effect-image" data-effect="image" data-preset="gradient-sunset" title="Fundo pôr do sol" aria-label="Fundo pôr do sol"></button>
+            <button class="effect-option effect-image hidden" data-effect="image" id="effectCustomImage" title="Seu fundo" aria-label="Seu fundo"></button>
+            <button class="effect-option effect-upload" id="btnUploadBackground" title="Enviar imagem de fundo" aria-label="Enviar imagem de fundo">
+              <i data-lucide="image-plus"></i>
+            </button>
+            <input type="file" id="backgroundFileInput" accept="image/*" hidden />
+          </div>
+          <p class="effects-note hidden" id="effectsUnsupported">
+            Efeitos de câmera não são suportados neste navegador. Use o app ou o Chrome/Edge.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- First run: pick a name before anything else (cannot be dismissed) -->
+  <div class="modal-overlay name-gate hidden" id="nameModal" role="dialog" aria-modal="true" aria-labelledby="nameModalTitle">
+    <form class="modal-dialog name-dialog" id="nameForm" novalidate>
+      <div class="name-dialog-hero">
+        <div class="name-avatar-preview" id="nameAvatarPreview">?</div>
+        <h2 id="nameModalTitle">Como a galera vai te chamar?</h2>
+        <p>Escolha o nome que aparece nas salas e no chat. Dá para mudar depois nas configurações.</p>
+      </div>
+      <div class="modal-body">
+        <div class="setting-section">
+          <label class="setting-label" for="nameInput">Nome de usuário</label>
+          <input type="text" id="nameInput" class="setting-input" maxlength="32" autocomplete="off" spellcheck="false" placeholder="Ex: Lucas_Gamer" />
+          <span class="field-hint" id="nameHint">Entre 2 e 32 caracteres.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn-primary" id="btnConfirmName" disabled>Continuar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay hidden" id="settingsModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2>Configurações do Usuário e Conexão</h2>
+        <button class="btn-icon-small" id="btnCloseSettings" aria-label="Fechar"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="modal-body">
+        <!-- User Profile Settings -->
+        <div class="setting-section">
+          <label class="setting-label">Seu nome de usuário</label>
+          <input type="text" id="settingsUsername" class="setting-input" maxlength="32" placeholder="Ex: Lucas_Gamer" />
+        </div>
+
+        <div class="setting-section">
+          <label class="setting-label">Status personalizado</label>
+          <input type="text" id="settingsStatus" class="setting-input" maxlength="64" placeholder="Ex: Jogando algo, De boa..." />
+        </div>
+
+        <div class="setting-section">
+          <label class="setting-label">Cor do avatar</label>
+          <div class="avatar-color-picker">
+            <div class="avatar-color-option selected" style="background-color: #5865F2;" data-color="#5865F2"></div>
+            <div class="avatar-color-option" style="background-color: #57F287;" data-color="#57F287"></div>
+            <div class="avatar-color-option" style="background-color: #FEE75C;" data-color="#FEE75C"></div>
+            <div class="avatar-color-option" style="background-color: #EB459E;" data-color="#EB459E"></div>
+            <div class="avatar-color-option" style="background-color: #ED4245;" data-color="#ED4245"></div>
+            <div class="avatar-color-option" style="background-color: #3BA55C;" data-color="#3BA55C"></div>
+            <div class="avatar-color-option" style="background-color: #9B59B6;" data-color="#9B59B6"></div>
+          </div>
+        </div>
+
+        <!-- Server Connection URL -->
+        <div class="setting-section">
+          <label class="setting-label">URL / IP do servidor</label>
+          <input type="text" id="settingsServerUrl" class="setting-input" placeholder="http://localhost:3000 ou IP do seu amigo" />
+          <small style="color: var(--text-muted); font-size: 11px;">
+            Para jogar com amigos: use o IP local (ex: <code>http://192.168.1.50:3000</code>) ou URL pública / Ngrok / Radmin VPN.
+          </small>
+        </div>
+
+        <!-- Audio Device Settings -->
+        <div class="setting-section">
+          <label class="setting-label">Dispositivo de microfone (entrada)</label>
+          <select id="settingsAudioInput" class="setting-select"></select>
+        </div>
+
+        <div class="setting-section">
+          <label class="setting-label">Dispositivo de áudio (saída)</label>
+          <select id="settingsAudioOutput" class="setting-select"></select>
+        </div>
+
+        <div class="setting-section">
+          <label class="setting-label">Câmera de vídeo</label>
+          <select id="settingsVideoInput" class="setting-select"></select>
+        </div>
+
+        <!-- Mic Test & Sensitivity -->
+        <div class="setting-section">
+          <label class="setting-label">Teste de microfone e sensibilidade de voz</label>
+          <label class="setting-checkbox">
+            <input type="checkbox" id="settingsNoiseSuppression" />
+            <span>Supressão de ruído por IA (RNNoise)</span>
+          </label>
+          <div class="mic-test-container">
+            <div class="mic-vu-meter-bg">
+              <div class="mic-vu-meter-fill" id="micVuMeterFill"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+              <button class="btn-secondary" id="btnTestMic" style="padding: 4px 8px; font-size: 12px;">Testar Microfone</button>
+              <span id="labelSensitivity" style="font-size: 12px; color: var(--text-muted);">15%</span>
+            </div>
+            <div class="slider-group" style="margin-top: 4px;">
+              <span style="font-size: 11px; color: var(--text-muted);">Mais Sensível</span>
+              <input type="range" id="settingsSensitivity" min="1" max="50" value="15" />
+              <span style="font-size: 11px; color: var(--text-muted);">Menos Sensível</span>
+            </div>
+            <div class="slider-group">
+              <span style="font-size: 11px; color: var(--text-muted);">Volume do retorno</span>
+              <input type="range" id="settingsMicTestVolume" min="0" max="200" step="5" value="100"
+                aria-label="Volume do retorno do teste de microfone"
+                title="Acima de 100% o som é amplificado. Use fones para não dar microfonia." />
+              <span id="labelMicTestVolume" style="font-size: 11px; color: var(--text-muted); min-width: 34px; text-align: right;">100%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Push-to-talk -->
+        <div class="setting-section">
+          <label class="setting-label">Modo de transmissão de voz</label>
+          <label class="setting-checkbox">
+            <input type="radio" name="voiceMode" id="settingsModeVAD" value="vad" checked />
+            <span>Detecção automática por voz</span>
+          </label>
+          <label class="setting-checkbox">
+            <input type="radio" name="voiceMode" id="settingsModePTT" value="ptt" />
+            <span>Falar para Transmitir (Push-to-Talk)</span>
+          </label>
+          <div class="ptt-key-row" id="pttKeyRow" style="display:none;">
+            <span style="font-size: 12px; color: var(--text-muted);">Tecla:</span>
+            <button type="button" class="btn-secondary" id="btnCapturePttKey" style="padding: 4px 10px; font-size: 12px;">Barra de espaço</button>
+          </div>
+        </div>
+
+        <!-- Appearance -->
+        <div class="setting-section">
+          <label class="setting-label">Aparência</label>
+          <label class="setting-checkbox">
+            <input type="checkbox" id="settingsLightTheme" />
+            <span>Usar tema claro</span>
+          </label>
+        </div>
+
+        <!-- Global shortcut (Electron only) -->
+        <div class="setting-section hidden" id="globalShortcutSection">
+          <label class="setting-label">Atalho global para mutar (funciona com o app em segundo plano)</label>
+          <input type="text" id="settingsGlobalShortcut" class="setting-input" placeholder="CommandOrControl+Shift+M" />
+        </div>
+
+        <!-- TURN server -->
+        <div class="setting-section">
+          <label class="setting-label">Servidor TURN personalizado (opcional)</label>
+          <small style="color: var(--text-muted); font-size: 11px; display:block; margin-bottom: 6px;">
+            Melhora a conexão atrás de redes restritas/CGNAT. Sem isso, um relay público de testes é usado como reserva.
+          </small>
+          <input type="text" id="settingsTurnUrl" class="setting-input" placeholder="turn:seu-servidor.com:3478" style="margin-bottom: 6px;" />
+          <input type="text" id="settingsTurnUsername" class="setting-input" placeholder="usuário" style="margin-bottom: 6px;" />
+          <input type="password" id="settingsTurnCredential" class="setting-input" placeholder="senha/credencial" />
+        </div>
+
+        <!-- Diagnostics: a report to send to Claude (or whoever maintains the app) -->
+        <div class="setting-section">
+          <label class="setting-label">Diagnóstico</label>
+          <div class="diagnostics-summary" id="diagnosticsSummary"></div>
+          <div class="diagnostics-actions">
+            <button type="button" class="btn-secondary" id="btnCopyDiagnostics"><i data-lucide="clipboard-copy"></i>Copiar relatório</button>
+            <button type="button" class="btn-secondary" id="btnSaveDiagnostics"><i data-lucide="download"></i>Salvar arquivo</button>
+            <button type="button" class="btn-secondary" id="btnTestConnection"><i data-lucide="activity"></i>Testar conexão</button>
+            <button type="button" class="btn-secondary" id="btnClearDiagnostics"><i data-lucide="trash-2"></i>Limpar</button>
+          </div>
+          <div class="diagnostics-test-result hidden" id="diagnosticsTestResult"></div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" id="btnSaveSettings">Salvar Alterações</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <!-- Per-user / per-stream volume (opened from a tile or by right-clicking a user) -->
+  <div id="volumePopover" class="volume-popover hidden" role="dialog" aria-label="Volume">
+    <div class="volume-popover-title" id="volumePopoverTitle"></div>
+    <div class="volume-popover-row">
+      <input type="range" id="volumePopoverSlider" min="0" max="100" step="1" value="100" aria-label="Volume" />
+      <span class="volume-popover-value" id="volumePopoverValue">100%</span>
+    </div>
+    <div class="volume-popover-actions">
+      <label class="setting-checkbox volume-popover-mute">
+        <input type="checkbox" id="volumePopoverMute" />
+        <span>Silenciar</span>
+      </label>
+      <button type="button" class="volume-popover-reset" id="volumePopoverReset">Redefinir</button>
+    </div>
+  </div>
+
+  <!-- Toast notifications (kicked, force-muted, rate limits, recording status...) -->
+  <div id="toastContainer" class="app-toast-container" aria-live="polite"></div>
+
+  <script src="js/vendor/lucide/lucide.min.js"></script>
+  <script src="js/icons.js"></script>
+  <!-- First, so it records everything the other modules log -->
+  <script src="js/diagnostics.js"></script>
+  <script src="js/socket.io.min.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/noise-suppression.js"></script>
+  <script src="js/camera-effects.js"></script>
+  <script src="js/gpu-relay.js"></script>
+  <script src="js/webrtc.js"></script>
+  <script src="js/system-audio.js"></script>
+  <script src="js/screen.js"></script>
+  <script src="js/soundboard.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
